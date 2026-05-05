@@ -23,9 +23,10 @@ class Game:
         self.reg_msg_id = None
         self.question_msg_id = None
 
-    def add_player(self, user_id, name):
+    def add_player(self, user_id, username):
+        """Добавляет игрока с username в формате @username"""
         if user_id not in self.registered:
-            self.registered[user_id] = {"name": name, "score": 0}
+            self.registered[user_id] = {"username": username, "score": 0}
 
     def record_answer(self, user_id, option_idx):
         if self.status == "active" and user_id in self.registered:
@@ -54,7 +55,7 @@ class Game:
     def get_leaderboard(self):
         return sorted(
             self.registered.items(),
-            key=lambda x: (-x[1]["score"], x[1]["name"].lower())
+            key=lambda x: (-x[1]["score"], x[1]["username"].lower())
         )
 
 # ==================== Загрузка пакета ====================
@@ -64,6 +65,14 @@ def load_pack(pack_id: str):
         return None
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+# ==================== Форматирование username ====================
+def format_username(user) -> str:
+    """Возвращает @username или @id_123456 если username отсутствует"""
+    if user.username:
+        return f"@{user.username}"
+    else:
+        return f"@id_{user.id}"
 
 # ==================== Проверка прав ====================
 async def is_admin(update: Update, user_id: int) -> bool:
@@ -138,11 +147,11 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Боты не участвуют.", show_alert=True)
         return
 
-    name = user.full_name or user.username or str(user.id)
-    game.add_player(user.id, name)
+    username = format_username(user)
+    game.add_player(user.id, username)
 
     users_list = "\n".join(
-        f"• {p['name']}" for uid, p in game.registered.items()
+        f"• {p['username']}" for uid, p in game.registered.items()
     )
     text = (
         f"🎉 Регистрация на викторину «{game.pack['title']}»\n"
@@ -172,7 +181,7 @@ async def end_registration(context: ContextTypes.DEFAULT_TYPE):
     game.status = "active"
 
     users_list = "\n".join(
-        f"• {p['name']}" for uid, p in game.registered.items()
+        f"• {p['username']}" for uid, p in game.registered.items()
     )
     await context.bot.edit_message_text(
         chat_id=chat_id,
@@ -227,6 +236,16 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     game.question_start_time = datetime.now(timezone.utc)
     game.answers.clear()
 
+    # Закрепляем вопрос с оповещением для всех участников
+    try:
+        await context.bot.pin_chat_message(
+            chat_id=chat_id,
+            message_id=msg.id,
+            disable_notification=False  # оповещение включено
+        )
+    except Exception as e:
+        print(f"Не удалось закрепить сообщение: {e}")
+
     context.job_queue.run_once(
         end_question,
         when=60,
@@ -263,6 +282,12 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
 
     question_text = f"❓ Вопрос {game.current_question + 1}/{len(game.pack['questions'])}\n\n{q['text']}\n\n{stats_text}"
 
+    # Снимаем закрепление с вопроса
+    try:
+        await context.bot.unpin_chat_message(chat_id=chat_id, message_id=game.question_msg_id)
+    except:
+        pass
+
     try:
         if q.get("image"):
             await context.bot.edit_message_caption(
@@ -282,7 +307,7 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
     leaderboard = game.get_leaderboard()
     rating_lines = []
     for i, (uid, data) in enumerate(leaderboard, 1):
-        rating_lines.append(f"{i}. {data['name']} — {data['score']} очк.")
+        rating_lines.append(f"{i}. {data['username']} — {data['score']} очк.")
     rating_text = "🏆 Текущий рейтинг:\n" + "\n".join(rating_lines)
     await context.bot.send_message(chat_id, text=rating_text)
 
@@ -336,7 +361,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
                 medal = "🥈"
             elif rank == 3:
                 medal = "🥉"
-            final_lines.append(f"{medal} {rank} место. {data['name']} — {data['score']} очк.")
+            final_lines.append(f"{medal} {rank} место. {data['username']} — {data['score']} очк.")
         rank += len(same_score_players)
 
     table = "🏁 Итоговое положение:\n\n" + "\n".join(final_lines)
@@ -361,11 +386,20 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     game.record_answer(user.id, option_idx)
 
-# ==================== Запуск ====================
+# ==================== ЗАПУСК ====================
 def main():
     token = os.environ.get("BOT_TOKEN")
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN в переменных окружения")
+
+    port = int(os.environ.get("PORT", "8000"))
+    railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+
+    if not railway_domain:
+        raise ValueError("❌ Не задан RAILWAY_PUBLIC_DOMAIN. Убедитесь, что сервис — Web Service.")
+
+    webhook_url = f"https://{railway_domain}/webhook"
+    print(f"🚀 Запуск webhook на {webhook_url} (порт {port})")
 
     app = Application.builder().token(token).build()
 
@@ -373,20 +407,12 @@ def main():
     app.add_handler(CallbackQueryHandler(register_callback, pattern="register"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
-    webhook_url = os.environ.get("WEBHOOK_URL")
-    port = int(os.environ.get("PORT", "8443"))
-
-    if webhook_url:
-        print(f"🚀 Запуск webhook на {webhook_url}/webhook")
-        app.run_webhook(
-            listen="0.0.0.0",
-            port=port,
-            webhook_url=f"{webhook_url}/webhook",
-            drop_pending_updates=True
-        )
-    else:
-        print("🚀 Запуск polling")
-        app.run_polling(allowed_updates=Update.ALL_TYPES)
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        webhook_url=webhook_url,
+        drop_pending_updates=True
+    )
 
 if __name__ == "__main__":
     main()
