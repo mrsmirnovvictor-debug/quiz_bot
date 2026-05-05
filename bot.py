@@ -24,7 +24,6 @@ class Game:
         self.question_msg_id = None
 
     def add_player(self, user_id, username):
-        """Добавляет игрока с username в формате @username"""
         if user_id not in self.registered:
             self.registered[user_id] = {"username": username, "score": 0}
 
@@ -68,7 +67,6 @@ def load_pack(pack_id: str):
 
 # ==================== Форматирование username ====================
 def format_username(user) -> str:
-    """Возвращает @username или @id_123456 если username отсутствует"""
     if user.username:
         return f"@{user.username}"
     else:
@@ -236,7 +234,6 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     game.question_start_time = datetime.now(timezone.utc)
     game.answers.clear()
 
-    # Закрепляем вопрос с оповещением для всех участников
     try:
         await context.bot.pin_chat_message(
             chat_id=chat_id,
@@ -246,7 +243,6 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Не удалось закрепить сообщение: {e}")
 
-    # Берём время из пакета, если указано, иначе 60 секунд по умолчанию
     question_time = game.pack.get("question_time", 60)
 
     context.job_queue.run_once(
@@ -285,7 +281,6 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
 
     question_text = f"❓ Вопрос {game.current_question + 1}/{len(game.pack['questions'])}\n\n{q['text']}\n\n{stats_text}"
 
-    # Снимаем закрепление с вопроса
     try:
         await context.bot.unpin_chat_message(
             chat_id=chat_id,
@@ -392,7 +387,7 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     game.record_answer(user.id, option_idx)
 
-# ==================== ЗАПУСК ====================
+# ==================== ЗАПУСК — ТОЛЬКО WEBHOOK ====================
 def main():
     token = os.environ.get("BOT_TOKEN")
     if not token:
@@ -404,47 +399,25 @@ def main():
     app.add_handler(CallbackQueryHandler(register_callback, pattern="register"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
-    # Пробуем получить домен разными способами
+    # Получаем домен
     railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
-    
-    # Если домена нет, пробуем собрать из других переменных Railway
     if not railway_domain:
-        service_id = os.environ.get("RAILWAY_SERVICE_ID")
-        env = os.environ.get("RAILWAY_ENVIRONMENT_NAME", "production")
-        project_id = os.environ.get("RAILWAY_PROJECT_ID")
-        
-        # Формат: https://web.railway.internal или https://<service>.up.railway.app
-        if service_id:
-            # Попытка 1: внутренний URL Railway
-            railway_domain = f"{service_id}.up.railway.app"
-            print(f"🔄 Пробую домен: {railway_domain}")
-    
-    # Проверяем, доступен ли домен (быстрый тест)
-    if railway_domain:
-        port = int(os.environ.get("PORT", "8000"))
-        webhook_url = f"https://{railway_domain}/webhook"
-        print(f"🚀 Запуск webhook на {webhook_url} (порт {port})")
-        
-        try:
-            app.run_webhook(
-                listen="0.0.0.0",
-                port=port,
-                webhook_url=webhook_url,
-                drop_pending_updates=True
-            )
-        except Exception as e:
-            print(f"❌ Webhook не удался: {e}")
-            print("🔄 Переключаюсь на polling...")
-            railway_domain = None
-    
-    # Если webhook не получился — запускаем polling с защитой от повторов
-    if not railway_domain:
-        print("🚀 Запуск polling")
-        app.run_polling(
-            allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True,
-            close_loop=False
+        raise RuntimeError(
+            "❌ RAILWAY_PUBLIC_DOMAIN не найден. "
+            "Сервис должен быть Web Service (не Worker). "
+            "Удалите сервис и создайте заново через New → Web Service."
         )
+
+    port = int(os.environ.get("PORT", "8000"))
+    webhook_url = f"https://{railway_domain}/webhook"
+    print(f"🚀 Запуск webhook на {webhook_url} (порт {port})")
+
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        webhook_url=webhook_url,
+        drop_pending_updates=True
+    )
 
 if __name__ == "__main__":
     main()
