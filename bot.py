@@ -404,26 +404,46 @@ def main():
     app.add_handler(CallbackQueryHandler(register_callback, pattern="register"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
-    # Пробуем получить домен Railway
+    # Пробуем получить домен разными способами
     railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
-
+    
+    # Если домена нет, пробуем собрать из других переменных Railway
+    if not railway_domain:
+        service_id = os.environ.get("RAILWAY_SERVICE_ID")
+        env = os.environ.get("RAILWAY_ENVIRONMENT_NAME", "production")
+        project_id = os.environ.get("RAILWAY_PROJECT_ID")
+        
+        # Формат: https://web.railway.internal или https://<service>.up.railway.app
+        if service_id:
+            # Попытка 1: внутренний URL Railway
+            railway_domain = f"{service_id}.up.railway.app"
+            print(f"🔄 Пробую домен: {railway_domain}")
+    
+    # Проверяем, доступен ли домен (быстрый тест)
     if railway_domain:
-        # Режим Webhook
         port = int(os.environ.get("PORT", "8000"))
         webhook_url = f"https://{railway_domain}/webhook"
         print(f"🚀 Запуск webhook на {webhook_url} (порт {port})")
-        app.run_webhook(
-            listen="0.0.0.0",
-            port=port,
-            webhook_url=webhook_url,
-            drop_pending_updates=True
-        )
-    else:
-        # Режим Polling (если домена нет)
-        print("🚀 Запуск polling (домен Railway не найден)")
+        
+        try:
+            app.run_webhook(
+                listen="0.0.0.0",
+                port=port,
+                webhook_url=webhook_url,
+                drop_pending_updates=True
+            )
+        except Exception as e:
+            print(f"❌ Webhook не удался: {e}")
+            print("🔄 Переключаюсь на polling...")
+            railway_domain = None
+    
+    # Если webhook не получился — запускаем polling с защитой от повторов
+    if not railway_domain:
+        print("🚀 Запуск polling")
         app.run_polling(
             allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True
+            drop_pending_updates=True,
+            close_loop=False
         )
 
 if __name__ == "__main__":
