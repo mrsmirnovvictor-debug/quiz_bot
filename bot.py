@@ -9,14 +9,14 @@ from telegram.ext import (
 )
 
 # ==================== Хранилище игр ====================
-games = {}
+games = {}  # chat_id -> Game (по одной игре на группу)
 
 class Game:
     def __init__(self, chat_id, pack, creator_id):
         self.chat_id = chat_id
         self.pack = pack
         self.creator_id = creator_id
-        self.status = "registration"
+        self.status = "registration"  # registration | active | finished | cancelled
         self.registered = {}
         self.current_question = 0
         self.answers = {}
@@ -28,7 +28,7 @@ class Game:
         self.reg_start_time = None
         self.reg_duration = 300
         self.default_question_time = 20
-        self._last_displayed_secs = None  # Для предотвращения лишних обновлений
+        self._last_displayed_secs = None
 
     def add_player(self, user_id, username):
         if user_id not in self.registered:
@@ -113,9 +113,15 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Только администраторы могут запускать викторину.")
         return
 
-    if chat_id in games and games[chat_id].status != "finished":
-        await update.message.reply_text("❌ Викторина уже идёт в этой группе.")
-        return
+    # Если в этой группе уже идёт игра — отменяем старую
+    if chat_id in games and games[chat_id].status not in ("finished", "cancelled"):
+        old_game = games[chat_id]
+        old_game.status = "cancelled"
+        if old_game.reg_timer_job:
+            old_game.reg_timer_job.schedule_removal()
+        if old_game.question_timer_job:
+            old_game.question_timer_job.schedule_removal()
+        await update.message.reply_text("⚠️ Предыдущая викторина была отменена. Начинаем новую!")
 
     args = context.args
     if not args or len(args[0]) != 4 or not args[0].isdigit():
@@ -272,7 +278,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     game.question_msg_id = msg.id
     game.question_start_time = datetime.now(timezone.utc)
     game.answers.clear()
-    game._last_displayed_secs = question_time  # Инициализируем
+    game._last_displayed_secs = question_time
 
     try:
         await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.id, disable_notification=False)
@@ -295,10 +301,8 @@ async def update_question_timer(context: ContextTypes.DEFAULT_TYPE):
     remaining = max(0, question_time - elapsed)
     secs = int(remaining)
 
-    # Пропускаем обновление, если значение не изменилось
     if secs == game._last_displayed_secs:
         return
-    
     game._last_displayed_secs = secs
 
     q = game.pack["questions"][game.current_question]
