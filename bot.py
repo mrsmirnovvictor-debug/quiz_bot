@@ -241,14 +241,17 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.pin_chat_message(
             chat_id=chat_id,
             message_id=msg.id,
-            disable_notification=False  # оповещение включено
+            disable_notification=False
         )
     except Exception as e:
         print(f"Не удалось закрепить сообщение: {e}")
 
+    # Берём время из пакета, если указано, иначе 60 секунд по умолчанию
+    question_time = game.pack.get("question_time", 60)
+
     context.job_queue.run_once(
         end_question,
-        when=60,
+        when=question_time,
         chat_id=chat_id,
         data=chat_id
     )
@@ -284,7 +287,10 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
 
     # Снимаем закрепление с вопроса
     try:
-        await context.bot.unpin_chat_message(chat_id=chat_id, message_id=game.question_msg_id)
+        await context.bot.unpin_chat_message(
+            chat_id=chat_id,
+            message_id=game.question_msg_id
+        )
     except:
         pass
 
@@ -392,27 +398,33 @@ def main():
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN в переменных окружения")
 
-    port = int(os.environ.get("PORT", "8000"))
-    railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
-
-    if not railway_domain:
-        raise ValueError("❌ Не задан RAILWAY_PUBLIC_DOMAIN. Убедитесь, что сервис — Web Service.")
-
-    webhook_url = f"https://{railway_domain}/webhook"
-    print(f"🚀 Запуск webhook на {webhook_url} (порт {port})")
-
     app = Application.builder().token(token).build()
 
     app.add_handler(CommandHandler("quiz", quiz_command))
     app.add_handler(CallbackQueryHandler(register_callback, pattern="register"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
-    app.run_webhook(
-        listen="0.0.0.0",
-        port=port,
-        webhook_url=webhook_url,
-        drop_pending_updates=True
-    )
+    # Пробуем получить домен Railway
+    railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+
+    if railway_domain:
+        # Режим Webhook
+        port = int(os.environ.get("PORT", "8000"))
+        webhook_url = f"https://{railway_domain}/webhook"
+        print(f"🚀 Запуск webhook на {webhook_url} (порт {port})")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            webhook_url=webhook_url,
+            drop_pending_updates=True
+        )
+    else:
+        # Режим Polling (если домена нет)
+        print("🚀 Запуск polling (домен Railway не найден)")
+        app.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True
+        )
 
 if __name__ == "__main__":
     main()
