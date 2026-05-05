@@ -23,11 +23,12 @@ class Game:
         self.question_start_time = None
         self.reg_msg_id = None
         self.question_msg_id = None
+        # задачи таймеров
         self.reg_timer_job = None
         self.question_timer_job = None
+        # время старта регистрации (для расчёта оставшегося времени)
         self.reg_start_time = None
         self.reg_duration = 300  # 5 минут
-        self.default_question_time = 20  # 20 секунд по умолчанию
 
     def add_player(self, user_id, username):
         if user_id not in self.registered:
@@ -45,15 +46,15 @@ class Game:
             if ans == correct:
                 points = 10
                 delta = (ts - self.question_start_time).total_seconds()
-                if delta <= 5:
+                if delta <= 10:
                     points += 5
-                elif delta <= 10:
+                elif delta <= 20:
                     points += 4
-                elif delta <= 13:
+                elif delta <= 30:
                     points += 3
-                elif delta <= 16:
+                elif delta <= 40:
                     points += 2
-                elif delta <= 19:
+                elif delta <= 50:
                     points += 1
                 self.registered[uid]["score"] += points
 
@@ -123,19 +124,21 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📋 Правила:\n"
         f"• У вас 5 минут на регистрацию\n"
         f"• 10 баллов за правильный ответ\n"
-        f"• Бонус за скорость: +5 (0-5с), +4 (6-10с), +3 (11-13с), +2 (14-16с), +1 (17-19с)\n\n"
+        f"• Бонус за скорость: +5 (0-10с), +4 (11-20с), +3 (21-30с), +2 (31-40с), +1 (41-50с)\n\n"
         f"⏳ Осталось: 5 мин 0 сек\n\n"
         f"Участники:",
         reply_markup=keyboard
     )
     game.reg_msg_id = msg.id
 
+    # Запускаем таймер автоматического завершения регистрации
     context.job_queue.run_once(
         end_registration,
         when=game.reg_duration,
         chat_id=chat_id,
         data=chat_id
     )
+    # Запускаем периодическое обновление таймера каждые 30 секунд
     game.reg_timer_job = context.job_queue.run_repeating(
         update_reg_timer,
         interval=30,
@@ -163,6 +166,8 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = format_username(user)
     game.add_player(user.id, username)
 
+    # Не обновляем сообщение немедленно, таймер сделает это сам
+    # Но можно обновить список участников, сохранив таймер
     await update_reg_timer_message(context, chat_id, game)
 
 async def update_reg_timer(context: ContextTypes.DEFAULT_TYPE):
@@ -198,7 +203,7 @@ async def update_reg_timer_message(context, chat_id, game):
             reply_markup=keyboard
         )
     except Exception as e:
-        print(f"Ошибка обновления таймера регистрации: {e}")
+        print(f"Ошибка обновления таймера: {e}")
 
 # ==================== Досрочное завершение регистрации ====================
 async def start_early_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -216,14 +221,17 @@ async def start_early_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer("Только организатор может начать досрочно.", show_alert=True)
         return
 
+    # Останавливаем таймеры регистрации
     if game.reg_timer_job:
         game.reg_timer_job.schedule_removal()
         game.reg_timer_job = None
+    # Отменяем автоматический запуск (если еще не сработал)
     for job in context.job_queue.jobs():
         if job.data == chat_id and job.callback == end_registration:
             job.schedule_removal()
             break
 
+    # Завершаем регистрацию немедленно
     await end_registration(context, chat_id=chat_id)
 
 # ==================== Завершение регистрации ====================
@@ -234,6 +242,7 @@ async def end_registration(context: ContextTypes.DEFAULT_TYPE, chat_id=None):
     if not game or game.status != "registration":
         return
 
+    # Останавливаем таймер обновления
     if game.reg_timer_job:
         game.reg_timer_job.schedule_removal()
         game.reg_timer_job = None
@@ -276,7 +285,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     ]
     keyboard = InlineKeyboardMarkup([[btn] for btn in buttons])
 
-    question_time = game.pack.get("question_time", game.default_question_time)
+    question_time = game.pack.get("question_time", 60)
     question_text = (
         f"❓ Вопрос {game.current_question + 1}/{len(game.pack['questions'])}\n"
         f"⏳ Осталось: {question_time} сек\n\n"
@@ -310,15 +319,16 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Не удалось закрепить сообщение: {e}")
 
-    # Таймер обновления каждую секунду
+    # Запускаем таймер обновления вопроса каждые 10 секунд
     game.question_timer_job = context.job_queue.run_repeating(
         update_question_timer,
-        interval=1,
-        first=1,
+        interval=10,
+        first=10,
         chat_id=chat_id,
         data=chat_id
     )
 
+    # Таймер окончания вопроса
     context.job_queue.run_once(
         end_question,
         when=question_time,
@@ -333,7 +343,7 @@ async def update_question_timer(context: ContextTypes.DEFAULT_TYPE):
         return
 
     elapsed = (datetime.now(timezone.utc) - game.question_start_time).total_seconds()
-    question_time = game.pack.get("question_time", game.default_question_time)
+    question_time = game.pack.get("question_time", 60)
     remaining = max(0, question_time - elapsed)
     secs = int(remaining)
 
@@ -365,7 +375,7 @@ async def update_question_timer(context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=keyboard
             )
     except Exception as e:
-        print(f"Ошибка обновления таймера вопроса: {e}")
+        print(f"Ошибка обновления вопроса: {e}")
 
 # ==================== Завершение вопроса ====================
 async def end_question(context: ContextTypes.DEFAULT_TYPE):
@@ -374,6 +384,7 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
     if not game or game.status != "active":
         return
 
+    # Останавливаем таймер обновления вопроса
     if game.question_timer_job:
         game.question_timer_job.schedule_removal()
         game.question_timer_job = None
@@ -522,9 +533,11 @@ def main():
     app.add_handler(CallbackQueryHandler(start_early_callback, pattern="start_early"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
+    # Пробуем получить домен Railway
     railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
 
     if railway_domain:
+        # Режим Webhook
         port = int(os.environ.get("PORT", "8000"))
         webhook_url = f"https://{railway_domain}/webhook"
         print(f"🚀 Запуск webhook на {webhook_url} (порт {port})")
@@ -535,6 +548,7 @@ def main():
             drop_pending_updates=True
         )
     else:
+        # Режим Polling (если домена нет)
         print("🚀 Запуск polling (домен Railway не найден)")
         app.run_polling(
             allowed_updates=Update.ALL_TYPES,
