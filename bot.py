@@ -1,7 +1,7 @@
 import asyncio
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -15,14 +15,13 @@ class Game:
     def __init__(self, chat_id, pack):
         self.chat_id = chat_id
         self.pack = pack
-        self.status = "registration"  # registration | active | finished
-        self.registered = {}   # user_id: {"name": str, "score": int}
+        self.status = "registration"
+        self.registered = {}
         self.current_question = 0
-        self.answers = {}      # user_id: (option_index, timestamp)
+        self.answers = {}
         self.question_start_time = None
         self.reg_msg_id = None
         self.question_msg_id = None
-        self.jobs = {}
 
     def add_player(self, user_id, name):
         if user_id not in self.registered:
@@ -30,7 +29,7 @@ class Game:
 
     def record_answer(self, user_id, option_idx):
         if self.status == "active" and user_id in self.registered:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             self.answers[user_id] = (option_idx, now)
 
     def calculate_scores(self):
@@ -102,7 +101,7 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     games[chat_id] = game
 
     keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("📝 Зарегистрироваться", callback_data="register")
+        InlineKeyboardButton(text="📝 Зарегистрироваться", callback_data="register")
     ]])
     msg = await update.message.reply_text(
         f"🎉 Добро пожаловать на викторину «{pack['title']}»!\n\n"
@@ -122,7 +121,6 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=chat_id,
         data=chat_id
     )
-    game.jobs["reg_timer"] = True
 
 # ==================== Регистрация ====================
 async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -152,7 +150,7 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Зарегистрировано: {len(game.registered)}\n{users_list}"
     )
     keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("📝 Зарегистрироваться", callback_data="register")
+        InlineKeyboardButton(text="📝 Зарегистрироваться", callback_data="register")
     ]])
     try:
         await context.bot.edit_message_text(
@@ -204,7 +202,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
 
     q = game.pack["questions"][game.current_question]
     buttons = [
-        InlineKeyboardButton(opt, callback_data=f"ans_{i}")
+        InlineKeyboardButton(text=opt, callback_data=f"ans_{i}")
         for i, opt in enumerate(q["options"])
     ]
     keyboard = InlineKeyboardMarkup([[btn] for btn in buttons])
@@ -226,7 +224,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
         )
 
     game.question_msg_id = msg.id
-    game.question_start_time = datetime.utcnow()
+    game.question_start_time = datetime.now(timezone.utc)
     game.answers.clear()
 
     context.job_queue.run_once(
