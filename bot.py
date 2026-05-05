@@ -86,16 +86,27 @@ async def is_admin(update: Update, user_id: int) -> bool:
     except:
         return False
 
-# ==================== Функция визуализации таймера ====================
-def format_timer(seconds):
-    """Возвращает красивую строку таймера с эмодзи"""
-    if seconds > 10:
-        bar = "🟢" * seconds
-    elif seconds > 5:
-        bar = "🟡" * seconds
+# ==================== Прогресс-бар ====================
+def format_progress_bar(seconds_remaining, total_seconds=20):
+    """Анимированный прогресс-бар на 20 секунд"""
+    elapsed = total_seconds - seconds_remaining
+    
+    # Прогресс-бар из 10 блоков
+    total_blocks = 10
+    elapsed_blocks = int((elapsed / total_seconds) * total_blocks)
+    remaining_blocks = total_blocks - elapsed_blocks
+    
+    # Заполненные блоки (прошедшее время) + пустые блоки (оставшееся время)
+    bar = "█" * elapsed_blocks + "░" * remaining_blocks
+    
+    if seconds_remaining > 10:
+        status = "🟢"
+    elif seconds_remaining > 5:
+        status = "🟡"
     else:
-        bar = "🔴" * seconds
-    return f"{bar}\n⏳ Осталось: {seconds} сек"
+        status = "🔴"
+    
+    return f"{status} [{bar}] {seconds_remaining}с"
 
 # ==================== Команда /quiz ====================
 async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -135,7 +146,7 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• У вас 5 минут на регистрацию\n"
         f"• 10 баллов за правильный ответ\n"
         f"• Бонус за скорость: +5 (0-5с), +4 (6-10с), +3 (11-13с), +2 (14-16с), +1 (17-19с)\n\n"
-        f"🟢🟢🟢🟢🟢\n⏳ Осталось: 5 мин 0 сек\n\n"
+        f"⏳ Осталось: 5 мин 0 сек\n\n"
         f"Участники:",
         reply_markup=keyboard
     )
@@ -194,7 +205,7 @@ async def update_reg_timer_message(context, chat_id, game):
     )
     text = (
         f"🎉 Регистрация на викторину «{game.pack['title']}»\n"
-        f"🟢🟢🟢🟢🟢\n⏳ Осталось: {mins} мин {secs} сек\n\n"
+        f"⏳ Осталось: {mins} мин {secs} сек\n\n"
         f"Зарегистрировано: {len(game.registered)}\n{users_list}"
     )
     keyboard = InlineKeyboardMarkup([
@@ -288,7 +299,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([[btn] for btn in buttons])
 
     question_time = game.pack.get("question_time", game.default_question_time)
-    timer_display = format_timer(question_time)
+    timer_display = format_progress_bar(question_time, question_time)
     question_text = (
         f"❓ Вопрос {game.current_question + 1}/{len(game.pack['questions'])}\n"
         f"{timer_display}\n\n"
@@ -322,7 +333,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Не удалось закрепить сообщение: {e}")
 
-    # Запускаем таймер обновления каждую секунду
+    # Таймер обновления каждую секунду
     game.question_timer_job = context.job_queue.run_repeating(
         update_question_timer,
         interval=1,
@@ -350,7 +361,10 @@ async def update_question_timer(context: ContextTypes.DEFAULT_TYPE):
     secs = int(remaining)
 
     q = game.pack["questions"][game.current_question]
-    timer_display = format_timer(secs)
+    
+    # Используем прогресс-бар
+    timer_display = format_progress_bar(secs, question_time)
+    
     question_text = (
         f"❓ Вопрос {game.current_question + 1}/{len(game.pack['questions'])}\n"
         f"{timer_display}\n\n"
