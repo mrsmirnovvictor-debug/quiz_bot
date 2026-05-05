@@ -46,15 +46,15 @@ class Game:
             if ans == correct:
                 points = 10
                 delta = (ts - self.question_start_time).total_seconds()
-                if delta <= 10:
+                if delta <= 5:
                     points += 5
-                elif delta <= 20:
+                elif delta <= 10:
                     points += 4
-                elif delta <= 30:
+                elif delta <= 13:
                     points += 3
-                elif delta <= 40:
+                elif delta <= 16:
                     points += 2
-                elif delta <= 50:
+                elif delta <= 19:
                     points += 1
                 self.registered[uid]["score"] += points
 
