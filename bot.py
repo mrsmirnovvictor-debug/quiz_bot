@@ -387,7 +387,7 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     game.record_answer(user.id, option_idx)
 
-# ==================== ЗАПУСК — ТОЛЬКО WEBHOOK ====================
+# ==================== ЗАПУСК ====================
 def main():
     token = os.environ.get("BOT_TOKEN")
     if not token:
@@ -399,17 +399,22 @@ def main():
     app.add_handler(CallbackQueryHandler(register_callback, pattern="register"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
-    # Получаем домен
+    # Получаем URL для webhook
+    webhook_url = os.environ.get("WEBHOOK_URL")
     railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
-    if not railway_domain:
+    
+    # Если есть WEBHOOK_URL — используем его
+    if webhook_url:
+        webhook_url = f"{webhook_url}/webhook"
+    elif railway_domain:
+        webhook_url = f"https://{railway_domain}/webhook"
+    else:
         raise RuntimeError(
-            "❌ RAILWAY_PUBLIC_DOMAIN не найден. "
-            "Сервис должен быть Web Service (не Worker). "
-            "Удалите сервис и создайте заново через New → Web Service."
+            "❌ Не задан ни WEBHOOK_URL, ни RAILWAY_PUBLIC_DOMAIN. "
+            "Добавьте переменную WEBHOOK_URL в Railway."
         )
 
     port = int(os.environ.get("PORT", "8000"))
-    webhook_url = f"https://{railway_domain}/webhook"
     print(f"🚀 Запуск webhook на {webhook_url} (порт {port})")
 
     app.run_webhook(
