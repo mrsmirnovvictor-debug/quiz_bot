@@ -46,15 +46,15 @@ class Game:
             if ans == correct:
                 points = 10
                 delta = (ts - self.question_start_time).total_seconds()
-                if delta <= 10:
+                if delta <= 5:
                     points += 5
-                elif delta <= 20:
+                elif delta <= 10:
                     points += 4
-                elif delta <= 30:
+                elif delta <= 13:
                     points += 3
-                elif delta <= 40:
+                elif delta <= 16:
                     points += 2
-                elif delta <= 50:
+                elif delta <= 19:
                     points += 1
                 self.registered[uid]["score"] += points
 
@@ -124,7 +124,7 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📋 Правила:\n"
         f"• У вас 5 минут на регистрацию\n"
         f"• 10 баллов за правильный ответ\n"
-        f"• Бонус за скорость: +5 (0-10с), +4 (11-20с), +3 (21-30с), +2 (31-40с), +1 (41-50с)\n\n"
+        f"• Бонус за скорость: +5 (0-5с), +4 (6-10с), +3 (11-13с), +2 (14-16с), +1 (17-19с)\n\n"
         f"⏳ Осталось: 5 мин 0 сек\n\n"
         f"Участники:",
         reply_markup=keyboard
@@ -285,7 +285,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     ]
     keyboard = InlineKeyboardMarkup([[btn] for btn in buttons])
 
-    question_time = game.pack.get("question_time", 60)
+    question_time = 20  # фиксированные 20 секунд
     question_text = (
         f"❓ Вопрос {game.current_question + 1}/{len(game.pack['questions'])}\n"
         f"⏳ Осталось: {question_time} сек\n\n"
@@ -319,11 +319,11 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Не удалось закрепить сообщение: {e}")
 
-    # Запускаем таймер обновления вопроса каждые 10 секунд
+    # Запускаем таймер обновления вопроса каждые 5 секунд
     game.question_timer_job = context.job_queue.run_repeating(
         update_question_timer,
-        interval=10,
-        first=10,
+        interval=5,
+        first=5,
         chat_id=chat_id,
         data=chat_id
     )
@@ -343,7 +343,7 @@ async def update_question_timer(context: ContextTypes.DEFAULT_TYPE):
         return
 
     elapsed = (datetime.now(timezone.utc) - game.question_start_time).total_seconds()
-    question_time = game.pack.get("question_time", 60)
+    question_time = 20  # фиксированные 20 секунд
     remaining = max(0, question_time - elapsed)
     secs = int(remaining)
 
