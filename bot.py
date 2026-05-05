@@ -1,9 +1,7 @@
 import asyncio
 import json
 import os
-from datetime import datetime, timezone, timedelta
-import random
-import time
+from datetime import datetime, timezone
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -30,6 +28,7 @@ class Game:
         self.reg_start_time = None
         self.reg_duration = 300
         self.default_question_time = 20
+        self._last_displayed_secs = None  # Для предотвращения лишних обновлений
 
     def add_player(self, user_id, username):
         if user_id not in self.registered:
@@ -149,19 +148,8 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     game.reg_msg_id = msg.id
 
-    context.job_queue.run_once(
-        end_registration,
-        when=game.reg_duration,
-        chat_id=chat_id,
-        data=chat_id
-    )
-    game.reg_timer_job = context.job_queue.run_repeating(
-        update_reg_timer,
-        interval=30,
-        first=30,
-        chat_id=chat_id,
-        data=chat_id
-    )
+    context.job_queue.run_once(end_registration, when=game.reg_duration, chat_id=chat_id, data=chat_id)
+    game.reg_timer_job = context.job_queue.run_repeating(update_reg_timer, interval=30, first=30, chat_id=chat_id, data=chat_id)
 
 # ==================== Регистрация ====================
 async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -181,7 +169,6 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     username = format_username(user)
     game.add_player(user.id, username)
-
     await update_reg_timer_message(context, chat_id, game)
 
 async def update_reg_timer(context: ContextTypes.DEFAULT_TYPE):
@@ -208,14 +195,9 @@ async def update_reg_timer_message(context, chat_id, game):
         [InlineKeyboardButton(text="🚀 Начать досрочно", callback_data="start_early")]
     ])
     try:
-        await context.bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=game.reg_msg_id,
-            text=text,
-            reply_markup=keyboard
-        )
-    except Exception as e:
-        print(f"Ошибка обновления таймера регистрации: {e}")
+        await context.bot.edit_message_text(chat_id=chat_id, message_id=game.reg_msg_id, text=text, reply_markup=keyboard)
+    except:
+        pass
 
 # ==================== Досрочное завершение регистрации ====================
 async def start_early_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -256,15 +238,10 @@ async def end_registration(context: ContextTypes.DEFAULT_TYPE, chat_id=None):
         game.reg_timer_job = None
 
     game.status = "active"
-
     users_list = "\n".join(f"• {p['username']}" for uid, p in game.registered.items())
     await context.bot.edit_message_text(
-        chat_id=chat_id,
-        message_id=game.reg_msg_id,
-        text=(
-            f"🎉 Регистрация завершена. Начинаем викторину «{game.pack['title']}»!\n"
-            f"Участников: {len(game.registered)}\n{users_list}"
-        )
+        chat_id=chat_id, message_id=game.reg_msg_id,
+        text=f"🎉 Регистрация завершена. Начинаем викторину «{game.pack['title']}»!\nУчастников: {len(game.registered)}\n{users_list}"
     )
     context.job_queue.run_once(start_question, when=5, chat_id=chat_id, data=chat_id)
 
@@ -285,10 +262,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
 
     question_time = game.pack.get("question_time", game.default_question_time)
     timer_display = format_progress_bar(question_time, question_time)
-    question_text = (
-        f"❓ Вопрос {game.current_question + 1}/{len(game.pack['questions'])}\n"
-        f"{timer_display}\n\n{q['text']}"
-    )
+    question_text = f"❓ Вопрос {game.current_question + 1}/{len(game.pack['questions'])}\n{timer_display}\n\n{q['text']}"
 
     if q.get("image"):
         msg = await context.bot.send_photo(chat_id, photo=q["image"], caption=question_text, reply_markup=keyboard)
@@ -298,11 +272,12 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     game.question_msg_id = msg.id
     game.question_start_time = datetime.now(timezone.utc)
     game.answers.clear()
+    game._last_displayed_secs = question_time  # Инициализируем
 
     try:
         await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.id, disable_notification=False)
-    except Exception as e:
-        print(f"Не удалось закрепить сообщение: {e}")
+    except:
+        pass
 
     game.question_timer_job = context.job_queue.run_repeating(
         update_question_timer, interval=1, first=1, chat_id=chat_id, data=chat_id
@@ -320,13 +295,15 @@ async def update_question_timer(context: ContextTypes.DEFAULT_TYPE):
     remaining = max(0, question_time - elapsed)
     secs = int(remaining)
 
+    # Пропускаем обновление, если значение не изменилось
+    if secs == game._last_displayed_secs:
+        return
+    
+    game._last_displayed_secs = secs
+
     q = game.pack["questions"][game.current_question]
     timer_display = format_progress_bar(secs, question_time)
-    question_text = (
-        f"❓ Вопрос {game.current_question + 1}/{len(game.pack['questions'])}\n"
-        f"{timer_display}\n\n{q['text']}"
-    )
-
+    question_text = f"❓ Вопрос {game.current_question + 1}/{len(game.pack['questions'])}\n{timer_display}\n\n{q['text']}"
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(text=opt, callback_data=f"ans_{i}")] for i, opt in enumerate(q["options"])])
 
     try:
@@ -334,8 +311,8 @@ async def update_question_timer(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.edit_message_caption(chat_id=chat_id, message_id=game.question_msg_id, caption=question_text, reply_markup=keyboard)
         else:
             await context.bot.edit_message_text(chat_id=chat_id, message_id=game.question_msg_id, text=question_text, reply_markup=keyboard)
-    except Exception as e:
-        print(f"Ошибка обновления таймера вопроса: {e}")
+    except:
+        pass
 
 # ==================== Завершение вопроса ====================
 async def end_question(context: ContextTypes.DEFAULT_TYPE):
@@ -358,13 +335,8 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
             counts[ans_idx] += 1
 
     percents = [(cnt / total_answers * 100) if total_answers > 0 else 0 for cnt in counts]
-
-    stats_lines = []
-    for idx, (opt, perc) in enumerate(zip(q["options"], percents)):
-        marker = " ✅" if idx == q["correct"] else ""
-        stats_lines.append(f"{opt}: {perc:.1f}%{marker}")
+    stats_lines = [f"{opt}: {perc:.1f}%{' ✅' if idx == q['correct'] else ''}" for idx, (opt, perc) in enumerate(zip(q["options"], percents))]
     stats_text = "📊 Статистика ответов:\n" + "\n".join(stats_lines)
-
     question_text = f"❓ Вопрос {game.current_question + 1}/{len(game.pack['questions'])}\n{q['text']}\n\n{stats_text}"
 
     try:
@@ -382,8 +354,7 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
 
     leaderboard = game.get_leaderboard()
     rating_lines = [f"{i}. {data['username']} — {data['score']} очк." for i, (uid, data) in enumerate(leaderboard, 1)]
-    rating_text = "🏆 Текущий рейтинг:\n" + "\n".join(rating_lines)
-    await context.bot.send_message(chat_id, text=rating_text)
+    await context.bot.send_message(chat_id, text="🏆 Текущий рейтинг:\n" + "\n".join(rating_lines))
 
     game.current_question += 1
     if game.current_question < len(game.pack["questions"]):
@@ -416,17 +387,13 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
             i += 1
         for uid, data in same_score_players:
             medal = ""
-            if rank == 1:
-                medal = "🥇"
-            elif rank == 2:
-                medal = "🥈"
-            elif rank == 3:
-                medal = "🥉"
+            if rank == 1: medal = "🥇"
+            elif rank == 2: medal = "🥈"
+            elif rank == 3: medal = "🥉"
             final_lines.append(f"{medal} {rank} место. {data['username']} — {data['score']} очк.")
         rank += len(same_score_players)
 
-    table = "🏁 Итоговое положение:\n\n" + "\n".join(final_lines)
-    await context.bot.send_message(chat_id, text=table)
+    await context.bot.send_message(chat_id, text="🏁 Итоговое положение:\n\n" + "\n".join(final_lines))
 
 # ==================== Обработка ответов ====================
 async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -453,11 +420,6 @@ def main():
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN в переменных окружения")
 
-    # Задержка для предотвращения одновременного запуска контейнеров
-    delay = random.randint(2, 5)
-    print(f"⏳ Ожидание {delay} сек для синхронизации...")
-    time.sleep(delay)
-
     app = Application.builder().token(token).build()
 
     app.add_handler(CommandHandler("quiz", quiz_command))
@@ -466,11 +428,7 @@ def main():
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
     print("🚀 Запуск бота в режиме polling...")
-
-    app.run_polling(
-        allowed_updates=Update.ALL_TYPES,
-        drop_pending_updates=True
-    )
+    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
