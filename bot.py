@@ -12,10 +12,11 @@ from telegram.ext import (
 games = {}
 
 class Game:
-    def __init__(self, chat_id, pack, creator_id):
+    def __init__(self, chat_id, pack, creator_id, message_thread_id=None):
         self.chat_id = chat_id
         self.pack = pack
         self.creator_id = creator_id
+        self.message_thread_id = message_thread_id  # ID ветки (топика)
         self.status = "registration"
         self.registered = {}
         self.current_question = 0
@@ -23,10 +24,8 @@ class Game:
         self.question_start_time = None
         self.reg_msg_id = None
         self.question_msg_id = None
-        # задачи таймеров
         self.reg_timer_job = None
         self.question_timer_job = None
-        # время старта регистрации (для расчёта оставшегося времени)
         self.reg_start_time = None
         self.reg_duration = 300  # 5 минут
 
@@ -91,6 +90,7 @@ async def is_admin(update: Update, user_id: int) -> bool:
 async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user = update.effective_user
+    message_thread_id = update.effective_message.message_thread_id  # ID ветки
 
     if not await is_admin(update, user.id):
         await update.message.reply_text("❌ Только администраторы могут запускать викторину.")
@@ -111,7 +111,7 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Пакет {pack_id} не найден в базе.")
         return
 
-    game = Game(chat_id, pack, user.id)
+    game = Game(chat_id, pack, user.id, message_thread_id)
     games[chat_id] = game
     game.reg_start_time = datetime.now(timezone.utc)
 
@@ -131,14 +131,12 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     game.reg_msg_id = msg.id
 
-    # Запускаем таймер автоматического завершения регистрации
     context.job_queue.run_once(
         end_registration,
         when=game.reg_duration,
         chat_id=chat_id,
         data=chat_id
     )
-    # Запускаем периодическое обновление таймера каждые 30 секунд
     game.reg_timer_job = context.job_queue.run_repeating(
         update_reg_timer,
         interval=30,
@@ -165,9 +163,6 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     username = format_username(user)
     game.add_player(user.id, username)
-
-    # Не обновляем сообщение немедленно, таймер сделает это сам
-    # Но можно обновить список участников, сохранив таймер
     await update_reg_timer_message(context, chat_id, game)
 
 async def update_reg_timer(context: ContextTypes.DEFAULT_TYPE):
@@ -221,17 +216,14 @@ async def start_early_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer("Только организатор может начать досрочно.", show_alert=True)
         return
 
-    # Останавливаем таймеры регистрации
     if game.reg_timer_job:
         game.reg_timer_job.schedule_removal()
         game.reg_timer_job = None
-    # Отменяем автоматический запуск (если еще не сработал)
     for job in context.job_queue.jobs():
         if job.data == chat_id and job.callback == end_registration:
             job.schedule_removal()
             break
 
-    # Завершаем регистрацию немедленно
     await end_registration(context, chat_id=chat_id)
 
 # ==================== Завершение регистрации ====================
@@ -242,7 +234,6 @@ async def end_registration(context: ContextTypes.DEFAULT_TYPE, chat_id=None):
     if not game or game.status != "registration":
         return
 
-    # Останавливаем таймер обновления
     if game.reg_timer_job:
         game.reg_timer_job.schedule_removal()
         game.reg_timer_job = None
@@ -292,18 +283,24 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
         f"{q['text']}"
     )
 
+    # Отправляем в ветку (message_thread_id), если она есть
+    send_kwargs = {
+        "chat_id": chat_id,
+        "reply_markup": keyboard
+    }
+    if game.message_thread_id:
+        send_kwargs["message_thread_id"] = game.message_thread_id
+
     if q.get("image"):
         msg = await context.bot.send_photo(
-            chat_id,
             photo=q["image"],
             caption=question_text,
-            reply_markup=keyboard
+            **send_kwargs
         )
     else:
         msg = await context.bot.send_message(
-            chat_id,
             text=question_text,
-            reply_markup=keyboard
+            **send_kwargs
         )
 
     game.question_msg_id = msg.id
@@ -319,7 +316,6 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Не удалось закрепить сообщение: {e}")
 
-    # Запускаем таймер обновления вопроса каждые 5 секунд
     game.question_timer_job = context.job_queue.run_repeating(
         update_question_timer,
         interval=5,
@@ -328,7 +324,6 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
         data=chat_id
     )
 
-    # Таймер окончания вопроса
     context.job_queue.run_once(
         end_question,
         when=question_time,
@@ -343,7 +338,7 @@ async def update_question_timer(context: ContextTypes.DEFAULT_TYPE):
         return
 
     elapsed = (datetime.now(timezone.utc) - game.question_start_time).total_seconds()
-    question_time = 20  # фиксированные 20 секунд
+    question_time = 20
     remaining = max(0, question_time - elapsed)
     secs = int(remaining)
 
@@ -384,7 +379,6 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
     if not game or game.status != "active":
         return
 
-    # Останавливаем таймер обновления вопроса
     if game.question_timer_job:
         game.question_timer_job.schedule_removal()
         game.question_timer_job = None
@@ -438,12 +432,21 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-    leaderboard = game.get_leaderboard()
-    rating_lines = []
-    for i, (uid, data) in enumerate(leaderboard, 1):
-        rating_lines.append(f"{i}. {data['username']} — {data['score']} очк.")
-    rating_text = "🏆 Текущий рейтинг:\n" + "\n".join(rating_lines)
-    await context.bot.send_message(chat_id, text=rating_text)
+    # Определяем, последний ли это вопрос
+    is_last_question = (game.current_question == len(game.pack["questions"]) - 1)
+
+    # Показываем рейтинг только если это НЕ последний вопрос
+    if not is_last_question:
+        leaderboard = game.get_leaderboard()
+        rating_lines = []
+        for i, (uid, data) in enumerate(leaderboard, 1):
+            rating_lines.append(f"{i}. {data['username']} — {data['score']} очк.")
+        rating_text = "🏆 Текущий рейтинг:\n" + "\n".join(rating_lines)
+        
+        send_kwargs = {"chat_id": chat_id, "text": rating_text}
+        if game.message_thread_id:
+            send_kwargs["message_thread_id"] = game.message_thread_id
+        await context.bot.send_message(**send_kwargs)
 
     game.current_question += 1
     if game.current_question < len(game.pack["questions"]):
@@ -455,10 +458,10 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         game.status = "finished"
-        await context.bot.send_message(
-            chat_id,
-            "🎉 Ура, викторина закончена! Подводим результаты..."
-        )
+        send_kwargs = {"chat_id": chat_id, "text": "🎉 Ура, викторина закончена! Подводим результаты..."}
+        if game.message_thread_id:
+            send_kwargs["message_thread_id"] = game.message_thread_id
+        await context.bot.send_message(**send_kwargs)
         context.job_queue.run_once(
             finish_quiz,
             when=5,
@@ -475,7 +478,10 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
 
     leaderboard = game.get_leaderboard()
     if not leaderboard:
-        await context.bot.send_message(chat_id, "Нет участников.")
+        send_kwargs = {"chat_id": chat_id, "text": "Нет участников."}
+        if game.message_thread_id:
+            send_kwargs["message_thread_id"] = game.message_thread_id
+        await context.bot.send_message(**send_kwargs)
         return
 
     final_lines = []
@@ -499,7 +505,10 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
         rank += len(same_score_players)
 
     table = "🏁 Итоговое положение:\n\n" + "\n".join(final_lines)
-    await context.bot.send_message(chat_id, text=table)
+    send_kwargs = {"chat_id": chat_id, "text": table}
+    if game.message_thread_id:
+        send_kwargs["message_thread_id"] = game.message_thread_id
+    await context.bot.send_message(**send_kwargs)
 
 # ==================== Обработка ответов ====================
 async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -533,11 +542,9 @@ def main():
     app.add_handler(CallbackQueryHandler(start_early_callback, pattern="start_early"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
-    # Пробуем получить домен Railway
     railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
 
     if railway_domain:
-        # Режим Webhook
         port = int(os.environ.get("PORT", "8000"))
         webhook_url = f"https://{railway_domain}/webhook"
         print(f"🚀 Запуск webhook на {webhook_url} (порт {port})")
@@ -548,7 +555,6 @@ def main():
             drop_pending_updates=True
         )
     else:
-        # Режим Polling (если домена нет)
         print("🚀 Запуск polling (домен Railway не найден)")
         app.run_polling(
             allowed_updates=Update.ALL_TYPES,
