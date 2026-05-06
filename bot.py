@@ -16,7 +16,7 @@ class Game:
         self.chat_id = chat_id
         self.pack = pack
         self.creator_id = creator_id
-        self.message_thread_id = message_thread_id  # ID ветки (топика)
+        self.message_thread_id = message_thread_id
         self.status = "registration"
         self.registered = {}
         self.current_question = 0
@@ -90,7 +90,7 @@ async def is_admin(update: Update, user_id: int) -> bool:
 async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user = update.effective_user
-    message_thread_id = update.effective_message.message_thread_id  # ID ветки
+    message_thread_id = update.effective_message.message_thread_id
 
     if not await is_admin(update, user.id):
         await update.message.reply_text("❌ Только администраторы могут запускать викторину.")
@@ -276,14 +276,13 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     ]
     keyboard = InlineKeyboardMarkup([[btn] for btn in buttons])
 
-    question_time = 20  # фиксированные 20 секунд
+    question_time = 20
     question_text = (
         f"❓ Вопрос {game.current_question + 1}/{len(game.pack['questions'])}\n"
         f"⏳ Осталось: {question_time} сек\n\n"
         f"{q['text']}"
     )
 
-    # Отправляем в ветку (message_thread_id), если она есть
     send_kwargs = {
         "chat_id": chat_id,
         "reply_markup": keyboard
@@ -403,9 +402,15 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
         stats_lines.append(f"{opt}: {perc:.1f}%{marker}")
     stats_text = "📊 Статистика ответов:\n" + "\n".join(stats_lines)
 
+    correct_answer_text = f"✅ Правильный ответ: {q['options'][q['correct']]}"
+    if q.get("comment"):
+        correct_answer_text += f"\n💡 {q['comment']}"
+
     question_text = (
         f"❓ Вопрос {game.current_question + 1}/{len(game.pack['questions'])}\n"
-        f"{q['text']}\n\n{stats_text}"
+        f"{q['text']}\n\n"
+        f"{stats_text}\n\n"
+        f"{correct_answer_text}"
     )
 
     try:
@@ -432,10 +437,8 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-    # Определяем, последний ли это вопрос
     is_last_question = (game.current_question == len(game.pack["questions"]) - 1)
 
-    # Показываем рейтинг только если это НЕ последний вопрос
     if not is_last_question:
         leaderboard = game.get_leaderboard()
         rating_lines = []
