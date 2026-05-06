@@ -3,7 +3,7 @@
   "questions": [
     {
       "text": "Флаг какой страны на рисунке?",
-      "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Flag_of_Monaco.svg/960px-Flag_of_Monaco.svg.png",
+      "image": "https://t4.ftcdn.net/jpg/00/71/24/81/360_F_71248100_hIsJ3RHN6jGcsyJjUXePrM7OanIYkv1H.jpg",
       "options": ["Польша", "Индонезия", "Монако", "Сингапур"],
       "correct": 2,
       "comment": "Это флаг княжества Монако."
