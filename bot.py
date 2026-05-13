@@ -532,7 +532,59 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     game.record_answer(user.id, option_idx)
 
-# ==================== ЗАПУСК ====================
+# ==================== Команда /rules ====================
+async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    rules_text = """🎲 *ДРУЗЬЯ, ДОБРО ПОЖАЛОВАТЬ В НАШ КВИЗ\!*
+
+Мы придумали для вас интеллектуальное шоу, где каждый сможет проверить свою эрудицию и скорость реакции\. Всё просто, честно и очень азартно\.
+
+*Как это будет?*
+
+Сначала мы запустим регистрацию\. У вас будет ровно *5 минут*, чтобы нажать кнопку «Зарегистрироваться» и занять место за игровым столом\. Опоздавшие — в игру не попадают, таковы правила\. Если все собрались раньше — ведущий \(то есть бот\) может начать досрочно\.
+
+*А дальше начинается самое интересное\.*
+
+Перед вами один за другим будут появляться вопросы\. К каждому вопросу — *4 варианта ответа*\. Только один из них правильный\. Ваша задача — угадать\.
+
+Но тут есть хитрость\.
+
+*Чем быстрее вы выбираете правильный ответ, тем больше баллов получаете\.*
+
+Вот как работает наша система:
+
+• Если вы ответили за *0–5 секунд* → получаете *15 баллов* 🚀
+• Если за *6–10 секунд* → *14 баллов* ⚡
+• Если за *11–13 секунд* → *13 баллов* 👍
+• Если за *14–16 секунд* → *12 баллов* 📊
+• Если за *17–19 секунд* → *11 баллов* ⏳
+
+А если не успели за 20 секунд? Увы, бот закрывает приём ответов\. В следующий раз повезёт больше\.
+
+*Как отвечать?*
+
+Только через кнопки под вопросом\! Текстом в чат писать бесполезно — бот вас просто не увидит\. Такая у него архитектура\.
+
+*После каждого вопроса мы показываем:*
+
+• Как распределились голоса \(кто сколько процентов набрал\)
+• Правильный ответ с коротким пояснением
+• Текущий рейтинг — кто лидирует, кто дышит в спину
+
+*В конце игры*
+
+Когда все вопросы кончатся, мы подведём итоги и наградим самых быстрых и умных\. Первое место — 🥇, второе — 🥈, третье — 🥉\.
+
+*И последнее, но важное:*
+
+Боты не участвуют\. Спамить кнопками бессмысленно — засчитывается только первый ответ\. И пожалуйста, не пытайтесь отвечать текстом в чат, даже если очень хочется\. Бот будет невозмутим\.
+
+*Ну что, готовы?*
+
+Жмите «Зарегистрироваться» и готовьте пальцы — вопросы уже ждут своей очереди\! 🎯"""
+    
+    await update.message.reply_text(rules_text, parse_mode="MarkdownV2")
+
+# ==================== ЗАПУСК (ТОЛЬКО POLLING) ====================
 def main():
     token = os.environ.get("BOT_TOKEN")
     if not token:
@@ -540,29 +592,21 @@ def main():
 
     app = Application.builder().token(token).build()
 
+    # Регистрируем обработчики команд
     app.add_handler(CommandHandler("quiz", quiz_command))
+    app.add_handler(CommandHandler("rules", rules_command))
     app.add_handler(CallbackQueryHandler(register_callback, pattern="register"))
     app.add_handler(CallbackQueryHandler(start_early_callback, pattern="start_early"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
-    railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
-
-    if railway_domain:
-        port = int(os.environ.get("PORT", "8000"))
-        webhook_url = f"https://{railway_domain}/webhook"
-        print(f"🚀 Запуск webhook на {webhook_url} (порт {port})")
-        app.run_webhook(
-            listen="0.0.0.0",
-            port=port,
-            webhook_url=webhook_url,
-            drop_pending_updates=True
-        )
-    else:
-        print("🚀 Запуск polling (домен Railway не найден)")
-        app.run_polling(
-            allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True
-        )
+    # Запускаем polling (долгое соединение) - ЭТОТ РЕЖИМ РАБОТАЕТ ВСЕГДА
+    print("🚀 Бот запущен в режиме polling")
+    print("🤖 Готов принимать команды: /quiz, /rules")
+    
+    app.run_polling(
+        allowed_updates=Update.ALL_TYPES,
+        drop_pending_updates=True  # Сбрасываем старые обновления при запуске
+    )
 
 if __name__ == "__main__":
     main()
