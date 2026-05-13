@@ -1,12 +1,46 @@
 import asyncio
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
+import sys
+import time
+
+# Блокировка повторного запуска
+PID_FILE = "/tmp/bot_pid.txt"
+
+# Сначала удаляем старый webhook принудительно
+try:
+    from telegram import Bot
+    token = os.environ.get("BOT_TOKEN")
+    if token:
+        temp_bot = Bot(token=token)
+        import asyncio
+        asyncio.get_event_loop().run_until_complete(temp_bot.delete_webhook(drop_pending_updates=True))
+        print("✅ Webhook удалён")
+except Exception as e:
+    print(f"⚠️ Не удалось удалить webhook: {e}")
+
+# Проверка на дублирующиеся процессы
+try:
+    with open(PID_FILE, 'r') as f:
+        old_pid = int(f.read().strip())
+        try:
+            os.kill(old_pid, 0)
+            print(f"❌ Процесс с PID {old_pid} уже запущен. Выход.")
+            sys.exit(0)
+        except OSError:
+            pass
+except FileNotFoundError:
+    pass
+
+with open(PID_FILE, 'w') as f:
+    f.write(str(os.getpid()))
+print(f"✅ Бот запущен с PID {os.getpid()}")
 
 # ==================== Хранилище игр ====================
 games = {}
@@ -27,7 +61,7 @@ class Game:
         self.reg_timer_job = None
         self.question_timer_job = None
         self.reg_start_time = None
-        self.reg_duration = 300
+        self.reg_duration = 300  # 5 минут
 
     def add_player(self, user_id, username):
         if user_id not in self.registered:
@@ -63,6 +97,7 @@ class Game:
             key=lambda x: (-x[1]["score"], x[1]["username"].lower())
         )
 
+# ==================== Загрузка пакета ====================
 def load_pack(pack_id: str):
     path = f"packs/{pack_id}.json"
     if not os.path.exists(path):
@@ -70,12 +105,14 @@ def load_pack(pack_id: str):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+# ==================== Форматирование username ====================
 def format_username(user) -> str:
     if user.username:
         return f"@{user.username}"
     else:
         return f"@id_{user.id}"
 
+# ==================== Проверка прав ====================
 async def is_admin(update: Update, user_id: int) -> bool:
     try:
         member = await update.effective_chat.get_member(user_id)
@@ -83,6 +120,7 @@ async def is_admin(update: Update, user_id: int) -> bool:
     except:
         return False
 
+# ==================== Команда /quiz ====================
 async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user = update.effective_user
@@ -141,6 +179,7 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data=chat_id
     )
 
+# ==================== Регистрация ====================
 async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -195,6 +234,7 @@ async def update_reg_timer_message(context, chat_id, game):
     except Exception as e:
         print(f"Ошибка обновления таймера: {e}")
 
+# ==================== Досрочное завершение регистрации ====================
 async def start_early_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -220,6 +260,7 @@ async def start_early_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await end_registration(context, chat_id=chat_id)
 
+# ==================== Завершение регистрации ====================
 async def end_registration(context: ContextTypes.DEFAULT_TYPE, chat_id=None):
     if chat_id is None:
         chat_id = context.job.data
@@ -251,6 +292,7 @@ async def end_registration(context: ContextTypes.DEFAULT_TYPE, chat_id=None):
         data=chat_id
     )
 
+# ==================== Старт вопроса ====================
 async def start_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -363,6 +405,7 @@ async def update_question_timer(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Ошибка обновления вопроса: {e}")
 
+# ==================== Завершение вопроса ====================
 async def end_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -463,6 +506,7 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
             data=chat_id
         )
 
+# ==================== Финальная таблица ====================
 async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.pop(chat_id, None)
@@ -503,6 +547,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
+# ==================== Обработка ответов ====================
 async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Ответ принят ✅")
@@ -521,6 +566,7 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     game.record_answer(user.id, option_idx)
 
+# ==================== Команда /rules ====================
 async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rules_text = """🎲 *ДРУЗЬЯ, ДОБРО ПОЖАЛОВАТЬ В НАШ КВИЗ\!*
 
@@ -572,24 +618,12 @@ async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(rules_text, parse_mode="MarkdownV2")
 
-# ==================== ЗАПУСК С ПРИНУДИТЕЛЬНЫМ УДАЛЕНИЕМ WEBHOOK ====================
-async def main():
+# ==================== ЗАПУСК (ТОЛЬКО POLLING) ====================
+def main():
     token = os.environ.get("BOT_TOKEN")
     if not token:
-        raise ValueError("❌ Не задан BOT_TOKEN в переменных окружения")
+        raise ValueError("❌ Не задан BOT_TOKEN")
 
-    # Принудительно удаляем webhook при старте
-    from telegram import Bot
-    temp_bot = Bot(token=token)
-    await temp_bot.delete_webhook(drop_pending_updates=True)
-    print("✅ Webhook удалён (если был)")
-    
-    # Проверяем, нет ли конфликта
-    info = await temp_bot.get_webhook_info()
-    print(f"📡 Текущий webhook URL: {info.url}")
-    print(f"⏳ Пендингов апдейтов: {info.pending_update_count}")
-
-    # Запускаем приложение
     app = Application.builder().token(token).build()
 
     app.add_handler(CommandHandler("quiz", quiz_command))
@@ -599,24 +633,14 @@ async def main():
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
     print("🚀 Бот запущен в режиме polling")
-    print("🤖 Готов принимать команды: /quiz, /rules")
-    
-    # Запускаем polling
-    await app.initialize()
-    await app.updater.start_polling(drop_pending_updates=True)
-    await app.start()
-    
-    # Держим бота запущенным
-    try:
-        while True:
-            await asyncio.sleep(3600)
-    except (KeyboardInterrupt, SystemExit):
-        print("🛑 Остановка бота...")
-        await app.stop()
-        await app.updater.stop()
+    print("🤖 Готов принимать команды")
 
-def run():
-    asyncio.run(main())
+    app.run_polling(
+        drop_pending_updates=True,
+        allowed_updates=Update.ALL_TYPES
+    )
 
 if __name__ == "__main__":
-    run()
+    # Даём время на завершение старых процессов
+    time.sleep(2)
+    main()
