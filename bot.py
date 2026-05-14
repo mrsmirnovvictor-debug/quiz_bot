@@ -1,6 +1,5 @@
 import sys
 import os
-import asyncio
 import re
 import json
 from datetime import datetime, timezone, timedelta
@@ -11,7 +10,7 @@ from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
 
-# ==================== БЛОКИРОВКА ЗАПУСКА ====================
+# ==================== БЛОКИРОВКА ПОВТОРНОГО ЗАПУСКА ====================
 PID_FILE = "/tmp/bot_pid.txt"
 
 def check_single_instance():
@@ -41,7 +40,7 @@ class Game:
         self.pack = pack
         self.creator_id = creator_id
         self.message_thread_id = message_thread_id
-        self.status = "registration"   # сразу регистрация
+        self.status = "registration"
         self.registered = {}
         self.current_question = 0
         self.answers = {}
@@ -50,8 +49,7 @@ class Game:
         self.question_msg_id = None
         self.reg_timer_job = None
         self.question_timer_job = None
-        self.reg_start_time = datetime.now(timezone.utc)
-        self.scheduled_start = scheduled_start   # время начала викторины (UTC)
+        self.scheduled_start = scheduled_start
         self.paused = False
         self.pause_after_question = False
 
@@ -103,13 +101,11 @@ async def is_admin(update: Update, user_id: int) -> bool:
     except:
         return False
 
-# ==================== Вспомогательные функции для времени ====================
+# ==================== Функции времени (Москва, UTC+3) ====================
 def utc_to_msk(dt_utc: datetime) -> datetime:
-    """Перевод UTC в московское время UTC+3 (без учёта летнего времени, всегда +3)"""
     return dt_utc + timedelta(hours=3)
 
 def format_datetime_msk(dt_utc: datetime) -> str:
-    """Форматирует дату и время по Москве: если сегодня — 'сегодня, в ЧЧ:ММ', иначе 'ДД.ММ.ГГГГ, в ЧЧ:ММ'"""
     msk = utc_to_msk(dt_utc)
     now_msk = utc_to_msk(datetime.now(timezone.utc))
     if msk.date() == now_msk.date():
@@ -131,7 +127,6 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Викторина уже идёт в этой группе.")
         return
 
-    # Парсим аргументы: /quiz <pack_id> | <дата> | <время>
     full_text = update.message.text.strip()
     rest = full_text[5:].strip()
     parts = re.split(r'\s*\|\s*', rest)
@@ -157,12 +152,12 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Неверный формат даты/времени. Используйте: ГГГГ-ММ-ДД ЧЧ:ММ (UTC)")
         return
+
     now = datetime.now(timezone.utc)
     if scheduled_start < now + timedelta(minutes=2):
         await update.message.reply_text("❌ Время начала должно быть не менее чем через 2 минуты от текущего.")
         return
 
-    # Создаём игру
     game = Game(
         chat_id=chat_id,
         pack=pack,
@@ -171,17 +166,13 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         scheduled_start=scheduled_start
     )
     games[chat_id] = game
-    game.status = "registration"
-    game.reg_start_time = now
-    # Открываем регистрацию
+
     await open_registration(context, chat_id)
 
-    # Планируем начало квиза (предупреждение + вопросы) в scheduled_start
     delay = (scheduled_start - now).total_seconds()
     if delay > 0:
         context.job_queue.run_once(start_quiz_sequence, when=delay, chat_id=chat_id, data=chat_id)
     else:
-        # Если время уже прошло (но по условию выше не пройдёт), начинаем немедленно
         await start_quiz_sequence(context, chat_id)
 
 async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
@@ -192,7 +183,6 @@ async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         [InlineKeyboardButton("📝 Зарегистрироваться", callback_data="register")],
         [InlineKeyboardButton("🚀 Начать сейчас", callback_data="start_early")]
     ])
-    # Форматируем дату и время по Москве
     start_str = format_datetime_msk(game.scheduled_start)
     text = (
         f"🎪 ОТКРЫТА РЕГИСТРАЦИЯ НА КВИЗ\n\n"
@@ -205,9 +195,7 @@ async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         send_kwargs["message_thread_id"] = game.message_thread_id
     msg = await context.bot.send_message(**send_kwargs)
     game.reg_msg_id = msg.id
-    # Нет таймера на закрытие регистрации – она закроется только при старте квиза или по кнопке "Начать сейчас"
-    # Но нужно обновлять сообщение при изменении списка участников
-    # Запускаем периодическое обновление каждые 10 секунд (или по событию регистрации)
+    # Обновляем сообщение раз в 10 секунд (показываем список участников)
     game.reg_timer_job = context.job_queue.run_repeating(update_reg_timer, interval=10, first=5, chat_id=chat_id, data=chat_id)
 
 async def update_reg_timer(context: ContextTypes.DEFAULT_TYPE):
@@ -229,8 +217,7 @@ async def update_reg_timer(context: ContextTypes.DEFAULT_TYPE):
     ])
     try:
         await context.bot.edit_message_text(chat_id=chat_id, message_id=game.reg_msg_id, text=text, reply_markup=keyboard)
-    except Exception as e:
-        # Если сообщение не изменилось, может быть ошибка, игнорируем
+    except Exception:
         pass
 
 async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -260,19 +247,17 @@ async def start_early_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if user.id != game.creator_id:
         await query.answer("Только организатор может начать досрочно.", show_alert=True)
         return
-    # Отменяем запланированный старт (если есть)
+    # Отменяем запланированный старт
     for job in context.job_queue.jobs():
         if job.chat_id == chat_id and job.callback == start_quiz_sequence:
             job.schedule_removal()
             break
-    # Переводим игру в активный режим и начинаем квиз немедленно
     await close_registration_and_start(context, chat_id, early=True)
 
 async def close_registration_and_start(context: ContextTypes.DEFAULT_TYPE, chat_id: int, early: bool = False):
     game = games.get(chat_id)
     if not game or game.status != "registration":
         return
-    # Останавливаем обновление регистрации
     if game.reg_timer_job:
         game.reg_timer_job.schedule_removal()
         game.reg_timer_job = None
@@ -286,11 +271,7 @@ async def close_registration_and_start(context: ContextTypes.DEFAULT_TYPE, chat_
              f"📅 Начало: {start_str}\nУчастников: {len(game.registered)}\n{users_list}"
     )
     if early:
-        # Начинаем вопросы через 5 секунд (без предупреждения)
         context.job_queue.run_once(start_question, when=5, chat_id=chat_id, data=chat_id)
-    else:
-        # Это вызов из start_quiz_sequence, там уже будет предупреждение и задержка 30 сек
-        pass
 
 async def start_quiz_sequence(context: ContextTypes.DEFAULT_TYPE, chat_id: int = None):
     if chat_id is None:
@@ -298,13 +279,8 @@ async def start_quiz_sequence(context: ContextTypes.DEFAULT_TYPE, chat_id: int =
     game = games.get(chat_id)
     if not game:
         return
-    # Если игра ещё в регистрации, закрываем регистрацию
     if game.status == "registration":
         await close_registration_and_start(context, chat_id, early=False)
-        game = games.get(chat_id)
-        if not game:
-            return
-    # Отправляем тег участникам и через 30 секунд начинаем вопросы
     await send_pre_start_warning(context, chat_id)
     context.job_queue.run_once(start_question, when=30, chat_id=chat_id, data=chat_id)
 
@@ -315,11 +291,11 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
     mentions = []
     for uid in game.registered.keys():
         try:
-            chat_member = await context.bot.get_chat_member(chat_id, uid)
-            if chat_member.user.username:
-                mentions.append(f"@{chat_member.user.username}")
+            member = await context.bot.get_chat_member(chat_id, uid)
+            if member.user.username:
+                mentions.append(f"@{member.user.username}")
             else:
-                mentions.append(f"[{chat_member.user.first_name}](tg://user?id={uid})")
+                mentions.append(f"[{member.user.first_name}](tg://user?id={uid})")
         except:
             mentions.append(f"id{uid}")
     mention_text = " ".join(mentions) if mentions else "Участники"
@@ -333,7 +309,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# ==================== Логика вопросов (без изменений) ====================
+# ==================== Логика вопросов ====================
 async def start_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -528,7 +504,7 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== Команда /rules ====================
 async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rules_text = "📜 *Правила квиза*\n\nЗдесь будут ваши правила..."  # замените на свой текст
+    rules_text = "📜 *Правила квиза*\n\nЗдесь напишите свои правила."
     await update.message.reply_text(rules_text, parse_mode="Markdown")
 
 # ==================== ЗАПУСК ====================
