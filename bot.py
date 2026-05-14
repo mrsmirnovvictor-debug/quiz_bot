@@ -11,14 +11,13 @@ from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
 
-# ==================== БЛОКИРОВКА ПОВТОРНОГО ЗАПУСКА ====================
+# -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
 
 def check_single_instance():
     try:
         with open(PID_FILE, 'r') as f:
             old_pid = int(f.read().strip())
-            # Если PID 1 (как в контейнере) – не выходим, т.к. это нормально
             if old_pid == 1:
                 print("⚠️ PID 1 обнаружен (контейнер), продолжаем запуск.")
             else:
@@ -35,7 +34,7 @@ def check_single_instance():
     print(f"✅ Бот запущен с PID {os.getpid()}")
 
 check_single_instance()
-# ============================================================
+# ---------------------------------------------------------------------
 
 games = {}
 
@@ -106,13 +105,11 @@ async def is_admin(update: Update, user_id: int) -> bool:
     except:
         return False
 
-# ==================== Функции перевода времени ====================
+# -------------------- Время: Москва (UTC+3) --------------------
 def msk_to_utc(dt_msk: datetime) -> datetime:
-    """Переводит московское время (наивное) в UTC (aware)"""
     return dt_msk.replace(tzinfo=timezone.utc) - timedelta(hours=3)
 
 def format_datetime_msk_multiline(dt_utc: datetime) -> str:
-    """Форматирует для вывода: '📅 Дата и время начала:\nсегодня, в HH:MM' или с датой"""
     msk = dt_utc + timedelta(hours=3)
     now_msk = datetime.now(timezone.utc) + timedelta(hours=3)
     if msk.date() == now_msk.date():
@@ -120,7 +117,7 @@ def format_datetime_msk_multiline(dt_utc: datetime) -> str:
     else:
         return f"📅 Дата и время начала:\n{msk.strftime('%d.%m.%Y')}, в {msk.strftime('%H:%M')}"
 
-# ==================== Команда /quiz ====================
+# -------------------- Команда /quiz --------------------
 async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user = update.effective_user
@@ -312,7 +309,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# ==================== Логика вопросов ====================
+# -------------------- Логика вопросов --------------------
 async def start_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -453,7 +450,7 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     game.record_answer(user.id, option_idx)
 
-# ==================== Команды организатора ====================
+# -------------------- Команды организатора --------------------
 async def pause_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user = update.effective_user
@@ -505,24 +502,24 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Данный квиз продолжен уже не будет. Ждите подробной информации о восстановлении сервиса в ближайшее время."
     )
 
-# ==================== Команда /rules ====================
+# -------------------- Правила --------------------
 async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rules_text = "📜 *Правила квиза*\n\nЗдесь напишите свои правила."
     await update.message.reply_text(rules_text, parse_mode="Markdown")
 
-# ==================== ЗАПУСК ====================
-async def main():
+# -------------------- ЗАПУСК --------------------
+def main():
     token = os.environ.get("BOT_TOKEN")
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN")
 
-    # Удаляем webhook
+    # Удаляем webhook синхронно (чтобы избежать конфликта polling)
     bot = Bot(token=token)
-    await bot.delete_webhook(drop_pending_updates=True)
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(bot.delete_webhook(drop_pending_updates=True))
     print("✅ Webhook удалён")
 
     app = Application.builder().token(token).build()
-
     app.add_handler(CommandHandler("quiz", quiz_command))
     app.add_handler(CommandHandler("rules", rules_command))
     app.add_handler(CommandHandler("pause", pause_quiz))
@@ -533,10 +530,7 @@ async def main():
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
     print("🚀 Бот запущен в режиме polling")
-    await app.run_polling(drop_pending_updates=True)
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("🛑 Бот остановлен.")
+    main()
