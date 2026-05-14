@@ -11,6 +11,9 @@ from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
 
+# -------------------- Константы --------------------
+TIMER_VIDEO_URL = "https://raw.githubusercontent.com/mrsmirnovvictor-debug/quiz_bot/main/assets/20%20Second%20Timer.mp4"
+
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
 
@@ -320,7 +323,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         except:
             mentions.append(f"id{uid}")
     mention_text = " ".join(mentions) if mentions else "Участники"
-    warning_text = (sudo apt install vlc
+    warning_text = (
         f"{mention_text}\n\n"
         f"🚀 Квиз сейчас начнётся! Даём вам 30 секунд зайти в Телеграм, проверить ваш VPN и настроиться быстро, "
         f"а главное — правильно отвечать на вопросы!"
@@ -330,7 +333,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# -------------------- Логика вопросов с видео-таймером (без обновления текста) --------------------
+# -------------------- Логика вопросов с видео-таймером --------------------
 async def start_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -340,7 +343,6 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
         await finish_quiz(context)
         return
     
-    # Отправляем видео с таймером отдельным сообщением
     send_kwargs = {"chat_id": chat_id}
     if game.message_thread_id:
         send_kwargs["message_thread_id"] = game.message_thread_id
@@ -356,16 +358,13 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         print(f"Ошибка отправки видео: {e}")
-        # Если видео не загрузилось, отправляем текстовое напоминание
         await context.bot.send_message(
             text="⏳ У вас есть 20 секунд на ответ!",
             **send_kwargs
         )
     
-    # Небольшая пауза, чтобы видео начало проигрываться
     await asyncio.sleep(0.5)
     
-    # Отправляем вопрос с кнопками
     q = game.pack["questions"][game.current_question]
     buttons = [InlineKeyboardButton(opt, callback_data=f"ans_{i}") for i, opt in enumerate(q["options"])]
     keyboard = InlineKeyboardMarkup([[btn] for btn in buttons])
@@ -392,7 +391,6 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
     
-    # Только один таймер — закрытие вопроса через 20 секунд
     context.job_queue.run_once(end_question, when=20, chat_id=chat_id, data=chat_id)
 
 async def end_question(context: ContextTypes.DEFAULT_TYPE):
@@ -541,47 +539,7 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # -------------------- Команда /rules --------------------
 async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rules_text = """🎲 ДРУЗЬЯ, ДОБРО ПОЖАЛОВАТЬ В НАШ КВИЗ!
-
-Мы придумали для вас интеллектуальное шоу, где каждый сможет проверить свою эрудицию и скорость реакции. Всё просто, честно и очень азартно.
-
-Как это будет?
-
-Сначала мы запустим регистрацию. У вас будет время до указанного времени старта, чтобы нажать кнопку "Зарегистрироваться" и занять место за игровым столом. Ведущий (бот) может начать досрочно кнопкой "Начать сейчас".
-
-А дальше начинается самое интересное.
-
-Перед вами один за другим будут появляться вопросы. К каждому вопросу — 4 варианта ответа. Только один из них правильный. Ваша задача — угадать.
-
-Чем быстрее вы выбираете правильный ответ, тем больше баллов получаете.
-
-• 0–5 секунд → +5 бонуса (всего 15)
-• 6–10 секунд → +4 бонуса (всего 14)
-• 11–13 секунд → +3 бонуса (всего 13)
-• 14–16 секунд → +2 бонуса (всего 12)
-• 17–19 секунд → +1 бонус (всего 11)
-
-Как отвечать?
-
-Только через кнопки под вопросом! Текстом в чат писать бесполезно — бот вас просто не увидит.
-
-После каждого вопроса мы показываем:
-
-• Статистику ответов (кто сколько процентов набрал)
-• Правильный ответ с пояснением
-• Текущий рейтинг
-
-В конце игры
-
-Когда все вопросы кончатся, мы подведём итоги и наградим самых быстрых и умных. Первое место — 🥇, второе — 🥈, третье — 🥉.
-
-И последнее, но важное:
-
-Боты не участвуют. Спамить кнопками бессмысленно — засчитывается только первый ответ.
-
-Ну что, готовы?
-
-Жмите "Зарегистрироваться" и готовьте пальцы — вопросы уже ждут своей очереди! 🎯"""
+    rules_text = "🎲 ДРУЗЬЯ, ДОБРО ПОЖАЛОВАТЬ В НАШ КВИЗ!\n\nМы придумали для вас интеллектуальное шоу..."
     await update.message.reply_text(rules_text)
 
 # -------------------- ЗАПУСК --------------------
