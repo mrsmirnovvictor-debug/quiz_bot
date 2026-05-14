@@ -35,7 +35,7 @@ check_single_instance()
 games = {}
 
 class Game:
-    def __init__(self, chat_id, pack, creator_id, message_thread_id=None, scheduled_start: Optional[datetime] = None):
+    def __init__(self, chat_id, pack, creator_id, message_thread_id=None, scheduled_start_utc: Optional[datetime] = None):
         self.chat_id = chat_id
         self.pack = pack
         self.creator_id = creator_id
@@ -49,7 +49,7 @@ class Game:
         self.question_msg_id = None
         self.reg_timer_job = None
         self.question_timer_job = None
-        self.scheduled_start = scheduled_start
+        self.scheduled_start_utc = scheduled_start_utc
         self.paused = False
         self.pause_after_question = False
 
@@ -101,17 +101,19 @@ async def is_admin(update: Update, user_id: int) -> bool:
     except:
         return False
 
-# ==================== Функции времени (Москва, UTC+3) ====================
-def utc_to_msk(dt_utc: datetime) -> datetime:
-    return dt_utc + timedelta(hours=3)
+# ==================== Функции перевода времени (Москва, UTC+3) ====================
+def msk_to_utc(dt_msk: datetime) -> datetime:
+    """Переводит московское время (наивное) в UTC"""
+    return dt_msk - timedelta(hours=3)
 
-def format_datetime_msk(dt_utc: datetime) -> str:
-    msk = utc_to_msk(dt_utc)
-    now_msk = utc_to_msk(datetime.now(timezone.utc))
+def format_datetime_msk_multiline(dt_utc: datetime) -> str:
+    """Форматирует для вывода: '📅 Дата и время начала:\nсегодня, в HH:MM' или с датой"""
+    msk = dt_utc + timedelta(hours=3)
+    now_msk = datetime.now(timezone.utc) + timedelta(hours=3)
     if msk.date() == now_msk.date():
-        return f"сегодня, в {msk.strftime('%H:%M')}"
+        return f"📅 Дата и время начала:\nсегодня, в {msk.strftime('%H:%M')}"
     else:
-        return f"{msk.strftime('%d.%m.%Y')}, в {msk.strftime('%H:%M')}"
+        return f"📅 Дата и время начала:\n{msk.strftime('%d.%m.%Y')}, в {msk.strftime('%H:%M')}"
 
 # ==================== Команда /quiz ====================
 async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -133,7 +135,7 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(parts) != 3:
         await update.message.reply_text(
             "❌ Неверный формат. Используйте:\n`/quiz 0007 | 2026-05-14 | 14:00`\n"
-            "Дата и время в UTC. Разделитель – вертикальная черта.",
+            "Дата и время указываются по МОСКВЕ (UTC+3). Разделитель – вертикальная черта.",
             parse_mode="Markdown"
         )
         return
@@ -146,16 +148,14 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Пакет {pack_id} не найден.")
         return
     try:
-        dt_str = f"{date_str} {time_str}"
-        scheduled_start = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
-        scheduled_start = scheduled_start.replace(tzinfo=timezone.utc)
+        dt_msk = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
     except ValueError:
-        await update.message.reply_text("Неверный формат даты/времени. Используйте: ГГГГ-ММ-ДД ЧЧ:ММ (UTC)")
+        await update.message.reply_text("Неверный формат даты/времени. Используйте: ГГГГ-ММ-ДД ЧЧ:ММ (московское время)")
         return
-
-    now = datetime.now(timezone.utc)
-    if scheduled_start < now + timedelta(minutes=2):
-        await update.message.reply_text("❌ Время начала должно быть не менее чем через 2 минуты от текущего.")
+    scheduled_start_utc = msk_to_utc(dt_msk)
+    now_utc = datetime.now(timezone.utc)
+    if scheduled_start_utc < now_utc + timedelta(minutes=2):
+        await update.message.reply_text("❌ Время начала должно быть не менее чем через 2 минуты от текущего (по Москве).")
         return
 
     game = Game(
@@ -163,13 +163,13 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pack=pack,
         creator_id=user.id,
         message_thread_id=message_thread_id,
-        scheduled_start=scheduled_start
+        scheduled_start_utc=scheduled_start_utc
     )
     games[chat_id] = game
 
     await open_registration(context, chat_id)
 
-    delay = (scheduled_start - now).total_seconds()
+    delay = (scheduled_start_utc - now_utc).total_seconds()
     if delay > 0:
         context.job_queue.run_once(start_quiz_sequence, when=delay, chat_id=chat_id, data=chat_id)
     else:
@@ -183,11 +183,11 @@ async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         [InlineKeyboardButton("📝 Зарегистрироваться", callback_data="register")],
         [InlineKeyboardButton("🚀 Начать сейчас", callback_data="start_early")]
     ])
-    start_str = format_datetime_msk(game.scheduled_start)
+    start_line = format_datetime_msk_multiline(game.scheduled_start_utc)
     text = (
         f"🎪 ОТКРЫТА РЕГИСТРАЦИЯ НА КВИЗ\n\n"
         f"✏️ Тема квиза: {game.pack['title']}\n"
-        f"📅 Дата и время начала: {start_str}\n\n"
+        f"{start_line}\n\n"
         f"👥 Список участников:\n(пока никого)\n"
     )
     send_kwargs = {"chat_id": chat_id, "text": text, "reply_markup": keyboard}
@@ -195,7 +195,6 @@ async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         send_kwargs["message_thread_id"] = game.message_thread_id
     msg = await context.bot.send_message(**send_kwargs)
     game.reg_msg_id = msg.id
-    # Обновляем сообщение раз в 10 секунд (показываем список участников)
     game.reg_timer_job = context.job_queue.run_repeating(update_reg_timer, interval=10, first=5, chat_id=chat_id, data=chat_id)
 
 async def update_reg_timer(context: ContextTypes.DEFAULT_TYPE):
@@ -204,11 +203,11 @@ async def update_reg_timer(context: ContextTypes.DEFAULT_TYPE):
     if not game or game.status != "registration":
         return
     users_list = "\n".join(f"• {p['username']}" for p in game.registered.values()) or "пока никого"
-    start_str = format_datetime_msk(game.scheduled_start)
+    start_line = format_datetime_msk_multiline(game.scheduled_start_utc)
     text = (
         f"🎪 ОТКРЫТА РЕГИСТРАЦИЯ НА КВИЗ\n\n"
         f"✏️ Тема квиза: {game.pack['title']}\n"
-        f"📅 Дата и время начала: {start_str}\n\n"
+        f"{start_line}\n\n"
         f"👥 Список участников ({len(game.registered)}):\n{users_list}"
     )
     keyboard = InlineKeyboardMarkup([
@@ -247,7 +246,6 @@ async def start_early_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if user.id != game.creator_id:
         await query.answer("Только организатор может начать досрочно.", show_alert=True)
         return
-    # Отменяем запланированный старт
     for job in context.job_queue.jobs():
         if job.chat_id == chat_id and job.callback == start_quiz_sequence:
             job.schedule_removal()
@@ -263,12 +261,12 @@ async def close_registration_and_start(context: ContextTypes.DEFAULT_TYPE, chat_
         game.reg_timer_job = None
     game.status = "active"
     users_list = "\n".join(f"• {p['username']}" for p in game.registered.values())
-    start_str = format_datetime_msk(game.scheduled_start)
+    start_line = format_datetime_msk_multiline(game.scheduled_start_utc)
     await context.bot.edit_message_text(
         chat_id=chat_id,
         message_id=game.reg_msg_id,
         text=f"🎉 Регистрация завершена. Начинаем викторину «{game.pack['title']}»!\n"
-             f"📅 Начало: {start_str}\nУчастников: {len(game.registered)}\n{users_list}"
+             f"{start_line}\nУчастников: {len(game.registered)}\n{users_list}"
     )
     if early:
         context.job_queue.run_once(start_question, when=5, chat_id=chat_id, data=chat_id)
@@ -309,7 +307,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# ==================== Логика вопросов ====================
+# ==================== Логика вопросов (без изменений) ====================
 async def start_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
