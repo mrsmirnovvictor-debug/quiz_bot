@@ -2,7 +2,6 @@ import sys
 import os
 import re
 import json
-import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -105,7 +104,7 @@ async def is_admin(update: Update, user_id: int) -> bool:
     except:
         return False
 
-# -------------------- Функции перевода времени (Москва UTC+3) --------------------
+# -------------------- Функции перевода времени --------------------
 def msk_to_utc(dt_msk: datetime) -> datetime:
     return dt_msk.replace(tzinfo=timezone.utc) - timedelta(hours=3)
 
@@ -575,13 +574,15 @@ def main():
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN")
 
-    # Удаляем webhook
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    bot = Bot(token=token)
-    loop.run_until_complete(bot.delete_webhook(drop_pending_updates=True))
-    print("✅ Webhook удалён")
-    loop.close()
+    # Просто удаляем webhook без создания отдельного event loop
+    # Используем bot.delete_webhook в синхронном режиме через asyncio.run()
+    import asyncio
+    async def delete_webhook():
+        bot = Bot(token=token)
+        await bot.delete_webhook(drop_pending_updates=True)
+        print("✅ Webhook удалён")
+    
+    asyncio.run(delete_webhook())
 
     app = Application.builder().token(token).build()
 
