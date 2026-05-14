@@ -2,6 +2,7 @@ import sys
 import os
 import re
 import json
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -9,6 +10,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
+
+# -------------------- Константы --------------------
+TIMER_VIDEO_URL = "https://raw.githubusercontent.com/ВАШ_АККАУНТ/ВАШ_РЕПОЗИТОРИЙ/main/assets/20%20Second%20Timer.mp4"
 
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
@@ -233,7 +237,6 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Боты не участвуют.", show_alert=True)
         return
     game.add_player(user.id, format_username(user))
-    # Принудительно обновляем сообщение
     await update_reg_timer_by_chat(context, chat_id)
 
 async def update_reg_timer_by_chat(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
@@ -330,7 +333,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# -------------------- Логика вопросов --------------------
+# -------------------- Логика вопросов с видео-таймером --------------------
 async def start_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -339,27 +342,55 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     if game.current_question >= len(game.pack["questions"]):
         await finish_quiz(context)
         return
+    
+    # Отправляем видео с таймером
+    send_kwargs = {"chat_id": chat_id}
+    if game.message_thread_id:
+        send_kwargs["message_thread_id"] = game.message_thread_id
+    
+    try:
+        await context.bot.send_video(
+            video=TIMER_VIDEO_URL,
+            caption="⏳ У вас есть 20 секунд на ответ!",
+            width=400,
+            height=300,
+            supports_streaming=True,
+            **send_kwargs
+        )
+    except Exception as e:
+        print(f"Ошибка отправки видео: {e}")
+    
+    # Небольшая пауза, чтобы видео начало проигрываться
+    await asyncio.sleep(1)
+    
+    # Отправляем вопрос с кнопками
     q = game.pack["questions"][game.current_question]
     buttons = [InlineKeyboardButton(opt, callback_data=f"ans_{i}") for i, opt in enumerate(q["options"])]
     keyboard = InlineKeyboardMarkup([[btn] for btn in buttons])
     text = (
-        f"❓ Вопрос {game.current_question+1}/{len(game.pack['questions'])}\n"
-        f"⏳ Осталось: 20 сек\n\n{q['text']}"
+        f"❓ Вопрос {game.current_question+1}/{len(game.pack['questions'])}\n\n"
+        f"{q['text']}"
     )
-    send_kwargs = {"chat_id": chat_id, "reply_markup": keyboard}
+    
+    send_kwargs = {"chat_id": chat_id, "text": text, "reply_markup": keyboard}
     if game.message_thread_id:
         send_kwargs["message_thread_id"] = game.message_thread_id
+    
     if q.get("image"):
         msg = await context.bot.send_photo(photo=q["image"], caption=text, **send_kwargs)
     else:
-        msg = await context.bot.send_message(text=text, **send_kwargs)
+        msg = await context.bot.send_message(**send_kwargs)
+    
     game.question_msg_id = msg.id
     game.question_start_time = datetime.now(timezone.utc)
     game.answers.clear()
+    
     try:
         await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.id, disable_notification=False)
     except:
         pass
+    
+    # Таймер для текстового обновления (каждые 5 секунд)
     game.question_timer_job = context.job_queue.run_repeating(update_question_timer, interval=5, first=5, chat_id=chat_id, data=chat_id)
     context.job_queue.run_once(end_question, when=20, chat_id=chat_id, data=chat_id)
 
@@ -372,13 +403,31 @@ async def update_question_timer(context: ContextTypes.DEFAULT_TYPE):
     remaining = max(0, 20 - elapsed)
     secs = int(remaining)
     q = game.pack["questions"][game.current_question]
-    text = f"❓ Вопрос {game.current_question+1}/{len(game.pack['questions'])}\n⏳ Осталось: {secs} сек\n\n{q['text']}"
-    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(opt, callback_data=f"ans_{i}") for i, opt in enumerate(q["options"])]])
+    
+    text = (
+        f"❓ Вопрос {game.current_question+1}/{len(game.pack['questions'])}\n"
+        f"⏳ Осталось: {secs} сек\n\n"
+        f"{q['text']}"
+    )
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(opt, callback_data=f"ans_{i}") for i, opt in enumerate(q["options"])]
+    ])
+    
     try:
         if q.get("image"):
-            await context.bot.edit_message_caption(chat_id=chat_id, message_id=game.question_msg_id, caption=text, reply_markup=keyboard)
+            await context.bot.edit_message_caption(
+                chat_id=chat_id,
+                message_id=game.question_msg_id,
+                caption=text,
+                reply_markup=keyboard
+            )
         else:
-            await context.bot.edit_message_text(chat_id=chat_id, message_id=game.question_msg_id, text=text, reply_markup=keyboard)
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=game.question_msg_id,
+                text=text,
+                reply_markup=keyboard
+            )
     except Exception:
         pass
 
@@ -574,10 +623,8 @@ def main():
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN")
 
-    # Создаём приложение
     app = Application.builder().token(token).build()
     
-    # Добавляем обработчики
     app.add_handler(CommandHandler("quiz", quiz_command))
     app.add_handler(CommandHandler("rules", rules_command))
     app.add_handler(CommandHandler("pause", pause_quiz))
@@ -588,7 +635,6 @@ def main():
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
     print("🚀 Бот запущен в режиме polling")
-    # Без предварительного удаления webhook — Telegram сам обработает
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
