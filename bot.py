@@ -11,19 +11,23 @@ from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
 
-# ==================== БЛОКИРОВКА ПОВТОРНОГО ЗАПУСКА И CONFLICT ====================
+# ==================== БЛОКИРОВКА ПОВТОРНОГО ЗАПУСКА ====================
 PID_FILE = "/tmp/bot_pid.txt"
 
 def check_single_instance():
     try:
         with open(PID_FILE, 'r') as f:
             old_pid = int(f.read().strip())
-            try:
-                os.kill(old_pid, 0)
-                print(f"❌ Бот уже запущен с PID {old_pid}. Выход.")
-                sys.exit(0)
-            except OSError:
-                pass
+            # Если PID 1 (как в контейнере) – не выходим, т.к. это нормально
+            if old_pid == 1:
+                print("⚠️ PID 1 обнаружен (контейнер), продолжаем запуск.")
+            else:
+                try:
+                    os.kill(old_pid, 0)
+                    print(f"❌ Бот уже запущен с PID {old_pid}. Выход.")
+                    sys.exit(0)
+                except OSError:
+                    pass
     except FileNotFoundError:
         pass
     with open(PID_FILE, 'w') as f:
@@ -31,15 +35,6 @@ def check_single_instance():
     print(f"✅ Бот запущен с PID {os.getpid()}")
 
 check_single_instance()
-
-# Принудительно удаляем webhook перед стартом (чтобы избежать Conflict)
-async def force_delete_webhook():
-    token = os.environ.get("BOT_TOKEN")
-    if token:
-        bot = Bot(token=token)
-        await bot.delete_webhook(drop_pending_updates=True)
-        print("✅ Webhook удалён")
-# Вызовем позже внутри main, т.к. там есть event loop
 # ============================================================
 
 games = {}
@@ -59,7 +54,6 @@ class Game:
         self.question_msg_id = None
         self.reg_timer_job = None
         self.question_timer_job = None
-        # scheduled_start_utc теперь всегда aware (UTC)
         self.scheduled_start_utc = scheduled_start_utc
         self.paused = False
         self.pause_after_question = False
@@ -112,7 +106,7 @@ async def is_admin(update: Update, user_id: int) -> bool:
     except:
         return False
 
-# ==================== Функции перевода времени (Москва, UTC+3) ====================
+# ==================== Функции перевода времени ====================
 def msk_to_utc(dt_msk: datetime) -> datetime:
     """Переводит московское время (наивное) в UTC (aware)"""
     return dt_msk.replace(tzinfo=timezone.utc) - timedelta(hours=3)
@@ -163,8 +157,8 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Неверный формат даты/времени. Используйте: ГГГГ-ММ-ДД ЧЧ:ММ (московское время)")
         return
-    scheduled_start_utc = msk_to_utc(dt_msk)   # теперь aware UTC
-    now_utc = datetime.now(timezone.utc)       # aware UTC
+    scheduled_start_utc = msk_to_utc(dt_msk)
+    now_utc = datetime.now(timezone.utc)
     if scheduled_start_utc < now_utc + timedelta(minutes=2):
         await update.message.reply_text("❌ Время начала должно быть не менее чем через 2 минуты от текущего (по Москве).")
         return
@@ -517,16 +511,15 @@ async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(rules_text, parse_mode="Markdown")
 
 # ==================== ЗАПУСК ====================
-def main():
+async def main():
     token = os.environ.get("BOT_TOKEN")
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN")
 
-    # Удаляем webhook синхронно в event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(force_delete_webhook())
-    loop.close()
+    # Удаляем webhook
+    bot = Bot(token=token)
+    await bot.delete_webhook(drop_pending_updates=True)
+    print("✅ Webhook удалён")
 
     app = Application.builder().token(token).build()
 
@@ -540,7 +533,10 @@ def main():
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
     print("🚀 Бот запущен в режиме polling")
-    app.run_polling(drop_pending_updates=True)
+    await app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("🛑 Бот остановлен.")
