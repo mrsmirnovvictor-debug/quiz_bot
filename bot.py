@@ -11,9 +11,6 @@ from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
 
-# -------------------- Константы --------------------
-TIMER_VIDEO_URL = "https://raw.githubusercontent.com/ВАШ_АККАУНТ/ВАШ_РЕПОЗИТОРИЙ/main/assets/20%20Second%20Timer.mp4"
-
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
 
@@ -323,7 +320,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         except:
             mentions.append(f"id{uid}")
     mention_text = " ".join(mentions) if mentions else "Участники"
-    warning_text = (
+    warning_text = (sudo apt install vlc
         f"{mention_text}\n\n"
         f"🚀 Квиз сейчас начнётся! Даём вам 30 секунд зайти в Телеграм, проверить ваш VPN и настроиться быстро, "
         f"а главное — правильно отвечать на вопросы!"
@@ -333,7 +330,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# -------------------- Логика вопросов с видео-таймером --------------------
+# -------------------- Логика вопросов с видео-таймером (без обновления текста) --------------------
 async def start_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -343,7 +340,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
         await finish_quiz(context)
         return
     
-    # Отправляем видео с таймером
+    # Отправляем видео с таймером отдельным сообщением
     send_kwargs = {"chat_id": chat_id}
     if game.message_thread_id:
         send_kwargs["message_thread_id"] = game.message_thread_id
@@ -359,9 +356,14 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         print(f"Ошибка отправки видео: {e}")
+        # Если видео не загрузилось, отправляем текстовое напоминание
+        await context.bot.send_message(
+            text="⏳ У вас есть 20 секунд на ответ!",
+            **send_kwargs
+        )
     
     # Небольшая пауза, чтобы видео начало проигрываться
-    await asyncio.sleep(1)
+    await asyncio.sleep(0.5)
     
     # Отправляем вопрос с кнопками
     q = game.pack["questions"][game.current_question]
@@ -390,55 +392,15 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
     
-    # Таймер для текстового обновления (каждые 5 секунд)
-    game.question_timer_job = context.job_queue.run_repeating(update_question_timer, interval=5, first=5, chat_id=chat_id, data=chat_id)
+    # Только один таймер — закрытие вопроса через 20 секунд
     context.job_queue.run_once(end_question, when=20, chat_id=chat_id, data=chat_id)
-
-async def update_question_timer(context: ContextTypes.DEFAULT_TYPE):
-    chat_id = context.job.data
-    game = games.get(chat_id)
-    if not game or game.status != "active" or game.paused:
-        return
-    elapsed = (datetime.now(timezone.utc) - game.question_start_time).total_seconds()
-    remaining = max(0, 20 - elapsed)
-    secs = int(remaining)
-    q = game.pack["questions"][game.current_question]
-    
-    text = (
-        f"❓ Вопрос {game.current_question+1}/{len(game.pack['questions'])}\n"
-        f"⏳ Осталось: {secs} сек\n\n"
-        f"{q['text']}"
-    )
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(opt, callback_data=f"ans_{i}") for i, opt in enumerate(q["options"])]
-    ])
-    
-    try:
-        if q.get("image"):
-            await context.bot.edit_message_caption(
-                chat_id=chat_id,
-                message_id=game.question_msg_id,
-                caption=text,
-                reply_markup=keyboard
-            )
-        else:
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=game.question_msg_id,
-                text=text,
-                reply_markup=keyboard
-            )
-    except Exception:
-        pass
 
 async def end_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
     if not game or game.status != "active":
         return
-    if game.question_timer_job:
-        game.question_timer_job.schedule_removal()
-        game.question_timer_job = None
+    
     q = game.pack["questions"][game.current_question]
     game.calculate_scores()
     total_answers = len(game.answers)
@@ -453,10 +415,12 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
     if q.get("comment"):
         correct_text += f"\n💡 {q['comment']}"
     final_text = f"❓ Вопрос {game.current_question+1}/{len(game.pack['questions'])}\n{q['text']}\n\n{stats_text}\n\n{correct_text}"
+    
     try:
         await context.bot.unpin_chat_message(chat_id=chat_id, message_id=game.question_msg_id)
     except:
         pass
+    
     try:
         if q.get("image"):
             await context.bot.edit_message_caption(chat_id=chat_id, message_id=game.question_msg_id, caption=final_text)
@@ -464,6 +428,7 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.edit_message_text(chat_id=chat_id, message_id=game.question_msg_id, text=final_text)
     except:
         pass
+    
     leaderboard = game.get_leaderboard()
     rating_lines = [f"{i+1}. {data['username']} — {data['score']} очк." for i, (_, data) in enumerate(leaderboard)]
     rating_text = "🏆 Текущий рейтинг:\n" + "\n".join(rating_lines)
@@ -471,12 +436,14 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
     if game.message_thread_id:
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
+    
     game.current_question += 1
     if game.pause_after_question:
         game.pause_after_question = False
         game.status = "paused"
         await context.bot.send_message(chat_id=chat_id, text="⏸ Квиз приостановлен. /resume для продолжения.")
         return
+    
     if game.current_question < len(game.pack["questions"]):
         context.job_queue.run_once(start_question, when=5, chat_id=chat_id, data=chat_id)
     else:
@@ -550,7 +517,7 @@ async def resume_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     game.status = "active"
     await update.message.reply_text("▶ Квиз возобновлён.")
-    if not game.question_timer_job and game.current_question < len(game.pack["questions"]):
+    if game.current_question < len(game.pack["questions"]):
         context.job_queue.run_once(start_question, when=2, chat_id=chat_id, data=chat_id)
 
 async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
