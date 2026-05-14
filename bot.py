@@ -2,15 +2,16 @@ import sys
 import os
 import re
 import json
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
 
-# ==================== БЛОКИРОВКА ПОВТОРНОГО ЗАПУСКА ====================
+# ==================== БЛОКИРОВКА ПОВТОРНОГО ЗАПУСКА И CONFLICT ====================
 PID_FILE = "/tmp/bot_pid.txt"
 
 def check_single_instance():
@@ -30,6 +31,15 @@ def check_single_instance():
     print(f"✅ Бот запущен с PID {os.getpid()}")
 
 check_single_instance()
+
+# Принудительно удаляем webhook перед стартом (чтобы избежать Conflict)
+async def force_delete_webhook():
+    token = os.environ.get("BOT_TOKEN")
+    if token:
+        bot = Bot(token=token)
+        await bot.delete_webhook(drop_pending_updates=True)
+        print("✅ Webhook удалён")
+# Вызовем позже внутри main, т.к. там есть event loop
 # ============================================================
 
 games = {}
@@ -49,6 +59,7 @@ class Game:
         self.question_msg_id = None
         self.reg_timer_job = None
         self.question_timer_job = None
+        # scheduled_start_utc теперь всегда aware (UTC)
         self.scheduled_start_utc = scheduled_start_utc
         self.paused = False
         self.pause_after_question = False
@@ -103,8 +114,8 @@ async def is_admin(update: Update, user_id: int) -> bool:
 
 # ==================== Функции перевода времени (Москва, UTC+3) ====================
 def msk_to_utc(dt_msk: datetime) -> datetime:
-    """Переводит московское время (наивное) в UTC"""
-    return dt_msk - timedelta(hours=3)
+    """Переводит московское время (наивное) в UTC (aware)"""
+    return dt_msk.replace(tzinfo=timezone.utc) - timedelta(hours=3)
 
 def format_datetime_msk_multiline(dt_utc: datetime) -> str:
     """Форматирует для вывода: '📅 Дата и время начала:\nсегодня, в HH:MM' или с датой"""
@@ -152,8 +163,8 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("Неверный формат даты/времени. Используйте: ГГГГ-ММ-ДД ЧЧ:ММ (московское время)")
         return
-    scheduled_start_utc = msk_to_utc(dt_msk)
-    now_utc = datetime.now(timezone.utc)
+    scheduled_start_utc = msk_to_utc(dt_msk)   # теперь aware UTC
+    now_utc = datetime.now(timezone.utc)       # aware UTC
     if scheduled_start_utc < now_utc + timedelta(minutes=2):
         await update.message.reply_text("❌ Время начала должно быть не менее чем через 2 минуты от текущего (по Москве).")
         return
@@ -307,7 +318,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# ==================== Логика вопросов (без изменений) ====================
+# ==================== Логика вопросов ====================
 async def start_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -510,6 +521,13 @@ def main():
     token = os.environ.get("BOT_TOKEN")
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN")
+
+    # Удаляем webhook синхронно в event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(force_delete_webhook())
+    loop.close()
+
     app = Application.builder().token(token).build()
 
     app.add_handler(CommandHandler("quiz", quiz_command))
