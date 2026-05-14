@@ -220,8 +220,23 @@ async def update_reg_timer(context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
+async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    game = games.get(chat_id)
+    if not game or game.status != "registration":
+        await query.answer("Регистрация закрыта.", show_alert=True)
+        return
+    if user.is_bot:
+        await query.answer("Боты не участвуют.", show_alert=True)
+        return
+    game.add_player(user.id, format_username(user))
+    # Обновляем сообщение вручную
+    await update_reg_timer_by_chat(context, chat_id)
+
 async def update_reg_timer_by_chat(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
-    """Обёртка для вызова update_reg_timer с chat_id"""
     game = games.get(chat_id)
     if not game or game.status != "registration":
         return
@@ -241,21 +256,6 @@ async def update_reg_timer_by_chat(context: ContextTypes.DEFAULT_TYPE, chat_id: 
         await context.bot.edit_message_text(chat_id=chat_id, message_id=game.reg_msg_id, text=text, reply_markup=keyboard)
     except Exception:
         pass
-
-async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    chat_id = update.effective_chat.id
-    user = update.effective_user
-    game = games.get(chat_id)
-    if not game or game.status != "registration":
-        await query.answer("Регистрация закрыта.", show_alert=True)
-        return
-    if user.is_bot:
-        await query.answer("Боты не участвуют.", show_alert=True)
-        return
-    game.add_player(user.id, format_username(user))
-    await update_reg_timer_by_chat(context, chat_id)
 
 async def start_early_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -527,45 +527,7 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rules_text = """🎲 ДРУЗЬЯ, ДОБРО ПОЖАЛОВАТЬ В НАШ КВИЗ!
 
-Мы придумали для вас интеллектуальное шоу, где каждый сможет проверить свою эрудицию и скорость реакции. Всё просто, честно и очень азартно.
-
-Как это будет?
-
-Сначала мы запустим регистрацию. У вас будет время до указанного времени старта, чтобы нажать кнопку "Зарегистрироваться" и занять место за игровым столом. Ведущий (бот) может начать досрочно кнопкой "Начать сейчас".
-
-А дальше начинается самое интересное.
-
-Перед вами один за другим будут появляться вопросы. К каждому вопросу — 4 варианта ответа. Только один из них правильный. Ваша задача — угадать.
-
-Чем быстрее вы выбираете правильный ответ, тем больше баллов получаете.
-
-• 0–5 секунд → +5 бонуса (всего 15)
-• 6–10 секунд → +4 бонуса (всего 14)
-• 11–13 секунд → +3 бонуса (всего 13)
-• 14–16 секунд → +2 бонуса (всего 12)
-• 17–19 секунд → +1 бонус (всего 11)
-
-Как отвечать?
-
-Только через кнопки под вопросом! Текстом в чат писать бесполезно — бот вас просто не увидит.
-
-После каждого вопроса мы показываем:
-
-• Статистику ответов (кто сколько процентов набрал)
-• Правильный ответ с пояснением
-• Текущий рейтинг
-
-В конце игры
-
-Когда все вопросы кончатся, мы подведём итоги и наградим самых быстрых и умных. Первое место — 🥇, второе — 🥈, третье — 🥉.
-
-И последнее, но важное:
-
-Боты не участвуют. Спамить кнопками бессмысленно — засчитывается только первый ответ.
-
-Ну что, готовы?
-
-Жмите "Зарегистрироваться" и готовьте пальцы — вопросы уже ждут своей очереди! 🎯"""
+Мы придумали для вас интеллектуальное шоу..."""
     await update.message.reply_text(rules_text)
 
 # -------------------- ЗАПУСК --------------------
@@ -574,17 +536,16 @@ def main():
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN")
 
-    # Просто удаляем webhook без создания отдельного event loop
-    # Используем bot.delete_webhook в синхронном режиме через asyncio.run()
+    # Создаём приложение и удаляем webhook через метод приложения
+    app = Application.builder().token(token).build()
+    
+    # Удаляем webhook синхронно
     import asyncio
-    async def delete_webhook():
-        bot = Bot(token=token)
-        await bot.delete_webhook(drop_pending_updates=True)
+    async def del_webhook():
+        await app.bot.delete_webhook(drop_pending_updates=True)
         print("✅ Webhook удалён")
     
-    asyncio.run(delete_webhook())
-
-    app = Application.builder().token(token).build()
+    asyncio.run(del_webhook())
 
     app.add_handler(CommandHandler("quiz", quiz_command))
     app.add_handler(CommandHandler("rules", rules_command))
