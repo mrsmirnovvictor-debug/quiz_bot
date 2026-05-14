@@ -2,7 +2,6 @@ import sys
 import os
 import re
 import json
-import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -107,11 +106,9 @@ async def is_admin(update: Update, user_id: int) -> bool:
 
 # -------------------- Функции перевода времени (Москва UTC+3) --------------------
 def msk_to_utc(dt_msk: datetime) -> datetime:
-    """Переводит московское время (наивное) в UTC (aware)"""
     return dt_msk.replace(tzinfo=timezone.utc) - timedelta(hours=3)
 
 def format_datetime_msk_multiline(dt_utc: datetime) -> str:
-    """Форматирует для вывода: '📅 Дата и время начала:\nсегодня, в HH:MM' или с датой"""
     msk = dt_utc + timedelta(hours=3)
     now_msk = datetime.now(timezone.utc) + timedelta(hours=3)
     if msk.date() == now_msk.date():
@@ -506,7 +503,7 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # -------------------- Команда /rules --------------------
 async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rules_text = """🎲 *ДРУЗЬЯ, ДОБРО ПОЖАЛОВАТЬ В НАШ КВИЗ\\!*
+    rules_text = """🎲 *ДРУЗЬЯ, ДОБРО ПОЖАЛОВАТЬ В НАШ КВИЗ!*
 
 Мы придумали для вас интеллектуальное шоу, где каждый сможет проверить свою эрудицию и скорость реакции. Всё просто, честно и очень азартно.
 
@@ -547,17 +544,20 @@ async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 *Ну что, готовы?*
 
 Жмите «Зарегистрироваться» и готовьте пальцы — вопросы уже ждут своей очереди! 🎯"""
-    await update.message.reply_text(rules_text, parse_mode="MarkdownV2")
+    await update.message.reply_text(rules_text, parse_mode="Markdown")
 
-# -------------------- ЗАПУСК --------------------
-async def main():
+# -------------------- ЗАПУСК (синхронный, правильный) --------------------
+def main():
     token = os.environ.get("BOT_TOKEN")
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN")
 
-    # Удаляем webhook перед запуском
+    # Удаляем webhook синхронно
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     bot = Bot(token=token)
-    await bot.delete_webhook(drop_pending_updates=True)
+    loop.run_until_complete(bot.delete_webhook(drop_pending_updates=True))
     print("✅ Webhook удалён")
 
     app = Application.builder().token(token).build()
@@ -572,10 +572,7 @@ async def main():
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
     print("🚀 Бот запущен в режиме polling")
-    await app.run_polling(drop_pending_updates=True)
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("🛑 Бот остановлен.")
+    main()
