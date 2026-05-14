@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
@@ -233,7 +233,7 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Боты не участвуют.", show_alert=True)
         return
     game.add_player(user.id, format_username(user))
-    # Обновляем сообщение вручную
+    # Принудительно обновляем сообщение
     await update_reg_timer_by_chat(context, chat_id)
 
 async def update_reg_timer_by_chat(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
@@ -527,7 +527,45 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rules_text = """🎲 ДРУЗЬЯ, ДОБРО ПОЖАЛОВАТЬ В НАШ КВИЗ!
 
-Мы придумали для вас интеллектуальное шоу..."""
+Мы придумали для вас интеллектуальное шоу, где каждый сможет проверить свою эрудицию и скорость реакции. Всё просто, честно и очень азартно.
+
+Как это будет?
+
+Сначала мы запустим регистрацию. У вас будет время до указанного времени старта, чтобы нажать кнопку "Зарегистрироваться" и занять место за игровым столом. Ведущий (бот) может начать досрочно кнопкой "Начать сейчас".
+
+А дальше начинается самое интересное.
+
+Перед вами один за другим будут появляться вопросы. К каждому вопросу — 4 варианта ответа. Только один из них правильный. Ваша задача — угадать.
+
+Чем быстрее вы выбираете правильный ответ, тем больше баллов получаете.
+
+• 0–5 секунд → +5 бонуса (всего 15)
+• 6–10 секунд → +4 бонуса (всего 14)
+• 11–13 секунд → +3 бонуса (всего 13)
+• 14–16 секунд → +2 бонуса (всего 12)
+• 17–19 секунд → +1 бонус (всего 11)
+
+Как отвечать?
+
+Только через кнопки под вопросом! Текстом в чат писать бесполезно — бот вас просто не увидит.
+
+После каждого вопроса мы показываем:
+
+• Статистику ответов (кто сколько процентов набрал)
+• Правильный ответ с пояснением
+• Текущий рейтинг
+
+В конце игры
+
+Когда все вопросы кончатся, мы подведём итоги и наградим самых быстрых и умных. Первое место — 🥇, второе — 🥈, третье — 🥉.
+
+И последнее, но важное:
+
+Боты не участвуют. Спамить кнопками бессмысленно — засчитывается только первый ответ.
+
+Ну что, готовы?
+
+Жмите "Зарегистрироваться" и готовьте пальцы — вопросы уже ждут своей очереди! 🎯"""
     await update.message.reply_text(rules_text)
 
 # -------------------- ЗАПУСК --------------------
@@ -536,17 +574,10 @@ def main():
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN")
 
-    # Создаём приложение и удаляем webhook через метод приложения
+    # Создаём приложение
     app = Application.builder().token(token).build()
     
-    # Удаляем webhook синхронно
-    import asyncio
-    async def del_webhook():
-        await app.bot.delete_webhook(drop_pending_updates=True)
-        print("✅ Webhook удалён")
-    
-    asyncio.run(del_webhook())
-
+    # Добавляем обработчики
     app.add_handler(CommandHandler("quiz", quiz_command))
     app.add_handler(CommandHandler("rules", rules_command))
     app.add_handler(CommandHandler("pause", pause_quiz))
@@ -557,6 +588,7 @@ def main():
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
 
     print("🚀 Бот запущен в режиме polling")
+    # Без предварительного удаления webhook — Telegram сам обработает
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
