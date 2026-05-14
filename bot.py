@@ -319,16 +319,16 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
             if member.user.username:
                 mentions.append(f"@{member.user.username}")
             else:
-                mentions.append(f"[{member.user.first_name}](tg://user?id={uid})")
+                mentions.append(f"{member.user.first_name}")
         except:
-            mentions.append(f"id{uid}")
+            mentions.append(f"Участник {uid}")
     mention_text = " ".join(mentions) if mentions else "Участники"
     warning_text = (
         f"{mention_text}\n\n"
         f"🚀 Квиз сейчас начнётся! Даём вам 30 секунд зайти в Телеграм, проверить ваш VPN и настроиться быстро, "
         f"а главное — правильно отвечать на вопросы!"
     )
-    send_kwargs = {"chat_id": chat_id, "text": warning_text, "parse_mode": "Markdown"}
+    send_kwargs = {"chat_id": chat_id, "text": warning_text}
     if game.message_thread_id:
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
