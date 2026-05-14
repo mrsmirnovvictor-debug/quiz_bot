@@ -2,6 +2,7 @@ import sys
 import os
 import re
 import json
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -220,6 +221,28 @@ async def update_reg_timer(context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
+async def update_reg_timer_by_chat(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+    """Обёртка для вызова update_reg_timer с chat_id"""
+    game = games.get(chat_id)
+    if not game or game.status != "registration":
+        return
+    users_list = "\n".join(f"• {p['username']}" for p in game.registered.values()) or "пока никого"
+    start_line = format_datetime_msk_multiline(game.scheduled_start_utc)
+    text = (
+        f"🎪 ОТКРЫТА РЕГИСТРАЦИЯ НА КВИЗ\n\n"
+        f"✏️ Тема квиза: {game.pack['title']}\n"
+        f"{start_line}\n\n"
+        f"👥 Список участников ({len(game.registered)}):\n{users_list}"
+    )
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📝 Зарегистрироваться", callback_data="register")],
+        [InlineKeyboardButton("🚀 Начать сейчас", callback_data="start_early")]
+    ])
+    try:
+        await context.bot.edit_message_text(chat_id=chat_id, message_id=game.reg_msg_id, text=text, reply_markup=keyboard)
+    except Exception:
+        pass
+
 async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -233,7 +256,7 @@ async def register_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Боты не участвуют.", show_alert=True)
         return
     game.add_player(user.id, format_username(user))
-    await update_reg_timer(context, chat_id)
+    await update_reg_timer_by_chat(context, chat_id)
 
 async def start_early_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -503,19 +526,19 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # -------------------- Команда /rules --------------------
 async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rules_text = """🎲 *ДРУЗЬЯ, ДОБРО ПОЖАЛОВАТЬ В НАШ КВИЗ!*
+    rules_text = """🎲 ДРУЗЬЯ, ДОБРО ПОЖАЛОВАТЬ В НАШ КВИЗ!
 
 Мы придумали для вас интеллектуальное шоу, где каждый сможет проверить свою эрудицию и скорость реакции. Всё просто, честно и очень азартно.
 
-*Как это будет?*
+Как это будет?
 
-Сначала мы запустим регистрацию. У вас будет время до указанного времени старта, чтобы нажать кнопку «Зарегистрироваться» и занять место за игровым столом. Ведущий (бот) может начать досрочно кнопкой «Начать сейчас».
+Сначала мы запустим регистрацию. У вас будет время до указанного времени старта, чтобы нажать кнопку "Зарегистрироваться" и занять место за игровым столом. Ведущий (бот) может начать досрочно кнопкой "Начать сейчас".
 
-*А дальше начинается самое интересное.*
+А дальше начинается самое интересное.
 
 Перед вами один за другим будут появляться вопросы. К каждому вопросу — 4 варианта ответа. Только один из них правильный. Ваша задача — угадать.
 
-*Чем быстрее вы выбираете правильный ответ, тем больше баллов получаете.*
+Чем быстрее вы выбираете правильный ответ, тем больше баллов получаете.
 
 • 0–5 секунд → +5 бонуса (всего 15)
 • 6–10 секунд → +4 бонуса (всего 14)
@@ -523,42 +546,42 @@ async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • 14–16 секунд → +2 бонуса (всего 12)
 • 17–19 секунд → +1 бонус (всего 11)
 
-*Как отвечать?*
+Как отвечать?
 
 Только через кнопки под вопросом! Текстом в чат писать бесполезно — бот вас просто не увидит.
 
-*После каждого вопроса мы показываем:*
+После каждого вопроса мы показываем:
 
 • Статистику ответов (кто сколько процентов набрал)
 • Правильный ответ с пояснением
 • Текущий рейтинг
 
-*В конце игры*
+В конце игры
 
 Когда все вопросы кончатся, мы подведём итоги и наградим самых быстрых и умных. Первое место — 🥇, второе — 🥈, третье — 🥉.
 
-*И последнее, но важное:*
+И последнее, но важное:
 
 Боты не участвуют. Спамить кнопками бессмысленно — засчитывается только первый ответ.
 
-*Ну что, готовы?*
+Ну что, готовы?
 
-Жмите «Зарегистрироваться» и готовьте пальцы — вопросы уже ждут своей очереди! 🎯"""
-    await update.message.reply_text(rules_text, parse_mode="Markdown")
+Жмите "Зарегистрироваться" и готовьте пальцы — вопросы уже ждут своей очереди! 🎯"""
+    await update.message.reply_text(rules_text)
 
-# -------------------- ЗАПУСК (синхронный, правильный) --------------------
+# -------------------- ЗАПУСК --------------------
 def main():
     token = os.environ.get("BOT_TOKEN")
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN")
 
-    # Удаляем webhook синхронно
-    import asyncio
+    # Удаляем webhook
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     bot = Bot(token=token)
     loop.run_until_complete(bot.delete_webhook(drop_pending_updates=True))
     print("✅ Webhook удалён")
+    loop.close()
 
     app = Application.builder().token(token).build()
 
