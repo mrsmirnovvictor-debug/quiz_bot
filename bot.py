@@ -334,7 +334,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# -------------------- Логика вопросов с видео-таймером --------------------
+# -------------------- Логика вопросов с видео-таймером (без текста) --------------------
 async def start_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -348,12 +348,11 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     if game.message_thread_id:
         base_kwargs["message_thread_id"] = game.message_thread_id
     
-    # Отправляем видео если URL задан
+    # Отправляем видео без текста
     if TIMER_VIDEO_URL:
         try:
             video_msg = await context.bot.send_video(
                 video=TIMER_VIDEO_URL,
-                caption="⏳ У вас есть 20 секунд на ответ!",
                 width=200,
                 height=150,
                 supports_streaming=True,
@@ -362,15 +361,8 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
             game.video_msg_id = video_msg.message_id
         except Exception as e:
             print(f"Ошибка отправки видео: {e}")
-            await context.bot.send_message(
-                text="⏳ У вас есть 20 секунд на ответ!",
-                **base_kwargs
-            )
     else:
-        await context.bot.send_message(
-            text="⏳ У вас есть 20 секунд на ответ!",
-            **base_kwargs
-        )
+        print("⚠️ TIMER_VIDEO_URL не задан, видео не отправлено")
     
     await asyncio.sleep(0.5)
     
