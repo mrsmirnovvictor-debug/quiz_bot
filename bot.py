@@ -948,15 +948,10 @@ async def abort_command(
 
 def main():
 
-    app = Application.builder().token(
-        BOT_TOKEN
-    ).build()
-
-    app.add_handler(
-        CommandHandler(
-            "quiz",
-            quiz_command
-        )
+    app = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .build()
     )
 
     app.add_handler(
@@ -968,8 +963,8 @@ def main():
 
     app.add_handler(
         CommandHandler(
-            "abort",
-            abort_command
+            "quiz",
+            quiz_command
         )
     )
 
@@ -994,13 +989,17 @@ def main():
         )
     )
 
-    logger.info("🚀 Quiz Bot started")
+    print("🚀 Quiz Bot started")
+    print("WEBHOOK:", f"{WEBHOOK_URL}/{BOT_TOKEN}")
 
     app.run_webhook(
         listen="0.0.0.0",
         port=PORT,
-        webhook_url=WEBHOOK_URL,
-        drop_pending_updates=True
+        secret_token=None,
+        url_path=BOT_TOKEN,
+        webhook_url=f"{WEBHOOK_URL}/{BOT_TOKEN}",
+        drop_pending_updates=True,
+        allowed_updates=Update.ALL_TYPES
     )
 
 if __name__ == "__main__":
