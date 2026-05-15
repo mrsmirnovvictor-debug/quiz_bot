@@ -334,7 +334,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# -------------------- Логика вопросов (видео + вопрос в одном сообщении) --------------------
+# -------------------- Логика вопросов (видео удаляется после ответа) --------------------
 async def start_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -373,7 +373,6 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
             game.question_msg_id = msg.message_id
         except Exception as e:
             print(f"Ошибка отправки видео: {e}")
-            # Fallback: отправляем только текст с кнопками
             msg = await context.bot.send_message(
                 text=question_text,
                 reply_markup=keyboard,
@@ -419,37 +418,18 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
         correct_text += f"\n💡 {q['comment']}"
     final_text = f"❓ Вопрос {game.current_question+1}/{len(game.pack['questions'])}\n{q['text']}\n\n{stats_text}\n\n{correct_text}"
     
-    try:
-        await context.bot.unpin_chat_message(chat_id=chat_id, message_id=game.question_msg_id)
-    except:
-        pass
-    
-    try:
-        # Редактируем исходное сообщение (видео или текст)
-        if q.get("image") and not TIMER_VIDEO_URL:
-            # Если был fallback на текст с картинкой
-            await context.bot.edit_message_caption(
-                chat_id=chat_id,
-                message_id=game.question_msg_id,
-                caption=final_text
-            )
-        else:
-            await context.bot.edit_message_caption(
-                chat_id=chat_id,
-                message_id=game.question_msg_id,
-                caption=final_text
-            )
-    except Exception as e:
-        print(f"Ошибка редактирования: {e}")
-        # Пробуем редактировать как текстовое сообщение
+    # Удаляем сообщение с видео
+    if game.video_msg_id:
         try:
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=game.question_msg_id,
-                text=final_text
-            )
-        except:
-            pass
+            await context.bot.delete_message(chat_id=chat_id, message_id=game.video_msg_id)
+        except Exception as e:
+            print(f"Не удалось удалить видео: {e}")
+    
+    # Отправляем новое сообщение с результатом
+    send_kwargs = {"chat_id": chat_id, "text": final_text}
+    if game.message_thread_id:
+        send_kwargs["message_thread_id"] = game.message_thread_id
+    await context.bot.send_message(**send_kwargs)
     
     leaderboard = game.get_leaderboard()
     rating_lines = [f"{i+1}. {data['username']} — {data['score']} очк." for i, (_, data) in enumerate(leaderboard)]
