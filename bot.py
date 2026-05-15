@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 # -------------------- Константы --------------------
-TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "")
+TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/20sec.MP4")
 
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
@@ -334,7 +334,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# -------------------- Логика вопросов с видео-таймером (без текста) --------------------
+# -------------------- Логика вопросов с видео-таймером --------------------
 async def start_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -348,7 +348,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     if game.message_thread_id:
         base_kwargs["message_thread_id"] = game.message_thread_id
     
-    # Отправляем видео без текста
+    # Отправляем видео
     if TIMER_VIDEO_URL:
         try:
             video_msg = await context.bot.send_video(
@@ -361,8 +361,6 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
             game.video_msg_id = video_msg.message_id
         except Exception as e:
             print(f"Ошибка отправки видео: {e}")
-    else:
-        print("⚠️ TIMER_VIDEO_URL не задан, видео не отправлено")
     
     await asyncio.sleep(0.5)
     
@@ -406,6 +404,13 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
     game = games.get(chat_id)
     if not game or game.status != "active":
         return
+    
+    # Удаляем сообщение с видео-таймером
+    if game.video_msg_id:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=game.video_msg_id)
+        except Exception as e:
+            print(f"Не удалось удалить видео: {e}")
     
     q = game.pack["questions"][game.current_question]
     game.calculate_scores()
