@@ -339,8 +339,9 @@ async def quiz_command(
     context: ContextTypes.DEFAULT_TYPE
 ):
 
-    chat_id = update.effective_chat.id
+    print("QUIZ COMMAND RECEIVED")
 
+    chat_id = update.effective_chat.id
     user = update.effective_user
 
     message_thread_id = (
