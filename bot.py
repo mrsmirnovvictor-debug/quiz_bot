@@ -4,125 +4,15 @@ import re
 import json
 import asyncio
 from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict, List
-from collections import defaultdict
+from typing import Optional
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
 
-# -------------------- Google Sheets импорт --------------------
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-
 # -------------------- Константы --------------------
-TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "")
-GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS", "")
-
-# -------------------- Инициализация Google Sheets --------------------
-def init_google_sheets():
-    """Инициализация подключения к Google Sheets"""
-    if not GOOGLE_CREDENTIALS_JSON:
-        print("⚠️ GOOGLE_CREDENTIALS не заданы, статистика не будет сохраняться")
-        return None
-    
-    try:
-        # Загружаем credentials из JSON строки
-        creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client = gspread.authorize(creds)
-        
-        # ID таблицы (можно задать в переменной окружения)
-        sheet_id = os.environ.get("GOOGLE_SHEET_ID", "")
-        if not sheet_id:
-            print("⚠️ GOOGLE_SHEET_ID не задан")
-            return None
-        
-        sheet = client.open_by_key(sheet_id).sheet1
-        print("✅ Google Sheets подключена")
-        return sheet
-    except Exception as e:
-        print(f"❌ Ошибка подключения к Google Sheets: {e}")
-        return None
-
-# -------------------- Функции работы с Google Sheets --------------------
-async def save_quiz_results(game):
-    """Сохраняет результаты квиза в Google Sheets"""
-    sheet = init_google_sheets()
-    if not sheet:
-        return
-    
-    try:
-        now = datetime.now(timezone.utc) + timedelta(hours=3)  # Московское время
-        date_str = now.strftime("%Y-%m-%d %H:%M:%S")
-        max_points = len(game.pack["questions"]) * 15  # 15 баллов максимум за вопрос
-        
-        for user_id, data in game.registered.items():
-            row = [
-                date_str,
-                str(game.chat_id),
-                game.pack["title"],
-                str(user_id),
-                data["username"],
-                data["score"],
-                max_points
-            ]
-            sheet.append_row(row)
-        
-        print(f"✅ Сохранено {len(game.registered)} результатов в Google Sheets")
-    except Exception as e:
-        print(f"❌ Ошибка сохранения в Google Sheets: {e}")
-
-async def get_leaderboard_stats(chat_id: int = None) -> List[Dict]:
-    """Получает общую статистику игроков из Google Sheets"""
-    sheet = init_google_sheets()
-    if not sheet:
-        return []
-    
-    try:
-        records = sheet.get_all_records()
-        stats = defaultdict(lambda: {"games": 0, "total_score": 0, "username": ""})
-        
-        for record in records:
-            user_id = str(record.get("User ID", ""))
-            if not user_id:
-                continue
-            
-            username = record.get("Username", user_id)
-            score = record.get("Набранные очки", 0)
-            
-            stats[user_id]["games"] += 1
-            stats[user_id]["total_score"] += score
-            stats[user_id]["username"] = username
-        
-        # Формируем список для вывода
-        leaderboard = []
-        for user_id, data in stats.items():
-            avg_score = data["total_score"] / data["games"] if data["games"] > 0 else 0
-            leaderboard.append({
-                "user_id": user_id,
-                "username": data["username"],
-                "games": data["games"],
-                "total_score": data["total_score"],
-                "avg_score": round(avg_score, 2)
-            })
-        
-        # Сортируем по суммарным очкам (от большего к меньшему)
-        leaderboard.sort(key=lambda x: x["total_score"], reverse=True)
-        return leaderboard
-    except Exception as e:
-        print(f"❌ Ошибка получения статистики: {e}")
-        return []
-
-async def get_user_stats(user_id: int) -> Dict:
-    """Получает статистику конкретного игрока"""
-    leaderboard = await get_leaderboard_stats()
-    for player in leaderboard:
-        if player["user_id"] == str(user_id):
-            return player
-    return None
+TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/20sec.MP4")
 
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
@@ -399,6 +289,9 @@ async def close_registration_and_start(context: ContextTypes.DEFAULT_TYPE, chat_
     game.status = "active"
     users_list = "\n".join(f"• {p['username']}" for p in game.registered.values())
     start_line = format_datetime_msk_multiline(game.scheduled_start_utc)
+    send_kwargs = {"chat_id": chat_id, "text": f"🎉 Регистрация завершена. Начинаем викторину «{game.pack['title']}»!\n{start_line}\nУчастников: {len(game.registered)}\n{users_list}"}
+    if game.message_thread_id:
+        send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.edit_message_text(
         chat_id=chat_id,
         message_id=game.reg_msg_id,
@@ -571,10 +464,6 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
     game = games.pop(chat_id, None)
     if not game:
         return
-    
-    # Сохраняем результаты в Google Sheets
-    await save_quiz_results(game)
-    
     leaderboard = game.get_leaderboard()
     if not leaderboard:
         send_kwargs = {"chat_id": chat_id, "text": "Нет участников."}
@@ -599,59 +488,6 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# -------------------- Команда /leaderboard --------------------
-async def leaderboard_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает общий рейтинг всех игроков по итогам всех квизов"""
-    await update.message.reply_text("🔄 Загружаю статистику...")
-    
-    leaderboard = await get_leaderboard_stats()
-    if not leaderboard:
-        await update.message.reply_text("❌ Пока нет сохранённых результатов. Проведите хотя бы один квиз!")
-        return
-    
-    # Формируем сообщение
-    message = "🏆 *ОБЩИЙ РЕЙТИНГ ИГРОКОВ*\n\n"
-    for i, player in enumerate(leaderboard[:20], 1):  # Показываем топ-20
-        medal = ""
-        if i == 1:
-            medal = "🥇"
-        elif i == 2:
-            medal = "🥈"
-        elif i == 3:
-            medal = "🥉"
-        
-        message += f"{medal} *{i}. {player['username']}*\n"
-        message += f"   📊 Игр: {player['games']}\n"
-        message += f"   ⭐ Сумма очков: {player['total_score']}\n"
-        message += f"   📈 Среднее: {player['avg_score']}\n\n"
-    
-    if len(leaderboard) > 20:
-        message += f"*И ещё {len(leaderboard) - 20} игроков...*"
-    
-    await update.message.reply_text(message, parse_mode="Markdown")
-
-# -------------------- Команда /stats --------------------
-async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает личную статистику игрока"""
-    user = update.effective_user
-    username = format_username(user)
-    
-    await update.message.reply_text("🔄 Загружаю вашу статистику...")
-    
-    stats = await get_user_stats(user.id)
-    if not stats:
-        await update.message.reply_text(f"❌ {username}, у вас пока нет сохранённых результатов. Сыграйте в квиз!")
-        return
-    
-    message = f"📊 *ЛИЧНАЯ СТАТИСТИКА*\n\n"
-    message += f"👤 Игрок: {stats['username']}\n"
-    message += f"🎮 Сыграно квизов: {stats['games']}\n"
-    message += f"⭐ Сумма очков: {stats['total_score']}\n"
-    message += f"📈 Средний балл за квиз: {stats['avg_score']}\n"
-    
-    await update.message.reply_text(message, parse_mode="Markdown")
-
-# -------------------- Остальные команды --------------------
 async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer("Ответ принят ✅")
@@ -666,6 +502,7 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     game.record_answer(user.id, option_idx)
 
+# -------------------- Команды организатора --------------------
 async def pause_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user = update.effective_user
@@ -726,7 +563,15 @@ def main():
     app = Application.builder().token(token).build()
     
     app.add_handler(CommandHandler("quiz", quiz_command))
-    app.add_handler(CommandHandler("leaderboard", leaderboard_command))
-    app.add_handler(CommandHandler("stats", stats_command))
     app.add_handler(CommandHandler("pause", pause_quiz))
     app.add_handler(CommandHandler("resume", resume_quiz))
+    app.add_handler(CommandHandler("abort", abort_quiz))
+    app.add_handler(CallbackQueryHandler(register_callback, pattern="register"))
+    app.add_handler(CallbackQueryHandler(start_early_callback, pattern="start_early"))
+    app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
+
+    print("🚀 Бот запущен в режиме polling")
+    app.run_polling(drop_pending_updates=True)
+
+if __name__ == "__main__":
+    main()
