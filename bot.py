@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import asyncio
 import logging
 
 from datetime import datetime, timezone, timedelta
@@ -12,9 +13,7 @@ from telegram import (
     InlineKeyboardMarkup
 )
 
-from telegram.error import (
-    BadRequest
-)
+from telegram.error import BadRequest
 
 from telegram.ext import (
     Application,
@@ -40,14 +39,6 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
-WEBHOOK_URL = os.environ.get(
-    "WEBHOOK_URL"
-)
-
-PORT = int(
-    os.environ.get("PORT", 8080)
-)
-
 TIMER_VIDEO_URL = os.environ.get(
     "TIMER_VIDEO_URL",
     ""
@@ -55,9 +46,6 @@ TIMER_VIDEO_URL = os.environ.get(
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN not found")
-
-if not WEBHOOK_URL:
-    raise ValueError("WEBHOOK_URL not found")
 
 # =========================================================
 # STORAGE
@@ -81,18 +69,10 @@ class Game:
     ):
 
         self.chat_id = chat_id
-
         self.pack = pack
-
         self.creator_id = creator_id
-
-        self.message_thread_id = (
-            message_thread_id
-        )
-
-        self.scheduled_start_utc = (
-            scheduled_start_utc
-        )
+        self.message_thread_id = message_thread_id
+        self.scheduled_start_utc = scheduled_start_utc
 
         self.status = "registration"
 
@@ -108,11 +88,7 @@ class Game:
 
         self.question_msg_id = None
 
-    def add_player(
-        self,
-        user_id,
-        username
-    ):
+    def add_player(self, user_id, username):
 
         if user_id not in self.registered:
 
@@ -121,11 +97,7 @@ class Game:
                 "score": 0
             }
 
-    def record_answer(
-        self,
-        user_id,
-        option_idx
-    ):
+    def record_answer(self, user_id, option_idx):
 
         if user_id in self.answers:
             return
@@ -136,9 +108,7 @@ class Game:
         if user_id not in self.registered:
             return
 
-        now = datetime.now(
-            timezone.utc
-        )
+        now = datetime.now(timezone.utc)
 
         self.answers[user_id] = (
             option_idx,
@@ -147,9 +117,7 @@ class Game:
 
     def calculate_scores(self):
 
-        q = self.pack["questions"][
-            self.current_question
-        ]
+        q = self.pack["questions"][self.current_question]
 
         correct = q["correct"]
 
@@ -195,6 +163,7 @@ class Game:
 # HELPERS
 # =========================================================
 
+
 def load_pack(pack_id):
 
     path = f"packs/{pack_id}.json"
@@ -210,6 +179,7 @@ def load_pack(pack_id):
 
         return json.load(f)
 
+
 def format_username(user):
 
     if user.username:
@@ -217,44 +187,12 @@ def format_username(user):
 
     return user.first_name
 
-def msk_to_utc(dt_msk):
-
-    moscow = timezone(
-        timedelta(hours=3)
-    )
-
-    return dt_msk.replace(
-        tzinfo=moscow
-    ).astimezone(timezone.utc)
-
-def format_datetime_msk(dt_utc):
-
-    msk = dt_utc + timedelta(hours=3)
-
-    now = (
-        datetime.now(timezone.utc)
-        + timedelta(hours=3)
-    )
-
-    if msk.date() == now.date():
-
-        return (
-            f"📅 Сегодня "
-            f"в {msk.strftime('%H:%M')}"
-        )
-
-    return (
-        f"📅 "
-        f"{msk.strftime('%d.%m.%Y %H:%M')}"
-    )
 
 async def is_admin(update, user_id):
 
     try:
 
-        member = await update.effective_chat.get_member(
-            user_id
-        )
+        member = await update.effective_chat.get_member(user_id)
 
         return member.status in (
             "administrator",
@@ -267,14 +205,13 @@ async def is_admin(update, user_id):
 
         return False
 
+
 # =========================================================
-# UPDATE REG MESSAGE
+# UPDATE REGISTRATION
 # =========================================================
 
-async def update_registration_message(
-    context,
-    chat_id
-):
+
+async def update_registration_message(context, chat_id):
 
     game = games.get(chat_id)
 
@@ -291,10 +228,8 @@ async def update_registration_message(
 
     text = (
         f"🎪 РЕГИСТРАЦИЯ НА КВИЗ\n\n"
-        f"🎯 {game.pack['title']}\n"
-        f"{format_datetime_msk(game.scheduled_start_utc)}\n\n"
-        f"👥 Участники "
-        f"({len(game.registered)}):\n"
+        f"🎯 {game.pack['title']}\n\n"
+        f"👥 Участники ({len(game.registered)}):\n"
         f"{users}"
     )
 
@@ -327,31 +262,21 @@ async def update_registration_message(
         if "Message is not modified" not in str(e):
             logger.error(e)
 
-    except Exception as e:
-        logger.error(e)
 
 # =========================================================
-# /QUIZ
+# QUIZ COMMAND
 # =========================================================
 
-async def quiz_command(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+
+async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     print("QUIZ COMMAND RECEIVED")
 
     chat_id = update.effective_chat.id
+
     user = update.effective_user
 
-    message_thread_id = (
-        update.effective_message.message_thread_id
-    )
-
-    if not await is_admin(
-        update,
-        user.id
-    ):
+    if not await is_admin(update, user.id):
 
         await update.message.reply_text(
             "❌ Только администратор может запускать квиз."
@@ -371,20 +296,17 @@ async def quiz_command(
 
     args = full_text[5:].strip()
 
-    parts = re.split(
-        r"\s*\|\s*",
-        args
-    )
+    parts = re.split(r"\s*\|\s*", args)
 
     if len(parts) != 3:
 
         await update.message.reply_text(
-            "/quiz 0001 | 2026-05-15 | 18:00"
+            "/quiz 0001 | 2026-05-15 | 21:00"
         )
 
         return
 
-    pack_id, date_str, time_str = parts
+    pack_id, _, _ = parts
 
     pack = load_pack(pack_id)
 
@@ -396,31 +318,10 @@ async def quiz_command(
 
         return
 
-    try:
-
-        dt_msk = datetime.strptime(
-            f"{date_str} {time_str}",
-            "%Y-%m-%d %H:%M"
-        )
-
-    except ValueError:
-
-        await update.message.reply_text(
-            "❌ Неверный формат даты."
-        )
-
-        return
-
-    scheduled_start_utc = msk_to_utc(
-        dt_msk
-    )
-
     game = Game(
         chat_id=chat_id,
         pack=pack,
-        creator_id=user.id,
-        message_thread_id=message_thread_id,
-        scheduled_start_utc=scheduled_start_utc
+        creator_id=user.id
     )
 
     games[chat_id] = game
@@ -440,50 +341,26 @@ async def quiz_command(
         ]
     ])
 
-    text = (
-        f"🎪 РЕГИСТРАЦИЯ НА КВИЗ\n\n"
-        f"🎯 {pack['title']}\n"
-        f"{format_datetime_msk(scheduled_start_utc)}\n\n"
-        f"👥 Участники:\n"
-        f"пока никого"
-    )
-
-    kwargs = {
-        "chat_id": chat_id,
-        "text": text,
-        "reply_markup": keyboard
-    }
-
-    if message_thread_id:
-        kwargs["message_thread_id"] = (
-            message_thread_id
-        )
-
     msg = await context.bot.send_message(
-        **kwargs
+        chat_id=chat_id,
+        text=(
+            f"🎪 РЕГИСТРАЦИЯ НА КВИЗ\n\n"
+            f"🎯 {pack['title']}\n\n"
+            f"👥 Участники:\n"
+            f"пока никого"
+        ),
+        reply_markup=keyboard
     )
 
     game.reg_msg_id = msg.id
 
-    delay = (
-        scheduled_start_utc
-        - datetime.now(timezone.utc)
-    ).total_seconds()
-
-    context.job_queue.run_once(
-        start_quiz_sequence,
-        when=max(delay, 1),
-        data=chat_id
-    )
 
 # =========================================================
 # CALLBACKS
 # =========================================================
 
-async def register_callback(
-    update,
-    context
-):
+
+async def register_callback(update, context):
 
     query = update.callback_query
 
@@ -496,15 +373,6 @@ async def register_callback(
     game = games.get(chat_id)
 
     if not game:
-        return
-
-    if game.status != "registration":
-
-        await query.answer(
-            "Регистрация закрыта",
-            show_alert=True
-        )
-
         return
 
     game.add_player(
@@ -517,10 +385,8 @@ async def register_callback(
         chat_id
     )
 
-async def start_now_callback(
-    update,
-    context
-):
+
+async def start_now_callback(update, context):
 
     query = update.callback_query
 
@@ -528,37 +394,30 @@ async def start_now_callback(
 
     chat_id = update.effective_chat.id
 
-    user = update.effective_user
-
     game = games.get(chat_id)
 
     if not game:
         return
 
-    if user.id != game.creator_id:
+    game.status = "active"
 
-        await query.answer(
-            "Только организатор",
-            show_alert=True
-        )
-
-        return
-
-    await start_quiz_sequence(
-        context,
-        chat_id
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="🚀 Квиз начинается!"
     )
 
-async def answer_callback(
-    update,
-    context
-):
+    context.job_queue.run_once(
+        start_question,
+        when=3,
+        data=chat_id
+    )
+
+
+async def answer_callback(update, context):
 
     query = update.callback_query
 
-    await query.answer(
-        "✅ Ответ принят"
-    )
+    await query.answer("✅ Ответ принят")
 
     chat_id = update.effective_chat.id
 
@@ -567,9 +426,6 @@ async def answer_callback(
     game = games.get(chat_id)
 
     if not game:
-        return
-
-    if game.status != "active":
         return
 
     try:
@@ -586,53 +442,11 @@ async def answer_callback(
         option_idx
     )
 
+
 # =========================================================
-# QUIZ FLOW
+# QUESTIONS
 # =========================================================
 
-async def start_quiz_sequence(
-    context,
-    chat_id=None
-):
-
-    if chat_id is None:
-        chat_id = context.job.data
-
-    game = games.get(chat_id)
-
-    if not game:
-        return
-
-    if game.status == "active":
-        return
-
-    if not game.registered:
-
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="❌ Нет участников."
-        )
-
-        games.pop(chat_id, None)
-
-        return
-
-    game.status = "active"
-
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=(
-            f"🚀 Квиз "
-            f"«{game.pack['title']}» "
-            f"начинается!"
-        )
-    )
-
-    context.job_queue.run_once(
-        start_question,
-        when=5,
-        data=chat_id
-    )
 
 async def start_question(context):
 
@@ -643,17 +457,13 @@ async def start_question(context):
     if not game:
         return
 
-    if game.current_question >= len(
-        game.pack["questions"]
-    ):
+    if game.current_question >= len(game.pack["questions"]):
 
         await finish_quiz(context)
 
         return
 
-    q = game.pack["questions"][
-        game.current_question
-    ]
+    q = game.pack["questions"][game.current_question]
 
     buttons = [
         [
@@ -662,75 +472,23 @@ async def start_question(context):
                 callback_data=f"ans_{i}"
             )
         ]
-        for i, option in enumerate(
-            q["options"]
-        )
+        for i, option in enumerate(q["options"])
     ]
 
-    keyboard = InlineKeyboardMarkup(
-        buttons
-    )
+    keyboard = InlineKeyboardMarkup(buttons)
 
     text = (
-        f"❓ Вопрос "
-        f"{game.current_question + 1}/"
-        f"{len(game.pack['questions'])}\n\n"
+        f"❓ Вопрос {game.current_question + 1}\n\n"
         f"{q['text']}"
     )
 
-    if TIMER_VIDEO_URL:
-
-        try:
-
-            await context.bot.send_video(
-                chat_id=chat_id,
-                video=TIMER_VIDEO_URL,
-                caption="⏳ 20 секунд"
-            )
-
-        except Exception as e:
-            logger.error(e)
-
-    if q.get("image"):
-
-        kwargs = {
-            "chat_id": chat_id,
-            "photo": q["image"],
-            "caption": text,
-            "reply_markup": keyboard
-        }
-
-        if game.message_thread_id:
-            kwargs["message_thread_id"] = (
-                game.message_thread_id
-            )
-
-        msg = await context.bot.send_photo(
-            **kwargs
-        )
-
-    else:
-
-        kwargs = {
-            "chat_id": chat_id,
-            "text": text,
-            "reply_markup": keyboard
-        }
-
-        if game.message_thread_id:
-            kwargs["message_thread_id"] = (
-                game.message_thread_id
-            )
-
-        msg = await context.bot.send_message(
-            **kwargs
-        )
-
-    game.question_msg_id = msg.id
-
-    game.question_start_time = datetime.now(
-        timezone.utc
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=text,
+        reply_markup=keyboard
     )
+
+    game.question_start_time = datetime.now(timezone.utc)
 
     game.answers.clear()
 
@@ -739,6 +497,7 @@ async def start_question(context):
         when=20,
         data=chat_id
     )
+
 
 async def end_question(context):
 
@@ -749,108 +508,41 @@ async def end_question(context):
     if not game:
         return
 
-    q = game.pack["questions"][
-        game.current_question
-    ]
+    q = game.pack["questions"][game.current_question]
 
     game.calculate_scores()
 
-    counts = [0] * len(q["options"])
-
-    for _, (answer, _) in game.answers.items():
-        counts[answer] += 1
-
-    total = len(game.answers)
-
-    lines = []
-
-    for i, option in enumerate(q["options"]):
-
-        percent = 0
-
-        if total > 0:
-
-            percent = round(
-                counts[i] / total * 100,
-                1
-            )
-
-        line = f"{option}: {percent}%"
-
-        if i == q["correct"]:
-            line += " ✅"
-
-        lines.append(line)
-
-    final_text = (
-        f"📊 Результаты\n\n"
-        f"{chr(10).join(lines)}\n\n"
-        f"✅ Правильный ответ:\n"
-        f"{q['options'][q['correct']]}"
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=(
+            f"✅ Правильный ответ:\n"
+            f"{q['options'][q['correct']]}"
+        )
     )
-
-    try:
-
-        if q.get("image"):
-
-            await context.bot.edit_message_caption(
-                chat_id=chat_id,
-                message_id=game.question_msg_id,
-                caption=final_text
-            )
-
-        else:
-
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=game.question_msg_id,
-                text=final_text
-            )
-
-    except Exception as e:
-        logger.error(e)
 
     leaderboard = game.get_leaderboard()
 
     rating = []
 
-    for i, (_, data) in enumerate(
-        leaderboard
-    ):
+    for i, (_, data) in enumerate(leaderboard):
 
         rating.append(
-            f"{i+1}. "
-            f"{data['username']} — "
-            f"{data['score']} очк."
+            f"{i+1}. {data['username']} — {data['score']}"
         )
 
     await context.bot.send_message(
         chat_id=chat_id,
-        text=(
-            "🏆 Рейтинг\n\n"
-            + "\n".join(rating)
-        )
+        text="🏆 Рейтинг\n\n" + "\n".join(rating)
     )
 
     game.current_question += 1
-
-    if game.current_question >= len(
-        game.pack["questions"]
-    ):
-
-        context.job_queue.run_once(
-            finish_quiz,
-            when=5,
-            data=chat_id
-        )
-
-        return
 
     context.job_queue.run_once(
         start_question,
         when=5,
         data=chat_id
     )
+
 
 async def finish_quiz(context):
 
@@ -863,88 +555,36 @@ async def finish_quiz(context):
 
     leaderboard = game.get_leaderboard()
 
-    lines = []
+    text = "🏁 ИТОГИ\n\n"
 
-    for i, (_, data) in enumerate(
-        leaderboard
-    ):
+    for i, (_, data) in enumerate(leaderboard):
 
-        medal = ""
-
-        if i == 0:
-            medal = "🥇"
-
-        elif i == 1:
-            medal = "🥈"
-
-        elif i == 2:
-            medal = "🥉"
-
-        lines.append(
-            f"{medal} "
-            f"{i+1}. "
-            f"{data['username']} — "
-            f"{data['score']} очк."
+        text += (
+            f"{i+1}. {data['username']} — {data['score']}\n"
         )
 
     await context.bot.send_message(
         chat_id=chat_id,
-        text=(
-            "🏁 ИТОГИ КВИЗА\n\n"
-            + "\n".join(lines)
-        )
+        text=text
     )
+
 
 # =========================================================
-# COMMANDS
+# RULES
 # =========================================================
 
-async def rules_command(
-    update,
-    context
-):
 
-    text = (
-        "🎯 ПРАВИЛА КВИЗА\n\n"
-        "• Чем быстрее ответ — тем больше очков\n"
-        "• Засчитывается только первый ответ\n"
-        "• После каждого вопроса рейтинг обновляется\n"
-        "• Побеждает игрок с максимумом очков"
-    )
+async def rules_command(update, context):
 
     await update.message.reply_text(
-        text
+        "🎯 Правила квиза работают"
     )
 
-async def abort_command(
-    update,
-    context
-):
-
-    chat_id = update.effective_chat.id
-
-    if chat_id not in games:
-
-        await update.message.reply_text(
-            "❌ Нет активного квиза."
-        )
-
-        return
-
-    for job in context.job_queue.jobs():
-
-        if job.data == chat_id:
-            job.schedule_removal()
-
-    games.pop(chat_id, None)
-
-    await update.message.reply_text(
-        "❌ Квиз остановлен."
-    )
 
 # =========================================================
 # MAIN
 # =========================================================
+
 
 def main():
 
@@ -989,18 +629,22 @@ def main():
         )
     )
 
-    print("🚀 Quiz Bot started")
-    print("WEBHOOK:", f"{WEBHOOK_URL}/{BOT_TOKEN}")
+    async def remove_webhook():
+        await app.bot.delete_webhook(
+            drop_pending_updates=True
+        )
 
-    app.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        secret_token=None,
-        url_path=BOT_TOKEN,
-        webhook_url=f"{WEBHOOK_URL}/{BOT_TOKEN}",
+    asyncio.run(remove_webhook())
+
+    print("🚀 Quiz Bot polling started")
+
+    app.run_polling(
         drop_pending_updates=True,
         allowed_updates=Update.ALL_TYPES
     )
 
+
 if __name__ == "__main__":
     main()
+
+WEBHOOK_URL полностью удалить.
