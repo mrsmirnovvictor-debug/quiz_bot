@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 # -------------------- Константы --------------------
-TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "https://raw.githubusercontent.com/mrsmirnovvictor-debug/quiz_bot/main/assets/20%20Second%20Timer.mp4")
+TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "")
 
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
@@ -347,18 +347,24 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     if game.message_thread_id:
         send_kwargs["message_thread_id"] = game.message_thread_id
     
-    # Отправляем видео с уменьшенным размером
-    try:
-        await context.bot.send_video(
-            video=TIMER_VIDEO_URL,
-            caption="⏳ У вас есть 20 секунд на ответ!",
-            width=200,
-            height=150,
-            supports_streaming=True,
-            **send_kwargs
-        )
-    except Exception as e:
-        print(f"Ошибка отправки видео: {e}")
+    # Отправляем видео если URL задан
+    if TIMER_VIDEO_URL:
+        try:
+            await context.bot.send_video(
+                video=TIMER_VIDEO_URL,
+                caption="⏳ У вас есть 20 секунд на ответ!",
+                width=200,
+                height=150,
+                supports_streaming=True,
+                **send_kwargs
+            )
+        except Exception as e:
+            print(f"Ошибка отправки видео: {e}")
+            await context.bot.send_message(
+                text="⏳ У вас есть 20 секунд на ответ!",
+                **send_kwargs
+            )
+    else:
         await context.bot.send_message(
             text="⏳ У вас есть 20 секунд на ответ!",
             **send_kwargs
@@ -588,14 +594,6 @@ def main():
     token = os.environ.get("BOT_TOKEN")
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN")
-
-    # Принудительно удаляем вебхук при старте
-    async def delete_webhook():
-        bot = Bot(token=token)
-        await bot.delete_webhook(drop_pending_updates=True)
-        print("✅ Webhook удалён")
-    
-    asyncio.run(delete_webhook())
 
     app = Application.builder().token(token).build()
     
