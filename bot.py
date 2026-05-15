@@ -289,6 +289,9 @@ async def close_registration_and_start(context: ContextTypes.DEFAULT_TYPE, chat_
     game.status = "active"
     users_list = "\n".join(f"• {p['username']}" for p in game.registered.values())
     start_line = format_datetime_msk_multiline(game.scheduled_start_utc)
+    send_kwargs = {"chat_id": chat_id, "text": f"🎉 Регистрация завершена. Начинаем викторину «{game.pack['title']}»!\n{start_line}\nУчастников: {len(game.registered)}\n{users_list}"}
+    if game.message_thread_id:
+        send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.edit_message_text(
         chat_id=chat_id,
         message_id=game.reg_msg_id,
@@ -334,7 +337,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# -------------------- Логика вопросов (видео удаляется после ответа) --------------------
+# -------------------- Логика вопросов --------------------
 async def start_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -357,7 +360,6 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
         f"{q['text']}"
     )
     
-    # Отправляем видео с кнопками в подписи (всё в одном сообщении)
     if TIMER_VIDEO_URL:
         try:
             msg = await context.bot.send_video(
@@ -418,14 +420,12 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
         correct_text += f"\n💡 {q['comment']}"
     final_text = f"❓ Вопрос {game.current_question+1}/{len(game.pack['questions'])}\n{q['text']}\n\n{stats_text}\n\n{correct_text}"
     
-    # Удаляем сообщение с видео
     if game.video_msg_id:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=game.video_msg_id)
         except Exception as e:
             print(f"Не удалось удалить видео: {e}")
     
-    # Отправляем новое сообщение с результатом
     send_kwargs = {"chat_id": chat_id, "text": final_text}
     if game.message_thread_id:
         send_kwargs["message_thread_id"] = game.message_thread_id
@@ -443,14 +443,20 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
     if game.pause_after_question:
         game.pause_after_question = False
         game.status = "paused"
-        await context.bot.send_message(chat_id=chat_id, text="⏸ Квиз приостановлен. /resume для продолжения.")
+        send_kwargs = {"chat_id": chat_id, "text": "⏸ Квиз приостановлен. /resume для продолжения."}
+        if game.message_thread_id:
+            send_kwargs["message_thread_id"] = game.message_thread_id
+        await context.bot.send_message(**send_kwargs)
         return
     
     if game.current_question < len(game.pack["questions"]):
         context.job_queue.run_once(start_question, when=5, chat_id=chat_id, data=chat_id)
     else:
         game.status = "finished"
-        await context.bot.send_message(chat_id=chat_id, text="🎉 Викторина закончена! Подводим итоги...")
+        send_kwargs = {"chat_id": chat_id, "text": "🎉 Викторина закончена! Подводим итоги..."}
+        if game.message_thread_id:
+            send_kwargs["message_thread_id"] = game.message_thread_id
+        await context.bot.send_message(**send_kwargs)
         context.job_queue.run_once(finish_quiz, when=5, chat_id=chat_id, data=chat_id)
 
 async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
@@ -460,7 +466,10 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
         return
     leaderboard = game.get_leaderboard()
     if not leaderboard:
-        await context.bot.send_message(chat_id=chat_id, text="Нет участников.")
+        send_kwargs = {"chat_id": chat_id, "text": "Нет участников."}
+        if game.message_thread_id:
+            send_kwargs["message_thread_id"] = game.message_thread_id
+        await context.bot.send_message(**send_kwargs)
         return
     final_lines, rank, i = [], 1, 0
     while i < len(leaderboard):
@@ -473,7 +482,11 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
             medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else ""
             final_lines.append(f"{medal} {rank} место. {data['username']} — {data['score']} очк.")
         rank += len(same_score)
-    await context.bot.send_message(chat_id=chat_id, text="🏁 Итоговое положение:\n\n" + "\n".join(final_lines))
+    table = "🏁 Итоговое положение:\n\n" + "\n".join(final_lines)
+    send_kwargs = {"chat_id": chat_id, "text": table}
+    if game.message_thread_id:
+        send_kwargs["message_thread_id"] = game.message_thread_id
+    await context.bot.send_message(**send_kwargs)
 
 async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
