@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 # -------------------- Константы --------------------
-TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "")
+TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "https://raw.githubusercontent.com/ВАШ_АККАУНТ/ВАШ_РЕПОЗИТОРИЙ/main/assets/20sec.MP4")
 
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
@@ -54,6 +54,7 @@ class Game:
         self.question_start_time = None
         self.reg_msg_id = None
         self.question_msg_id = None
+        self.video_msg_id = None
         self.reg_timer_job = None
         self.question_timer_job = None
         self.scheduled_start_utc = scheduled_start_utc
@@ -347,10 +348,10 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     if game.message_thread_id:
         base_kwargs["message_thread_id"] = game.message_thread_id
     
-    # Отправляем видео если URL задан
+    # Отправляем видео без зацикливания (Telegram по умолчанию не зацикливает)
     if TIMER_VIDEO_URL:
         try:
-            await context.bot.send_video(
+            video_msg = await context.bot.send_video(
                 video=TIMER_VIDEO_URL,
                 caption="⏳ У вас есть 20 секунд на ответ!",
                 width=200,
@@ -358,6 +359,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
                 supports_streaming=True,
                 **base_kwargs
             )
+            game.video_msg_id = video_msg.message_id
         except Exception as e:
             print(f"Ошибка отправки видео: {e}")
             await context.bot.send_message(
@@ -448,6 +450,9 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
             )
     except:
         pass
+    
+    # Видео остаётся в чате, но мы его не удаляем
+    # (Telegram не позволяет удалять сообщения другим пользователям)
     
     leaderboard = game.get_leaderboard()
     rating_lines = [f"{i+1}. {data['username']} — {data['score']} очк." for i, (_, data) in enumerate(leaderboard)]
@@ -559,51 +564,6 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Данный квиз продолжен уже не будет. Ждите подробной информации о восстановлении сервиса в ближайшее время."
     )
 
-# -------------------- Команда /rules --------------------
-async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rules_text = """🎲 ДРУЗЬЯ, ДОБРО ПОЖАЛОВАТЬ В НАШ КВИЗ!
-
-Мы придумали для вас интеллектуальное шоу, где каждый сможет проверить свою эрудицию и скорость реакции. Всё просто, честно и очень азартно.
-
-Как это будет?
-
-Сначала мы запустим регистрацию. У вас будет время до указанного времени старта, чтобы нажать кнопку "Зарегистрироваться" и занять место за игровым столом. Ведущий (бот) может начать досрочно кнопкой "Начать сейчас".
-
-А дальше начинается самое интересное.
-
-Перед вами один за другим будут появляться вопросы. К каждому вопросу — 4 варианта ответа. Только один из них правильный. Ваша задача — угадать.
-
-Чем быстрее вы выбираете правильный ответ, тем больше баллов получаете.
-
-• 0–5 секунд → +5 бонуса (всего 15)
-• 6–10 секунд → +4 бонуса (всего 14)
-• 11–13 секунд → +3 бонуса (всего 13)
-• 14–16 секунд → +2 бонуса (всего 12)
-• 17–19 секунд → +1 бонус (всего 11)
-
-Как отвечать?
-
-Только через кнопки под вопросом! Текстом в чат писать бесполезно — бот вас просто не увидит.
-
-После каждого вопроса мы показываем:
-
-• Статистику ответов (кто сколько процентов набрал)
-• Правильный ответ с пояснением
-• Текущий рейтинг
-
-В конце игры
-
-Когда все вопросы кончатся, мы подведём итоги и наградим самых быстрых и умных. Первое место — 🥇, второе — 🥈, третье — 🥉.
-
-И последнее, но важное:
-
-Боты не участвуют. Спамить кнопками бессмысленно — засчитывается только первый ответ.
-
-Ну что, готовы?
-
-Жмите "Зарегистрироваться" и готовьте пальцы — вопросы уже ждут своей очереди! 🎯"""
-    await update.message.reply_text(rules_text)
-
 # -------------------- ЗАПУСК --------------------
 def main():
     token = os.environ.get("BOT_TOKEN")
@@ -613,7 +573,6 @@ def main():
     app = Application.builder().token(token).build()
     
     app.add_handler(CommandHandler("quiz", quiz_command))
-    app.add_handler(CommandHandler("rules", rules_command))
     app.add_handler(CommandHandler("pause", pause_quiz))
     app.add_handler(CommandHandler("resume", resume_quiz))
     app.add_handler(CommandHandler("abort", abort_quiz))
