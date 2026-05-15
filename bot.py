@@ -1,10 +1,9 @@
 import os
 import re
 import json
-import asyncio
 import logging
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional
 
 from telegram import (
@@ -39,13 +38,8 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
-TIMER_VIDEO_URL = os.environ.get(
-    "TIMER_VIDEO_URL",
-    ""
-)
-
 if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN not found")
+    raise ValueError("❌ BOT_TOKEN not found")
 
 # =========================================================
 # STORAGE
@@ -54,7 +48,7 @@ if not BOT_TOKEN:
 games = {}
 
 # =========================================================
-# GAME
+# GAME CLASS
 # =========================================================
 
 class Game:
@@ -85,8 +79,6 @@ class Game:
         self.question_start_time = None
 
         self.reg_msg_id = None
-
-        self.question_msg_id = None
 
     def add_player(self, user_id, username):
 
@@ -163,7 +155,6 @@ class Game:
 # HELPERS
 # =========================================================
 
-
 def load_pack(pack_id):
 
     path = f"packs/{pack_id}.json"
@@ -179,14 +170,12 @@ def load_pack(pack_id):
 
         return json.load(f)
 
-
 def format_username(user):
 
     if user.username:
         return f"@{user.username}"
 
     return user.first_name
-
 
 async def is_admin(update, user_id):
 
@@ -205,11 +194,9 @@ async def is_admin(update, user_id):
 
         return False
 
-
 # =========================================================
-# UPDATE REGISTRATION
+# UPDATE REGISTRATION MESSAGE
 # =========================================================
-
 
 async def update_registration_message(context, chat_id):
 
@@ -262,13 +249,14 @@ async def update_registration_message(context, chat_id):
         if "Message is not modified" not in str(e):
             logger.error(e)
 
-
 # =========================================================
-# QUIZ COMMAND
+# /QUIZ
 # =========================================================
 
-
-async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def quiz_command(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
     print("QUIZ COMMAND RECEIVED")
 
@@ -354,11 +342,9 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     game.reg_msg_id = msg.id
 
-
 # =========================================================
 # CALLBACKS
 # =========================================================
-
 
 async def register_callback(update, context):
 
@@ -385,7 +371,6 @@ async def register_callback(update, context):
         chat_id
     )
 
-
 async def start_now_callback(update, context):
 
     query = update.callback_query
@@ -411,7 +396,6 @@ async def start_now_callback(update, context):
         when=3,
         data=chat_id
     )
-
 
 async def answer_callback(update, context):
 
@@ -442,11 +426,9 @@ async def answer_callback(update, context):
         option_idx
     )
 
-
 # =========================================================
 # QUESTIONS
 # =========================================================
-
 
 async def start_question(context):
 
@@ -498,7 +480,6 @@ async def start_question(context):
         data=chat_id
     )
 
-
 async def end_question(context):
 
     chat_id = context.job.data
@@ -543,7 +524,6 @@ async def end_question(context):
         data=chat_id
     )
 
-
 async def finish_quiz(context):
 
     chat_id = context.job.data
@@ -568,11 +548,9 @@ async def finish_quiz(context):
         text=text
     )
 
-
 # =========================================================
-# RULES
+# /RULES
 # =========================================================
-
 
 async def rules_command(update, context):
 
@@ -580,11 +558,9 @@ async def rules_command(update, context):
         "🎯 Правила квиза работают"
     )
 
-
 # =========================================================
 # MAIN
 # =========================================================
-
 
 def main():
 
@@ -629,20 +605,12 @@ def main():
         )
     )
 
-    async def remove_webhook():
-        await app.bot.delete_webhook(
-            drop_pending_updates=True
-        )
-
-    asyncio.run(remove_webhook())
-
     print("🚀 Quiz Bot polling started")
 
     app.run_polling(
         drop_pending_updates=True,
-        allowed_updates=Update.ALL_TYPES
+        close_loop=False
     )
-
 
 if __name__ == "__main__":
     main()
