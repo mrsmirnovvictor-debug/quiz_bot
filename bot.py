@@ -6,7 +6,7 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
@@ -37,25 +37,6 @@ def check_single_instance():
     print(f"✅ Бот запущен с PID {os.getpid()}")
 
 check_single_instance()
-# ---------------------------------------------------------------------
-
-# Принудительно удаляем webhook перед любыми другими операциями
-async def delete_webhook_force():
-    token = os.environ.get("BOT_TOKEN")
-    if token:
-        bot = Bot(token=token)
-        await bot.delete_webhook(drop_pending_updates=True)
-        print("✅ Webhook принудительно удалён")
-
-# Запускаем удаление webhook синхронно
-try:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(delete_webhook_force())
-    loop.close()
-except Exception as e:
-    print(f"⚠️ Ошибка при удалении webhook: {e}")
-
 # ---------------------------------------------------------------------
 
 games = {}
