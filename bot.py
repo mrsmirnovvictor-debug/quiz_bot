@@ -6,13 +6,13 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
 
 # -------------------- Константы --------------------
-TIMER_VIDEO_URL = "https://raw.githubusercontent.com/mrsmirnovvictor-debug/quiz_bot/main/assets/20%20Second%20Timer.mp4"
+TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "https://raw.githubusercontent.com/mrsmirnovvictor-debug/quiz_bot/main/assets/20%20Second%20Timer.mp4")
 
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
@@ -99,7 +99,7 @@ def load_pack(pack_id: str):
         return json.load(f)
 
 def format_username(user):
-    return f"@{user.username}" if user.username else f"@id_{user.id}"
+    return f"@{user.username}" if user.username else f"id{user.id}"
 
 async def is_admin(update: Update, user_id: int) -> bool:
     try:
@@ -321,7 +321,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
             else:
                 mentions.append(f"{member.user.first_name}")
         except:
-            mentions.append(f"Участник {uid}")
+            mentions.append(f"Участник")
     mention_text = " ".join(mentions) if mentions else "Участники"
     warning_text = (
         f"{mention_text}\n\n"
@@ -347,12 +347,13 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     if game.message_thread_id:
         send_kwargs["message_thread_id"] = game.message_thread_id
     
+    # Отправляем видео с уменьшенным размером
     try:
         await context.bot.send_video(
             video=TIMER_VIDEO_URL,
             caption="⏳ У вас есть 20 секунд на ответ!",
-            width=400,
-            height=300,
+            width=200,
+            height=150,
             supports_streaming=True,
             **send_kwargs
         )
@@ -539,7 +540,47 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # -------------------- Команда /rules --------------------
 async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rules_text = "🎲 ДРУЗЬЯ, ДОБРО ПОЖАЛОВАТЬ В НАШ КВИЗ!\n\nМы придумали для вас интеллектуальное шоу..."
+    rules_text = """🎲 ДРУЗЬЯ, ДОБРО ПОЖАЛОВАТЬ В НАШ КВИЗ!
+
+Мы придумали для вас интеллектуальное шоу, где каждый сможет проверить свою эрудицию и скорость реакции. Всё просто, честно и очень азартно.
+
+Как это будет?
+
+Сначала мы запустим регистрацию. У вас будет время до указанного времени старта, чтобы нажать кнопку "Зарегистрироваться" и занять место за игровым столом. Ведущий (бот) может начать досрочно кнопкой "Начать сейчас".
+
+А дальше начинается самое интересное.
+
+Перед вами один за другим будут появляться вопросы. К каждому вопросу — 4 варианта ответа. Только один из них правильный. Ваша задача — угадать.
+
+Чем быстрее вы выбираете правильный ответ, тем больше баллов получаете.
+
+• 0–5 секунд → +5 бонуса (всего 15)
+• 6–10 секунд → +4 бонуса (всего 14)
+• 11–13 секунд → +3 бонуса (всего 13)
+• 14–16 секунд → +2 бонуса (всего 12)
+• 17–19 секунд → +1 бонус (всего 11)
+
+Как отвечать?
+
+Только через кнопки под вопросом! Текстом в чат писать бесполезно — бот вас просто не увидит.
+
+После каждого вопроса мы показываем:
+
+• Статистику ответов (кто сколько процентов набрал)
+• Правильный ответ с пояснением
+• Текущий рейтинг
+
+В конце игры
+
+Когда все вопросы кончатся, мы подведём итоги и наградим самых быстрых и умных. Первое место — 🥇, второе — 🥈, третье — 🥉.
+
+И последнее, но важное:
+
+Боты не участвуют. Спамить кнопками бессмысленно — засчитывается только первый ответ.
+
+Ну что, готовы?
+
+Жмите "Зарегистрироваться" и готовьте пальцы — вопросы уже ждут своей очереди! 🎯"""
     await update.message.reply_text(rules_text)
 
 # -------------------- ЗАПУСК --------------------
@@ -547,6 +588,14 @@ def main():
     token = os.environ.get("BOT_TOKEN")
     if not token:
         raise ValueError("❌ Не задан BOT_TOKEN")
+
+    # Принудительно удаляем вебхук при старте
+    async def delete_webhook():
+        bot = Bot(token=token)
+        await bot.delete_webhook(drop_pending_updates=True)
+        print("✅ Webhook удалён")
+    
+    asyncio.run(delete_webhook())
 
     app = Application.builder().token(token).build()
     
