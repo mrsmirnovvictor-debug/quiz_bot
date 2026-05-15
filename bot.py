@@ -6,13 +6,13 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
 
 # -------------------- Константы --------------------
-TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "https://raw.githubusercontent.com/ВАШ_АККАУНТ/ВАШ_РЕПОЗИТОРИЙ/main/assets/20sec.MP4")
+TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "")
 
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
@@ -37,6 +37,25 @@ def check_single_instance():
     print(f"✅ Бот запущен с PID {os.getpid()}")
 
 check_single_instance()
+# ---------------------------------------------------------------------
+
+# Принудительно удаляем webhook перед любыми другими операциями
+async def delete_webhook_force():
+    token = os.environ.get("BOT_TOKEN")
+    if token:
+        bot = Bot(token=token)
+        await bot.delete_webhook(drop_pending_updates=True)
+        print("✅ Webhook принудительно удалён")
+
+# Запускаем удаление webhook синхронно
+try:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(delete_webhook_force())
+    loop.close()
+except Exception as e:
+    print(f"⚠️ Ошибка при удалении webhook: {e}")
+
 # ---------------------------------------------------------------------
 
 games = {}
@@ -348,7 +367,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     if game.message_thread_id:
         base_kwargs["message_thread_id"] = game.message_thread_id
     
-    # Отправляем видео без зацикливания (Telegram по умолчанию не зацикливает)
+    # Отправляем видео если URL задан
     if TIMER_VIDEO_URL:
         try:
             video_msg = await context.bot.send_video(
@@ -450,9 +469,6 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
             )
     except:
         pass
-    
-    # Видео остаётся в чате, но мы его не удаляем
-    # (Telegram не позволяет удалять сообщения другим пользователям)
     
     leaderboard = game.get_leaderboard()
     rating_lines = [f"{i+1}. {data['username']} — {data['score']} очк." for i, (_, data) in enumerate(leaderboard)]
