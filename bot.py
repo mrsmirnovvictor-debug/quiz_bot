@@ -1,6 +1,8 @@
 import os
 import re
 import json
+import logging
+
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -20,58 +22,36 @@ from telegram.ext import (
 )
 
 # =========================================================
+# LOGGING
+# =========================================================
+
+logging.basicConfig(
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    level=logging.INFO
+)
+
+logger = logging.getLogger(__name__)
+
+# =========================================================
 # CONFIG
 # =========================================================
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "")
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
+PORT = int(os.environ.get("PORT", 8080))
+
+TIMER_VIDEO_URL = os.environ.get(
+    "TIMER_VIDEO_URL",
+    ""
+)
 
 if not BOT_TOKEN:
-    raise ValueError("❌ BOT_TOKEN не найден")
+    raise ValueError("BOT_TOKEN not found")
+
+if not WEBHOOK_URL:
+    raise ValueError("WEBHOOK_URL not found")
 
 games = {}
-
-# =========================================================
-# HELPERS
-# =========================================================
-
-def load_pack(pack_id: str):
-    path = f"packs/{pack_id}.json"
-
-    if not os.path.exists(path):
-        return None
-
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def format_username(user):
-    return f"@{user.username}" if user.username else user.first_name
-
-
-def msk_to_utc(dt_msk: datetime) -> datetime:
-    moscow = timezone(timedelta(hours=3))
-    return dt_msk.replace(tzinfo=moscow).astimezone(timezone.utc)
-
-
-def format_datetime_msk_multiline(dt_utc: datetime) -> str:
-    msk = dt_utc + timedelta(hours=3)
-    now_msk = datetime.now(timezone.utc) + timedelta(hours=3)
-
-    if msk.date() == now_msk.date():
-        return f"📅 Дата и время начала:\nсегодня, в {msk.strftime('%H:%M')}"
-
-    return f"📅 Дата и время начала:\n{msk.strftime('%d.%m.%Y')} в {msk.strftime('%H:%M')}"
-
-
-async def is_admin(update: Update, user_id: int):
-    try:
-        member = await update.effective_chat.get_member(user_id)
-        return member.status in ("creator", "administrator")
-    except Exception as e:
-        print(f"Ошибка проверки админа: {e}")
-        return False
-
 
 # =========================================================
 # GAME CLASS
@@ -91,6 +71,7 @@ class Game:
         self.chat_id = chat_id
         self.pack = pack
         self.creator_id = creator_id
+
         self.message_thread_id = message_thread_id
 
         self.status = "registration"
@@ -108,11 +89,10 @@ class Game:
 
         self.scheduled_start_utc = scheduled_start_utc
 
-        self.pause_after_question = False
-
     def add_player(self, user_id, username):
 
         if user_id not in self.registered:
+
             self.registered[user_id] = {
                 "username": username,
                 "score": 0
@@ -131,11 +111,16 @@ class Game:
 
         now = datetime.now(timezone.utc)
 
-        self.answers[user_id] = (option_idx, now)
+        self.answers[user_id] = (
+            option_idx,
+            now
+        )
 
     def calculate_scores(self):
 
-        q = self.pack["questions"][self.current_question]
+        q = self.pack["questions"][
+            self.current_question
+        ]
 
         correct = q["correct"]
 
@@ -146,16 +131,22 @@ class Game:
 
             points = 10
 
-            delta = (ts - self.question_start_time).total_seconds()
+            delta = (
+                ts - self.question_start_time
+            ).total_seconds()
 
             if delta <= 5:
                 points += 5
+
             elif delta <= 10:
                 points += 4
+
             elif delta <= 13:
                 points += 3
+
             elif delta <= 16:
                 points += 2
+
             elif delta <= 19:
                 points += 1
 
@@ -171,62 +162,91 @@ class Game:
             )
         )
 
+# =========================================================
+# HELPERS
+# =========================================================
+
+def load_pack(pack_id: str):
+
+    path = f"packs/{pack_id}.json"
+
+    if not os.path.exists(path):
+        return None
+
+    with open(
+        path,
+        "r",
+        encoding="utf-8"
+    ) as f:
+
+        return json.load(f)
+
+
+def format_username(user):
+
+    if user.username:
+        return f"@{user.username}"
+
+    return user.first_name
+
+
+def msk_to_utc(dt_msk: datetime):
+
+    moscow = timezone(timedelta(hours=3))
+
+    return dt_msk.replace(
+        tzinfo=moscow
+    ).astimezone(timezone.utc)
+
+
+def format_datetime_msk_multiline(dt_utc):
+
+    msk = dt_utc + timedelta(hours=3)
+
+    now_msk = (
+        datetime.now(timezone.utc)
+        + timedelta(hours=3)
+    )
+
+    if msk.date() == now_msk.date():
+
+        return (
+            f"📅 Сегодня в "
+            f"{msk.strftime('%H:%M')}"
+        )
+
+    return (
+        f"📅 "
+        f"{msk.strftime('%d.%m.%Y %H:%M')}"
+    )
+
+
+async def is_admin(update, user_id):
+
+    try:
+
+        member = await update.effective_chat.get_member(
+            user_id
+        )
+
+        return member.status in (
+            "creator",
+            "administrator"
+        )
+
+    except Exception as e:
+
+        logger.error(e)
+
+        return False
 
 # =========================================================
 # REGISTRATION
 # =========================================================
 
-async def open_registration(
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int
-):
-
-    game = games.get(chat_id)
-
-    if not game:
-        return
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(
-            "📝 Зарегистрироваться",
-            callback_data="register"
-        )],
-        [InlineKeyboardButton(
-            "🚀 Начать сейчас",
-            callback_data="start_early"
-        )]
-    ])
-
-    users_list = "пока никого"
-
-    start_line = format_datetime_msk_multiline(
-        game.scheduled_start_utc
-    )
-
-    text = (
-        f"🎪 ОТКРЫТА РЕГИСТРАЦИЯ НА КВИЗ\n\n"
-        f"✏️ Тема: {game.pack['title']}\n"
-        f"{start_line}\n\n"
-        f"👥 Участники:\n{users_list}"
-    )
-
-    kwargs = {
-        "chat_id": chat_id,
-        "text": text,
-        "reply_markup": keyboard
-    }
-
-    if game.message_thread_id:
-        kwargs["message_thread_id"] = game.message_thread_id
-
-    msg = await context.bot.send_message(**kwargs)
-
-    game.reg_msg_id = msg.id
-
-
 async def update_registration_message(
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int
+    context,
+    chat_id
 ):
 
     game = games.get(chat_id)
@@ -234,36 +254,36 @@ async def update_registration_message(
     if not game:
         return
 
-    users_list = "\n".join(
+    users = "\n".join(
         f"• {x['username']}"
         for x in game.registered.values()
     )
 
-    if not users_list:
-        users_list = "пока никого"
+    if not users:
+        users = "пока никого"
 
-    start_line = format_datetime_msk_multiline(
-        game.scheduled_start_utc
+    text = (
+        f"🎪 РЕГИСТРАЦИЯ НА КВИЗ\n\n"
+        f"🎯 {game.pack['title']}\n"
+        f"{format_datetime_msk_multiline(game.scheduled_start_utc)}\n\n"
+        f"👥 Участники ({len(game.registered)}):\n"
+        f"{users}"
     )
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(
-            "📝 Зарегистрироваться",
-            callback_data="register"
-        )],
-        [InlineKeyboardButton(
-            "🚀 Начать сейчас",
-            callback_data="start_early"
-        )]
+        [
+            InlineKeyboardButton(
+                "📝 Зарегистрироваться",
+                callback_data="register"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🚀 Начать сейчас",
+                callback_data="start_now"
+            )
+        ]
     ])
-
-    text = (
-        f"🎪 ОТКРЫТА РЕГИСТРАЦИЯ НА КВИЗ\n\n"
-        f"✏️ Тема: {game.pack['title']}\n"
-        f"{start_line}\n\n"
-        f"👥 Участники ({len(game.registered)}):\n"
-        f"{users_list}"
-    )
 
     try:
 
@@ -277,14 +297,13 @@ async def update_registration_message(
     except BadRequest as e:
 
         if "Message is not modified" not in str(e):
-            print(e)
+            logger.error(e)
 
     except Exception as e:
-        print(e)
-
+        logger.error(e)
 
 # =========================================================
-# COMMAND /quiz
+# /QUIZ
 # =========================================================
 
 async def quiz_command(
@@ -296,12 +315,14 @@ async def quiz_command(
 
     user = update.effective_user
 
-    message_thread_id = update.effective_message.message_thread_id
+    message_thread_id = (
+        update.effective_message.message_thread_id
+    )
 
     if not await is_admin(update, user.id):
 
         await update.message.reply_text(
-            "❌ Только администраторы могут запускать квиз."
+            "❌ Только администратор может запустить квиз."
         )
 
         return
@@ -314,11 +335,11 @@ async def quiz_command(
 
         return
 
-    full_text = update.message.text.strip()
+    text = update.message.text.strip()
 
-    rest = full_text[5:].strip()
+    args = text[5:].strip()
 
-    parts = re.split(r'\s*\|\s*', rest)
+    parts = re.split(r"\s*\|\s*", args)
 
     if len(parts) != 3:
 
@@ -350,22 +371,12 @@ async def quiz_command(
     except ValueError:
 
         await update.message.reply_text(
-            "❌ Неверный формат даты."
+            "❌ Ошибка даты."
         )
 
         return
 
     scheduled_start_utc = msk_to_utc(dt_msk)
-
-    now_utc = datetime.now(timezone.utc)
-
-    if scheduled_start_utc <= now_utc:
-
-        await update.message.reply_text(
-            "❌ Время старта уже прошло."
-        )
-
-        return
 
     game = Game(
         chat_id=chat_id,
@@ -377,27 +388,60 @@ async def quiz_command(
 
     games[chat_id] = game
 
-    await open_registration(context, chat_id)
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "📝 Зарегистрироваться",
+                callback_data="register"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🚀 Начать сейчас",
+                callback_data="start_now"
+            )
+        ]
+    ])
+
+    text = (
+        f"🎪 РЕГИСТРАЦИЯ НА КВИЗ\n\n"
+        f"🎯 {pack['title']}\n"
+        f"{format_datetime_msk_multiline(scheduled_start_utc)}\n\n"
+        f"👥 Участники:\n"
+        f"пока никого"
+    )
+
+    kwargs = {
+        "chat_id": chat_id,
+        "text": text,
+        "reply_markup": keyboard
+    }
+
+    if message_thread_id:
+        kwargs["message_thread_id"] = message_thread_id
+
+    msg = await context.bot.send_message(
+        **kwargs
+    )
+
+    game.reg_msg_id = msg.id
 
     delay = (
-        scheduled_start_utc - now_utc
+        scheduled_start_utc
+        - datetime.now(timezone.utc)
     ).total_seconds()
 
     context.job_queue.run_once(
         start_quiz_sequence,
-        when=delay,
+        when=max(delay, 1),
         data=chat_id
     )
-
 
 # =========================================================
 # CALLBACKS
 # =========================================================
 
-async def register_callback(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def register_callback(update, context):
 
     query = update.callback_query
 
@@ -415,13 +459,10 @@ async def register_callback(
     if game.status != "registration":
 
         await query.answer(
-            "Регистрация закрыта.",
+            "Регистрация закрыта",
             show_alert=True
         )
 
-        return
-
-    if user.is_bot:
         return
 
     game.add_player(
@@ -435,10 +476,7 @@ async def register_callback(
     )
 
 
-async def start_early_callback(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def start_now_callback(update, context):
 
     query = update.callback_query
 
@@ -456,23 +494,23 @@ async def start_early_callback(
     if user.id != game.creator_id:
 
         await query.answer(
-            "Только организатор.",
+            "Только организатор",
             show_alert=True
         )
 
         return
 
-    await start_quiz_sequence(context, chat_id)
+    await start_quiz_sequence(
+        context,
+        chat_id
+    )
 
 
-async def answer_callback(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def answer_callback(update, context):
 
     query = update.callback_query
 
-    await query.answer("Ответ принят ✅")
+    await query.answer("✅ Ответ принят")
 
     chat_id = update.effective_chat.id
 
@@ -500,13 +538,12 @@ async def answer_callback(
         option_idx
     )
 
-
 # =========================================================
 # QUIZ FLOW
 # =========================================================
 
 async def start_quiz_sequence(
-    context: ContextTypes.DEFAULT_TYPE,
+    context,
     chat_id=None
 ):
 
@@ -516,6 +553,9 @@ async def start_quiz_sequence(
     game = games.get(chat_id)
 
     if not game:
+        return
+
+    if game.status == "active":
         return
 
     if not game.registered:
@@ -534,7 +574,9 @@ async def start_quiz_sequence(
     await context.bot.send_message(
         chat_id=chat_id,
         text=(
-            f"🚀 Квиз «{game.pack['title']}» начинается!"
+            f"🚀 Квиз "
+            f"«{game.pack['title']}» "
+            f"начинается!"
         )
     )
 
@@ -545,9 +587,7 @@ async def start_quiz_sequence(
     )
 
 
-async def start_question(
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def start_question(context):
 
     chat_id = context.job.data
 
@@ -556,24 +596,32 @@ async def start_question(
     if not game:
         return
 
-    if game.current_question >= len(game.pack["questions"]):
+    if game.current_question >= len(
+        game.pack["questions"]
+    ):
 
         await finish_quiz(context)
 
         return
 
-    q = game.pack["questions"][game.current_question]
+    q = game.pack["questions"][
+        game.current_question
+    ]
 
     buttons = [
-        InlineKeyboardButton(
-            opt,
-            callback_data=f"ans_{i}"
+        [
+            InlineKeyboardButton(
+                option,
+                callback_data=f"ans_{i}"
+            )
+        ]
+        for i, option in enumerate(
+            q["options"]
         )
-        for i, opt in enumerate(q["options"])
     ]
 
     keyboard = InlineKeyboardMarkup(
-        [[btn] for btn in buttons]
+        buttons
     )
 
     text = (
@@ -590,11 +638,11 @@ async def start_question(
             await context.bot.send_video(
                 chat_id=chat_id,
                 video=TIMER_VIDEO_URL,
-                caption="⏳ У вас 20 секунд"
+                caption="⏳ 20 секунд"
             )
 
         except Exception as e:
-            print(e)
+            logger.error(e)
 
     if q.get("image"):
 
@@ -606,9 +654,13 @@ async def start_question(
         }
 
         if game.message_thread_id:
-            kwargs["message_thread_id"] = game.message_thread_id
+            kwargs["message_thread_id"] = (
+                game.message_thread_id
+            )
 
-        msg = await context.bot.send_photo(**kwargs)
+        msg = await context.bot.send_photo(
+            **kwargs
+        )
 
     else:
 
@@ -619,9 +671,13 @@ async def start_question(
         }
 
         if game.message_thread_id:
-            kwargs["message_thread_id"] = game.message_thread_id
+            kwargs["message_thread_id"] = (
+                game.message_thread_id
+            )
 
-        msg = await context.bot.send_message(**kwargs)
+        msg = await context.bot.send_message(
+            **kwargs
+        )
 
     game.question_msg_id = msg.id
 
@@ -631,16 +687,6 @@ async def start_question(
 
     game.answers.clear()
 
-    try:
-
-        await context.bot.pin_chat_message(
-            chat_id=chat_id,
-            message_id=msg.id
-        )
-
-    except Exception as e:
-        print(e)
-
     context.job_queue.run_once(
         end_question,
         when=20,
@@ -648,9 +694,7 @@ async def start_question(
     )
 
 
-async def end_question(
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def end_question(context):
 
     chat_id = context.job.data
 
@@ -659,58 +703,44 @@ async def end_question(
     if not game:
         return
 
-    q = game.pack["questions"][game.current_question]
+    q = game.pack["questions"][
+        game.current_question
+    ]
 
     game.calculate_scores()
 
-    total_answers = len(game.answers)
-
     counts = [0] * len(q["options"])
 
-    for _, (ans_idx, _) in game.answers.items():
+    for _, (answer, _) in game.answers.items():
+        counts[answer] += 1
 
-        counts[ans_idx] += 1
+    total = len(game.answers)
 
-    percents = []
+    lines = []
 
-    for c in counts:
+    for i, option in enumerate(q["options"]):
 
-        if total_answers == 0:
-            percents.append(0)
-        else:
-            percents.append(
-                round(c / total_answers * 100, 1)
+        percent = 0
+
+        if total > 0:
+            percent = round(
+                counts[i] / total * 100,
+                1
             )
 
-    stats_lines = []
-
-    for i, opt in enumerate(q["options"]):
-
-        line = f"{opt}: {percents[i]}%"
+        line = f"{option}: {percent}%"
 
         if i == q["correct"]:
             line += " ✅"
 
-        stats_lines.append(line)
-
-    stats_text = "\n".join(stats_lines)
+        lines.append(line)
 
     final_text = (
-        f"📊 Результаты вопроса\n\n"
-        f"{stats_text}\n\n"
+        f"📊 Результаты\n\n"
+        f"{chr(10).join(lines)}\n\n"
         f"✅ Правильный ответ:\n"
         f"{q['options'][q['correct']]}"
     )
-
-    try:
-
-        await context.bot.unpin_chat_message(
-            chat_id=chat_id,
-            message_id=game.question_msg_id
-        )
-
-    except Exception as e:
-        print(e)
 
     try:
 
@@ -731,15 +761,15 @@ async def end_question(
             )
 
     except Exception as e:
-        print(e)
+        logger.error(e)
 
     leaderboard = game.get_leaderboard()
 
-    lines = []
+    rating = []
 
     for i, (_, data) in enumerate(leaderboard):
 
-        lines.append(
+        rating.append(
             f"{i+1}. "
             f"{data['username']} — "
             f"{data['score']} очк."
@@ -747,12 +777,17 @@ async def end_question(
 
     await context.bot.send_message(
         chat_id=chat_id,
-        text="🏆 Рейтинг:\n\n" + "\n".join(lines)
+        text=(
+            "🏆 Рейтинг\n\n"
+            + "\n".join(rating)
+        )
     )
 
     game.current_question += 1
 
-    if game.current_question >= len(game.pack["questions"]):
+    if game.current_question >= len(
+        game.pack["questions"]
+    ):
 
         context.job_queue.run_once(
             finish_quiz,
@@ -769,9 +804,7 @@ async def end_question(
     )
 
 
-async def finish_quiz(
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def finish_quiz(context):
 
     chat_id = context.job.data
 
@@ -790,8 +823,10 @@ async def finish_quiz(
 
         if i == 0:
             medal = "🥇"
+
         elif i == 1:
             medal = "🥈"
+
         elif i == 2:
             medal = "🥉"
 
@@ -804,31 +839,33 @@ async def finish_quiz(
 
     await context.bot.send_message(
         chat_id=chat_id,
-        text="🏁 ИТОГИ КВИЗА\n\n" + "\n".join(lines)
+        text=(
+            "🏁 ИТОГИ КВИЗА\n\n"
+            + "\n".join(lines)
+        )
     )
 
-
 # =========================================================
-# COMMANDS
+# RULES
 # =========================================================
 
-async def rules_command(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def rules_command(update, context):
 
-    await update.message.reply_text(
-        "🎯 Правила квиза:\n\n"
-        "— Быстрее отвечаешь → больше очков\n"
-        "— Только первый ответ засчитывается\n"
-        "— Побеждает игрок с максимумом очков"
+    text = (
+        "🎯 ПРАВИЛА КВИЗА\n\n"
+        "• Чем быстрее ответ — тем больше очков\n"
+        "• Засчитывается только первый ответ\n"
+        "• После каждого вопроса рейтинг обновляется\n"
+        "• Побеждает игрок с максимумом очков"
     )
 
+    await update.message.reply_text(text)
 
-async def abort_quiz(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+# =========================================================
+# ABORT
+# =========================================================
+
+async def abort_command(update, context):
 
     chat_id = update.effective_chat.id
 
@@ -848,7 +885,6 @@ async def abort_quiz(
         "❌ Квиз остановлен."
     )
 
-
 # =========================================================
 # MAIN
 # =========================================================
@@ -860,15 +896,24 @@ def main():
     ).build()
 
     app.add_handler(
-        CommandHandler("quiz", quiz_command)
+        CommandHandler(
+            "quiz",
+            quiz_command
+        )
     )
 
     app.add_handler(
-        CommandHandler("rules", rules_command)
+        CommandHandler(
+            "rules",
+            rules_command
+        )
     )
 
     app.add_handler(
-        CommandHandler("abort", abort_quiz)
+        CommandHandler(
+            "abort",
+            abort_command
+        )
     )
 
     app.add_handler(
@@ -880,8 +925,8 @@ def main():
 
     app.add_handler(
         CallbackQueryHandler(
-            start_early_callback,
-            pattern="start_early"
+            start_now_callback,
+            pattern="start_now"
         )
     )
 
@@ -892,12 +937,14 @@ def main():
         )
     )
 
-    print("🚀 Quiz Bot запущен")
+    logger.info("🚀 Quiz Bot started")
 
-    app.run_polling(
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        webhook_url=WEBHOOK_URL,
         drop_pending_updates=True
     )
-
 
 if __name__ == "__main__":
     main()
