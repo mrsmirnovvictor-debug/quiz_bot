@@ -438,13 +438,14 @@ async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     msg = await context.bot.send_message(**send_kwargs)
     game.reg_msg_id = msg.id
     
+    # Пин сообщения регистрации
     try:
         await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.id, disable_notification=False)
     except Exception as e:
         print(f"Не удалось закрепить сообщение регистрации: {e}")
     
-    start_time_str = start_line.split('\n')[-1]
-    call_text = f"/all{ZAZYVALA_BOT} Квиз «{game.pack['title']}» начнётся {start_time_str}. Успейте зарегистрироваться!"
+    # Вызов бота-зазывалы - ТОЛЬКО КОМАНДА, БЕЗ ТЕКСТА
+    call_text = f"/all{ZAZYVALA_BOT}"
     call_kwargs = {"chat_id": chat_id, "text": call_text}
     if game.message_thread_id:
         call_kwargs["message_thread_id"] = game.message_thread_id
@@ -915,20 +916,25 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user = update.effective_user
     game = games.get(chat_id)
+    
     if not game:
         await update.message.reply_text("❌ Нет активного квиза.")
         return
+    
     if user.id != game.creator_id:
-        await update.message.reply_text("❌ Только организатор может отменить квиз.")
+        await update.message.reply_text("❌ Только организатор может остановить квиз.")
         return
+    
     for job in context.job_queue.jobs():
         if job.chat_id == chat_id:
             job.schedule_removal()
+    
     games.pop(chat_id, None)
-    await update.message.reply_text(
-        "Упс, что-то пошло не так. Мы остановили квиз и пошли исправлять ошибки.\n"
-        "Данный квиз продолжен уже не будет. Ждите подробной информации о восстановлении сервиса в ближайшее время."
-    )
+    
+    send_kwargs = {"chat_id": chat_id, "text": "Квиз остановлен. Необходимо запустить заново."}
+    if game.message_thread_id:
+        send_kwargs["message_thread_id"] = game.message_thread_id
+    await context.bot.send_message(**send_kwargs)
 
 # -------------------- Команда /stats --------------------
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
