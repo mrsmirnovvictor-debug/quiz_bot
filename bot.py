@@ -154,36 +154,39 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             
             if username in player_stats:
                 stats = player_stats[username]
-                new_games = stats["Количество игр"] + 1
+                old_games_count = stats["Количество игр"]
+                new_games = old_games_count + 1
                 new_total_score = stats["Всего очков"] + score
                 new_avg_score = new_total_score / new_games
                 
                 old_avg_time_all = stats["Среднее время ответа"]
                 if old_avg_time_all > 0:
-                    new_avg_time_all = (old_avg_time_all * stats["Количество игр"] + avg_time_all) / new_games
+                    new_avg_time_all = (old_avg_time_all * old_games_count + avg_time_all) / new_games
                 else:
                     new_avg_time_all = avg_time_all
                 
                 old_avg_time_correct = stats["Среднее время (правильные)"]
                 if old_avg_time_correct > 0:
-                    new_avg_time_correct = (old_avg_time_correct * stats["Количество игр"] + avg_time_correct) / new_games
+                    new_avg_time_correct = (old_avg_time_correct * old_games_count + avg_time_correct) / new_games
                 else:
                     new_avg_time_correct = avg_time_correct
                 
                 old_percent = stats["% правильных ответов"]
-                new_percent = (old_percent * stats["Количество игр"] + correct_percent) / new_games
+                new_percent = (old_percent * old_games_count + correct_percent) / new_games
+                
                 new_elo = max(stats["ELO"], elo)
                 
-                players_sheet.update(f"B{existing_data.index(stats)+2}", [[new_games]])
-                players_sheet.update(f"C{existing_data.index(stats)+2}", [[new_total_score]])
-                players_sheet.update(f"D{existing_data.index(stats)+2}", [[round(new_avg_score, 2)]])
-                players_sheet.update(f"E{existing_data.index(stats)+2}", [[round(new_avg_time_all, 2)]])
-                players_sheet.update(f"F{existing_data.index(stats)+2}", [[round(new_avg_time_correct, 2)]])
-                players_sheet.update(f"G{existing_data.index(stats)+2}", [[round(new_percent, 2)]])
-                players_sheet.update(f"H{existing_data.index(stats)+2}", [[new_elo]])
+                row_index = existing_data.index(stats) + 2
+                players_sheet.update(f"B{row_index}", [[new_games]])
+                players_sheet.update(f"C{row_index}", [[new_total_score]])
+                players_sheet.update(f"D{row_index}", [[round(new_avg_score, 2)]])
+                players_sheet.update(f"E{row_index}", [[round(new_avg_time_all, 2)]])
+                players_sheet.update(f"F{row_index}", [[round(new_avg_time_correct, 2)]])
+                players_sheet.update(f"G{row_index}", [[round(new_percent, 2)]])
+                players_sheet.update(f"H{row_index}", [[new_elo]])
             else:
                 players_sheet.append_row([
-                    username, 1, score, round(score, 2), 
+                    username, 1, score, round(score, 2),
                     round(avg_time_all, 2), round(avg_time_correct, 2),
                     round(correct_percent, 2), elo
                 ])
@@ -438,13 +441,11 @@ async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     msg = await context.bot.send_message(**send_kwargs)
     game.reg_msg_id = msg.id
     
-    # Пин сообщения регистрации
     try:
         await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.id, disable_notification=False)
     except Exception as e:
         print(f"Не удалось закрепить сообщение регистрации: {e}")
     
-    # Вызов бота-зазывалы - ТОЛЬКО КОМАНДА, БЕЗ ТЕКСТА
     call_text = f"/all{ZAZYVALA_BOT}"
     call_kwargs = {"chat_id": chat_id, "text": call_text}
     if game.message_thread_id:
@@ -572,11 +573,11 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
             else:
                 mentions.append(f"{member.user.first_name}")
         except:
-            mentions.append(f"Участник")
+            mentions.append("Участник")
     mention_text = " ".join(mentions) if mentions else "Участники"
     warning_text = (
         f"{mention_text}\n\n"
-        f"🚀 Квиз начнется через 30 секунд! Даём Вам время зайти в Телеграм, проверить ваш VPN и настроиться быстро, "
+        f"Квиз начнется через 30 секунд! Даём Вам время зайти в Телеграм, проверить ваш VPN и настроиться быстро, "
         f"а главное правильно отвечать на вопросы!"
     )
     send_kwargs = {"chat_id": chat_id, "text": warning_text}
@@ -736,7 +737,7 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
         context.job_queue.run_once(start_question, when=5, chat_id=chat_id, data=chat_id)
     else:
         game.status = "finished"
-        send_kwargs = {"chat_id": chat_id, "text": "🎉 Викторина закончена! Подводим итоги..."}
+        send_kwargs = {"chat_id": chat_id, "text": "Викторина закончена! Подводим итоги..."}
         if game.message_thread_id:
             send_kwargs["message_thread_id"] = game.message_thread_id
         await context.bot.send_message(**send_kwargs)
@@ -839,7 +840,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
             pass
         await asyncio.sleep(3)
     
-    final_lines = ["🏁 *Итоговое положение:*\n"]
+    final_lines = ["🏁 Итоговое положение:\n"]
     for medal in players_ranking:
         place = medal["place"]
         players_list = medal["players"]
@@ -856,7 +857,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
             final_lines.append(f"{medal_emoji} {p['username']} — {p['score']} очк.")
     
     table = "\n".join(final_lines)
-    send_kwargs = {"chat_id": chat_id, "text": table, "parse_mode": "Markdown"}
+    send_kwargs = {"chat_id": chat_id, "text": table}
     if game.message_thread_id:
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
@@ -955,7 +956,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         data.sort(key=lambda x: x.get("ELO", 0), reverse=True)
         
-        message = "🏆 *ОБЩАЯ СТАТИСТИКА ИГРОКОВ*\n\n"
+        message = "🏆 ОБЩАЯ СТАТИСТИКА ИГРОКОВ\n\n"
         for i, row in enumerate(data[:20], 1):
             medal = ""
             if i == 1:
@@ -965,14 +966,22 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif i == 3:
                 medal = "🥉"
             
-            message += f"{medal} *{i}. {row['Игрок']}*\n"
+            correct_percent = row.get("% правильных ответов", 0)
+            if isinstance(correct_percent, str):
+                try:
+                    correct_percent = float(correct_percent)
+                except:
+                    correct_percent = 0
+            
+            message += f"{medal} {i}. {row['Игрок']}\n"
             message += f"   📊 Игр: {row['Количество игр']}\n"
             message += f"   ⭐ Всего очков: {row['Всего очков']}\n"
             message += f"   📈 Средний балл: {row['Средний балл за квиз']}\n"
             message += f"   ⏱️ Среднее время: {row['Среднее время ответа']} сек\n"
+            message += f"   ✅ % правильных ответов: {correct_percent:.1f}%\n"
             message += f"   🎯 ELO: {row['ELO']}\n\n"
         
-        await update.message.reply_text(message, parse_mode="Markdown")
+        await update.message.reply_text(message)
     except Exception as e:
         print(f"Ошибка получения статистики: {e}")
         await update.message.reply_text("❌ Ошибка загрузки статистики.")
@@ -1001,20 +1010,20 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         user_games.sort(key=lambda x: x.get("Дата", ""), reverse=True)
         
-        message = f"📜 *ИСТОРИЯ ИГРОКА {username}*\n\n"
+        message = f"📜 ИСТОРИЯ ИГРОКА {username}\n\n"
         
         for i, game_record in enumerate(user_games[:10], 1):
-            message += f"*{i}. {game_record.get('Название квиза', '-')}*\n"
-            message += f"   📅 Дата: {game_record.get('Дата', '-')}\n"
-            message += f"   🏆 Место: {game_record.get('Место', '-')}\n"
-            message += f"   ⭐ Очки: {game_record.get('Общий счёт', 0)}\n"
-            message += f"   ⏱️ Среднее время: {game_record.get('Среднее время ответа', '-')} сек\n"
-            message += f"   🎯 ELO после игры: {game_record.get('ELO после игры', 0)}\n\n"
+            message += f"{i}. {game_record.get('Название квиза', '-')}\n"
+            message += f"   Дата: {game_record.get('Дата', '-')}\n"
+            message += f"   Место: {game_record.get('Место', '-')}\n"
+            message += f"   Очки: {game_record.get('Общий счёт', 0)}\n"
+            message += f"   Среднее время: {game_record.get('Среднее время ответа', '-')} сек\n"
+            message += f"   ELO после игры: {game_record.get('ELO после игры', 0)}\n\n"
         
         if len(user_games) > 10:
-            message += f"_и ещё {len(user_games) - 10} игр..._"
+            message += f"и ещё {len(user_games) - 10} игр..."
         
-        await update.message.reply_text(message, parse_mode="Markdown")
+        await update.message.reply_text(message)
     except Exception as e:
         print(f"Ошибка получения истории: {e}")
         await update.message.reply_text("❌ Ошибка загрузки истории.")
