@@ -4,7 +4,7 @@ import re
 import json
 import asyncio
 from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict, List, Tuple
+from typing import Optional
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -50,8 +50,7 @@ class Game:
         self.status = "registration"
         self.registered = {}
         self.current_question = 0
-        self.answers = {}  # user_id -> (answer_time, is_correct, speed_penalty)
-        self.user_speed_sum = {}  # user_id -> сумма скоростей (меньше = быстрее)
+        self.answers = {}  # user_id -> (option_idx, answer_time, is_correct, points)
         self.question_start_time = None
         self.reg_msg_id = None
         self.question_msg_id = None
@@ -61,61 +60,59 @@ class Game:
         self.scheduled_start_utc = scheduled_start_utc
         self.paused = False
         self.pause_after_question = False
+        self.user_speed_sum = {}
+        self.user_correct_count = {}
 
     def add_player(self, user_id, username):
         if user_id not in self.registered:
-            self.registered[user_id] = {"username": username, "score": 0, "speed_sum": 0, "correct_count": 0}
+            self.registered[user_id] = {"username": username, "score": 0}
+            self.user_speed_sum[user_id] = 0
+            self.user_correct_count[user_id] = 0
 
     def record_answer(self, user_id, option_idx, answer_time: datetime):
         if self.status != "active" or user_id not in self.registered or self.paused:
             return
-        if user_id in self.answers and self.answers[user_id].get("is_recorded"):
+        if user_id in self.answers:
             return
         
         q = self.pack["questions"][self.current_question]
         is_correct = (option_idx == q["correct"])
-        
         delta = (answer_time - self.question_start_time).total_seconds()
         
+        points = 0
         if is_correct:
             points = 10
-            speed_bonus = 0
             if delta <= 5:
-                speed_bonus = 5
+                points += 5
             elif delta <= 10:
-                speed_bonus = 4
+                points += 4
             elif delta <= 13:
-                speed_bonus = 3
+                points += 3
             elif delta <= 16:
-                speed_bonus = 2
+                points += 2
             elif delta <= 19:
-                speed_bonus = 1
-            points += speed_bonus
-            
+                points += 1
             self.registered[user_id]["score"] += points
-            self.registered[user_id]["speed_sum"] += delta  # сумма времени для определения скорости
-            self.registered[user_id]["correct_count"] += 1
+            self.user_speed_sum[user_id] += delta
+            self.user_correct_count[user_id] += 1
         
-        self.answers[user_id] = {
-            "is_recorded": True,
-            "is_correct": is_correct,
-            "delta": delta,
-            "points": points if is_correct else 0
-        }
+        self.answers[user_id] = (option_idx, answer_time, is_correct, points)
 
-    def calculate_final_scores(self):
-        """Рассчитывает финальные очки и сортирует по очкам и скорости"""
+    def get_leaderboard(self):
+        items = list(self.registered.items())
+        items.sort(key=lambda x: (-x[1]["score"], self.user_speed_sum.get(x[0], 0)))
+        return items
+
+    def calculate_final_ranking(self):
         players = []
         for uid, data in self.registered.items():
             players.append({
                 "user_id": uid,
                 "username": data["username"],
                 "score": data["score"],
-                "speed_sum": data["speed_sum"],
-                "correct_count": data["correct_count"]
+                "speed_sum": self.user_speed_sum.get(uid, 0),
+                "correct_count": self.user_correct_count.get(uid, 0)
             })
-        
-        # Сортировка: по очкам, при равенстве — по скорости (меньше сумма = быстрее)
         players.sort(key=lambda x: (-x["score"], x["speed_sum"]))
         return players
 
@@ -354,7 +351,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
     warning_text = (
         f"{mention_text}\n\n"
         f"🚀 Квиз сейчас начнётся! Даём вам 30 секунд зайти в Телеграм, проверить ваш VPN и настроиться быстро, "
-        f"а главное — правильно отвечать на вопросы!"
+        f"а главное правильно отвечать на вопросы!"
     )
     send_kwargs = {"chat_id": chat_id, "text": warning_text}
     if game.message_thread_id:
@@ -384,35 +381,38 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
         f"{q['text']}"
     )
     
+    # Отправляем видео-таймер отдельным сообщением
     if TIMER_VIDEO_URL:
         try:
-            msg = await context.bot.send_video(
+            video_msg = await context.bot.send_video(
                 video=TIMER_VIDEO_URL,
-                caption=question_text,
-                reply_markup=keyboard,
                 width=200,
                 height=150,
                 supports_streaming=True,
                 **base_kwargs
             )
-            game.video_msg_id = msg.message_id
-            game.question_msg_id = msg.message_id
+            game.video_msg_id = video_msg.message_id
         except Exception as e:
             print(f"Ошибка отправки видео: {e}")
-            msg = await context.bot.send_message(
-                text=question_text,
-                reply_markup=keyboard,
-                **base_kwargs
-            )
-            game.question_msg_id = msg.id
+    
+    await asyncio.sleep(0.5)
+    
+    # Отправляем вопрос (с картинкой или без, с кнопками)
+    if q.get("image"):
+        msg = await context.bot.send_photo(
+            photo=q["image"],
+            caption=question_text,
+            reply_markup=keyboard,
+            **base_kwargs
+        )
     else:
         msg = await context.bot.send_message(
             text=question_text,
             reply_markup=keyboard,
             **base_kwargs
         )
-        game.question_msg_id = msg.id
     
+    game.question_msg_id = msg.id
     game.question_start_time = datetime.now(timezone.utc)
     game.answers.clear()
     
@@ -423,10 +423,6 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     
     context.job_queue.run_once(end_question, when=20, chat_id=chat_id, data=chat_id)
 
-async def update_question_timer(context: ContextTypes.DEFAULT_TYPE):
-    # Этот метод вызывается, но теперь не обновляет текст, так как мы удалили таймер из вопроса
-    pass
-
 async def end_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -435,33 +431,29 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
     
     q = game.pack["questions"][game.current_question]
     
-    total_answers = len([a for a in game.answers.values() if a.get("is_recorded")])
+    # Подсчёт статистики по вариантам
+    total_answers = len(game.answers)
     counts = [0] * len(q["options"])
-    for answer in game.answers.values():
-        if answer.get("is_correct"):
-            # В статистике считаем только ответы, которые были записаны
-            pass
+    for uid, (opt_idx, _, is_correct, _) in game.answers.items():
+        if 0 <= opt_idx < len(counts):
+            counts[opt_idx] += 1
     
-    # Для статистики пересчитаем по-другому
-    correct_counts = [0] * len(q["options"])
-    answer_counts = [0] * len(q["options"])
-    for uid, answer in game.answers.items():
-        if answer.get("is_recorded"):
-            # Нам нужно знать, какой вариант выбрал пользователь — у нас нет этой информации
-            pass
+    percents = []
+    for cnt in counts:
+        perc = (cnt / total_answers * 100) if total_answers > 0 else 0
+        percents.append(perc)
     
-    # Простая статистика: просто количество правильных ответов
-    correct_count = sum(1 for a in game.answers.values() if a.get("is_correct"))
-    total_count = len(game.answers)
-    if total_count > 0:
-        stats_text = f"📊 Статистика ответов:\nПравильных ответов: {correct_count}/{total_count} ({correct_count/total_count*100:.1f}%)"
-    else:
-        stats_text = "📊 Статистика ответов: никто не ответил"
+    stats_lines = []
+    for idx, (opt, perc) in enumerate(zip(q["options"], percents)):
+        marker = " ✅" if idx == q["correct"] else ""
+        stats_lines.append(f"{opt}: {perc:.1f}%{marker}")
+    stats_text = "📊 Статистика ответов:\n" + "\n".join(stats_lines)
     
-    correct_text = f"✅ Правильный ответ: {q['options'][q['correct']]}"
+    correct_answer_text = f"✅ Правильный ответ: {q['options'][q['correct']]}"
     if q.get("comment"):
-        correct_text += f"\n💡 {q['comment']}"
-    final_text = f"❓ Вопрос {game.current_question+1}/{len(game.pack['questions'])}\n{q['text']}\n\n{stats_text}\n\n{correct_text}"
+        correct_answer_text += f"\n💡 {q['comment']}"
+    
+    final_text = f"❓ Вопрос {game.current_question+1}/{len(game.pack['questions'])}\n{q['text']}\n\n{stats_text}\n\n{correct_answer_text}"
     
     if game.video_msg_id:
         try:
@@ -474,8 +466,19 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
     
-    # Не показываем промежуточный рейтинг
-    # Рейтинг будет только в конце
+    # Показываем текущий рейтинг (кроме последнего вопроса)
+    is_last_question = (game.current_question == len(game.pack["questions"]) - 1)
+    
+    if not is_last_question:
+        leaderboard = game.get_leaderboard()
+        rating_lines = []
+        for i, (uid, data) in enumerate(leaderboard, 1):
+            rating_lines.append(f"{i}. {data['username']} — {data['score']} очк.")
+        rating_text = "🏆 Текущий рейтинг:\n" + "\n".join(rating_lines)
+        send_kwargs = {"chat_id": chat_id, "text": rating_text}
+        if game.message_thread_id:
+            send_kwargs["message_thread_id"] = game.message_thread_id
+        await context.bot.send_message(**send_kwargs)
     
     game.current_question += 1
     if game.pause_after_question:
@@ -503,7 +506,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
     if not game:
         return
     
-    players = game.calculate_final_scores()
+    players = game.calculate_final_ranking()
     
     if not players:
         send_kwargs = {"chat_id": chat_id, "text": "Нет участников."}
