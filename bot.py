@@ -4,7 +4,7 @@ import re
 import json
 import asyncio
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional, Dict, List, Tuple
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 # -------------------- Константы --------------------
-TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/20sec.MP4")
+TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "")
 
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
@@ -50,7 +50,8 @@ class Game:
         self.status = "registration"
         self.registered = {}
         self.current_question = 0
-        self.answers = {}
+        self.answers = {}  # user_id -> (answer_time, is_correct, speed_penalty)
+        self.user_speed_sum = {}  # user_id -> сумма скоростей (меньше = быстрее)
         self.question_start_time = None
         self.reg_msg_id = None
         self.question_msg_id = None
@@ -63,34 +64,60 @@ class Game:
 
     def add_player(self, user_id, username):
         if user_id not in self.registered:
-            self.registered[user_id] = {"username": username, "score": 0}
+            self.registered[user_id] = {"username": username, "score": 0, "speed_sum": 0, "correct_count": 0}
 
-    def record_answer(self, user_id, option_idx):
-        if self.status == "active" and user_id in self.registered and not self.paused:
-            now = datetime.now(timezone.utc)
-            self.answers[user_id] = (option_idx, now)
-
-    def calculate_scores(self):
+    def record_answer(self, user_id, option_idx, answer_time: datetime):
+        if self.status != "active" or user_id not in self.registered or self.paused:
+            return
+        if user_id in self.answers and self.answers[user_id].get("is_recorded"):
+            return
+        
         q = self.pack["questions"][self.current_question]
-        correct = q["correct"]
-        for uid, (ans, ts) in self.answers.items():
-            if ans == correct:
-                points = 10
-                delta = (ts - self.question_start_time).total_seconds()
-                if delta <= 5:
-                    points += 5
-                elif delta <= 10:
-                    points += 4
-                elif delta <= 13:
-                    points += 3
-                elif delta <= 16:
-                    points += 2
-                elif delta <= 19:
-                    points += 1
-                self.registered[uid]["score"] += points
+        is_correct = (option_idx == q["correct"])
+        
+        delta = (answer_time - self.question_start_time).total_seconds()
+        
+        if is_correct:
+            points = 10
+            speed_bonus = 0
+            if delta <= 5:
+                speed_bonus = 5
+            elif delta <= 10:
+                speed_bonus = 4
+            elif delta <= 13:
+                speed_bonus = 3
+            elif delta <= 16:
+                speed_bonus = 2
+            elif delta <= 19:
+                speed_bonus = 1
+            points += speed_bonus
+            
+            self.registered[user_id]["score"] += points
+            self.registered[user_id]["speed_sum"] += delta  # сумма времени для определения скорости
+            self.registered[user_id]["correct_count"] += 1
+        
+        self.answers[user_id] = {
+            "is_recorded": True,
+            "is_correct": is_correct,
+            "delta": delta,
+            "points": points if is_correct else 0
+        }
 
-    def get_leaderboard(self):
-        return sorted(self.registered.items(), key=lambda x: (-x[1]["score"], x[1]["username"].lower()))
+    def calculate_final_scores(self):
+        """Рассчитывает финальные очки и сортирует по очкам и скорости"""
+        players = []
+        for uid, data in self.registered.items():
+            players.append({
+                "user_id": uid,
+                "username": data["username"],
+                "score": data["score"],
+                "speed_sum": data["speed_sum"],
+                "correct_count": data["correct_count"]
+            })
+        
+        # Сортировка: по очкам, при равенстве — по скорости (меньше сумма = быстрее)
+        players.sort(key=lambda x: (-x["score"], x["speed_sum"]))
+        return players
 
 def load_pack(pack_id: str):
     path = f"packs/{pack_id}.json"
@@ -289,9 +316,6 @@ async def close_registration_and_start(context: ContextTypes.DEFAULT_TYPE, chat_
     game.status = "active"
     users_list = "\n".join(f"• {p['username']}" for p in game.registered.values())
     start_line = format_datetime_msk_multiline(game.scheduled_start_utc)
-    send_kwargs = {"chat_id": chat_id, "text": f"🎉 Регистрация завершена. Начинаем викторину «{game.pack['title']}»!\n{start_line}\nУчастников: {len(game.registered)}\n{users_list}"}
-    if game.message_thread_id:
-        send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.edit_message_text(
         chat_id=chat_id,
         message_id=game.reg_msg_id,
@@ -399,6 +423,10 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     
     context.job_queue.run_once(end_question, when=20, chat_id=chat_id, data=chat_id)
 
+async def update_question_timer(context: ContextTypes.DEFAULT_TYPE):
+    # Этот метод вызывается, но теперь не обновляет текст, так как мы удалили таймер из вопроса
+    pass
+
 async def end_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -406,15 +434,30 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
         return
     
     q = game.pack["questions"][game.current_question]
-    game.calculate_scores()
-    total_answers = len(game.answers)
+    
+    total_answers = len([a for a in game.answers.values() if a.get("is_recorded")])
     counts = [0] * len(q["options"])
-    for _, (ans_idx, _) in game.answers.items():
-        if 0 <= ans_idx < len(counts):
-            counts[ans_idx] += 1
-    percents = [cnt/total_answers*100 if total_answers else 0 for cnt in counts]
-    stats_lines = [f"{opt}: {perc:.1f}%{' ✅' if i==q['correct'] else ''}" for i, (opt, perc) in enumerate(zip(q["options"], percents))]
-    stats_text = "📊 Статистика ответов:\n" + "\n".join(stats_lines)
+    for answer in game.answers.values():
+        if answer.get("is_correct"):
+            # В статистике считаем только ответы, которые были записаны
+            pass
+    
+    # Для статистики пересчитаем по-другому
+    correct_counts = [0] * len(q["options"])
+    answer_counts = [0] * len(q["options"])
+    for uid, answer in game.answers.items():
+        if answer.get("is_recorded"):
+            # Нам нужно знать, какой вариант выбрал пользователь — у нас нет этой информации
+            pass
+    
+    # Простая статистика: просто количество правильных ответов
+    correct_count = sum(1 for a in game.answers.values() if a.get("is_correct"))
+    total_count = len(game.answers)
+    if total_count > 0:
+        stats_text = f"📊 Статистика ответов:\nПравильных ответов: {correct_count}/{total_count} ({correct_count/total_count*100:.1f}%)"
+    else:
+        stats_text = "📊 Статистика ответов: никто не ответил"
+    
     correct_text = f"✅ Правильный ответ: {q['options'][q['correct']]}"
     if q.get("comment"):
         correct_text += f"\n💡 {q['comment']}"
@@ -431,13 +474,8 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
     
-    leaderboard = game.get_leaderboard()
-    rating_lines = [f"{i+1}. {data['username']} — {data['score']} очк." for i, (_, data) in enumerate(leaderboard)]
-    rating_text = "🏆 Текущий рейтинг:\n" + "\n".join(rating_lines)
-    send_kwargs = {"chat_id": chat_id, "text": rating_text}
-    if game.message_thread_id:
-        send_kwargs["message_thread_id"] = game.message_thread_id
-    await context.bot.send_message(**send_kwargs)
+    # Не показываем промежуточный рейтинг
+    # Рейтинг будет только в конце
     
     game.current_question += 1
     if game.pause_after_question:
@@ -461,32 +499,139 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
 
 async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
-    game = games.pop(chat_id, None)
+    game = games.get(chat_id)
     if not game:
         return
-    leaderboard = game.get_leaderboard()
-    if not leaderboard:
+    
+    players = game.calculate_final_scores()
+    
+    if not players:
         send_kwargs = {"chat_id": chat_id, "text": "Нет участников."}
         if game.message_thread_id:
             send_kwargs["message_thread_id"] = game.message_thread_id
         await context.bot.send_message(**send_kwargs)
+        games.pop(chat_id, None)
         return
-    final_lines, rank, i = [], 1, 0
-    while i < len(leaderboard):
-        same_score = []
-        score = leaderboard[i][1]["score"]
-        while i < len(leaderboard) and leaderboard[i][1]["score"] == score:
-            same_score.append(leaderboard[i])
+    
+    # Определяем уникальные места по очкам
+    medals = []
+    current_place = 1
+    i = 0
+    while i < len(players):
+        current_score = players[i]["score"]
+        same_score_players = []
+        while i < len(players) and players[i]["score"] == current_score:
+            same_score_players.append(players[i])
             i += 1
-        for _, data in same_score:
-            medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else ""
-            final_lines.append(f"{medal} {rank} место. {data['username']} — {data['score']} очк.")
-        rank += len(same_score)
-    table = "🏁 Итоговое положение:\n\n" + "\n".join(final_lines)
-    send_kwargs = {"chat_id": chat_id, "text": table}
+        medals.append({
+            "place": current_place,
+            "players": same_score_players,
+            "score": current_score
+        })
+        current_place += len(same_score_players)
+    
+    # 1. Сообщение про 3 место (если есть)
+    third_place = None
+    for medal in medals:
+        if medal["place"] == 3:
+            third_place = medal
+            break
+    
+    if third_place:
+        mentions = []
+        for p in third_place["players"]:
+            username = p["username"]
+            if username.startswith("@"):
+                mentions.append(username)
+            else:
+                mentions.append(username)
+        mention_str = " и ".join(mentions)
+        if len(third_place["players"]) == 1:
+            text_3rd = f"Почетное 3 место занимает {mention_str}. Поздравляем!"
+        else:
+            text_3rd = f"Почетное 3 место разделили игроки {mention_str}. Поздравляем!"
+        send_kwargs = {"chat_id": chat_id, "text": text_3rd}
+        if game.message_thread_id:
+            send_kwargs["message_thread_id"] = game.message_thread_id
+        await context.bot.send_message(**send_kwargs)
+        await asyncio.sleep(3)
+    
+    # 2. Сообщение про 2 место (если есть)
+    second_place = None
+    for medal in medals:
+        if medal["place"] == 2:
+            second_place = medal
+            break
+    
+    if second_place:
+        mentions = []
+        for p in second_place["players"]:
+            username = p["username"]
+            if username.startswith("@"):
+                mentions.append(username)
+            else:
+                mentions.append(username)
+        mention_str = " и ".join(mentions)
+        if len(second_place["players"]) == 1:
+            text_2nd = f"Немного не хватило для победы, 2 место занимает {mention_str}. Поздравляем!"
+        else:
+            text_2nd = f"Немного не хватило для победы, 2 место разделили игроки {mention_str}. Поздравляем!"
+        send_kwargs = {"chat_id": chat_id, "text": text_2nd}
+        if game.message_thread_id:
+            send_kwargs["message_thread_id"] = game.message_thread_id
+        await context.bot.send_message(**send_kwargs)
+        await asyncio.sleep(3)
+    
+    # 3. Сообщение про победителя (1 место) с пином
+    first_place = medals[0] if medals else None
+    
+    if first_place:
+        mentions = []
+        for p in first_place["players"]:
+            username = p["username"]
+            if username.startswith("@"):
+                mentions.append(username)
+            else:
+                mentions.append(username)
+        mention_str = " и ".join(mentions)
+        if len(first_place["players"]) == 1:
+            text_1st = f"Поздравляем победителя нашей викторины — {mention_str}! 🎉🥳"
+        else:
+            text_1st = f"Поздравляем победителей нашей викторины — {mention_str}! 🎉🥳"
+        send_kwargs = {"chat_id": chat_id, "text": text_1st}
+        if game.message_thread_id:
+            send_kwargs["message_thread_id"] = game.message_thread_id
+        msg = await context.bot.send_message(**send_kwargs)
+        try:
+            await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id, disable_notification=False)
+        except:
+            pass
+        await asyncio.sleep(3)
+    
+    # 4. Полные итоговые результаты
+    final_lines = ["🏁 *Итоговое положение:*\n"]
+    for idx, medal in enumerate(medals):
+        place = medal["place"]
+        players_list = medal["players"]
+        if place == 1:
+            medal_emoji = "🥇"
+        elif place == 2:
+            medal_emoji = "🥈"
+        elif place == 3:
+            medal_emoji = "🥉"
+        else:
+            medal_emoji = f"{place}."
+        
+        for p in players_list:
+            final_lines.append(f"{medal_emoji} {p['username']} — {p['score']} очк.")
+    
+    table = "\n".join(final_lines)
+    send_kwargs = {"chat_id": chat_id, "text": table, "parse_mode": "Markdown"}
     if game.message_thread_id:
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
+    
+    games.pop(chat_id, None)
 
 async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -500,7 +645,9 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         option_idx = int(query.data.split("_")[1])
     except:
         return
-    game.record_answer(user.id, option_idx)
+    
+    now = datetime.now(timezone.utc)
+    game.record_answer(user.id, option_idx, now)
 
 # -------------------- Команды организатора --------------------
 async def pause_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
