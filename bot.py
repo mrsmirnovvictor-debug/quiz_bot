@@ -234,7 +234,8 @@ async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         print(f"Не удалось закрепить сообщение регистрации: {e}")
     
     # Вызов бота-зазывалы
-    call_text = f"/all{ZAZYVALA_BOT} Квиз «{game.pack['title']}» начнётся {start_line.split('\\n')[-1]}. Успейте зарегистрироваться!"
+    start_time_str = start_line.split('\n')[-1]
+    call_text = f"/all{ZAZYVALA_BOT} Квиз «{game.pack['title']}» начнётся {start_time_str}. Успейте зарегистрироваться!"
     call_kwargs = {"chat_id": chat_id, "text": call_text}
     if game.message_thread_id:
         call_kwargs["message_thread_id"] = game.message_thread_id
