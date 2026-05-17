@@ -58,7 +58,7 @@ def ensure_sheets_exist(sheet):
         except gspread.WorksheetNotFound:
             games_sheet = sheet.add_worksheet(title="Games", rows=1, cols=50)
             headers = ["Дата", "Chat ID", "Название квиза", "Игрок", "Место", "Общий счёт", 
-                       "Среднее время ответа", "Среднее время (правильные)", "ELO после игры"]
+                       "Среднее время ответа", "Среднее время (правильные)", "ELO после игры", "% правильных ответов"]
             for i in range(1, 17):
                 headers.append(f"Вопрос {i} ответ")
                 headers.append(f"Вопрос {i} баллы")
@@ -81,19 +81,26 @@ def ensure_sheets_exist(sheet):
         return None, None
 
 def calculate_elo(player_score: int, max_score: int, avg_time_correct: float, total_players: int, place: int) -> int:
-    """Расчёт ELO для игрока за квиз"""
+    """
+    Расчёт ELO для игрока за квиз
+    
+    Формула:
+    - Базовые очки за правильные ответы: (score / max_score) * 100  (максимум 100)
+    - Бонус за скорость: max(0, 30 - avg_time_correct) (максимум 30, если ответил за 0 сек)
+    - Бонус за место: (total_players - place + 1) * 5 (максимум 5*total_players)
+    - Бонус за участие: 20
+    Итог от 20 до ~200
+    """
     if max_score == 0:
-        return 0
+        return 20  # базовый бонус за участие
     
     score_percent = (player_score / max_score) * 100
-    speed_bonus = 0
-    if avg_time_correct > 0:
-        speed_bonus = max(0, 30 - avg_time_correct)
+    speed_bonus = max(0, 30 - avg_time_correct) if avg_time_correct > 0 else 0
     place_bonus = (total_players - place + 1) * 5
     participation_bonus = 20
     
     elo = int(score_percent + speed_bonus + place_bonus + participation_bonus)
-    return max(0, min(500, elo))
+    return max(20, min(300, elo))  # от 20 до 300
 
 def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, player_answers_detail):
     """Сохраняет результаты игры в Google Sheets"""
@@ -117,10 +124,11 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             score = player["score"]
             avg_time_all = avg_times_all.get(user_id, 0)
             avg_time_correct = avg_times_correct.get(user_id, 0)
+            correct_percent = (score / max_possible_score) * 100 if max_possible_score > 0 else 0
             elo = calculate_elo(score, max_possible_score, avg_time_correct, len(game.registered), place)
             
             row = [date_str, str(game.chat_id), game.pack["title"], username, place, score, 
-                   round(avg_time_all, 2), round(avg_time_correct, 2), elo]
+                   round(avg_time_all, 2), round(avg_time_correct, 2), elo, round(correct_percent, 2)]
             
             answers_detail = player_answers_detail.get(user_id, [])
             for q_idx in range(len(game.pack["questions"])):
@@ -151,6 +159,7 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             avg_time_correct = avg_times_correct.get(user_id, 0)
             max_possible = len(game.pack["questions"]) * 15
             correct_percent = (score / max_possible) * 100 if max_possible > 0 else 0
+            elo = calculate_elo(score, max_possible, avg_time_correct, len(game.registered), place_info["place"])
             
             if username in player_stats:
                 stats = player_stats[username]
@@ -253,7 +262,8 @@ class Game:
     def record_answer(self, user_id, option_idx, answer_time: datetime):
         if self.status != "active" or user_id not in self.registered or self.paused:
             return
-        if len(self.user_answers_detail[user_id]) > self.current_question:
+        
+        if user_id in self.answers:
             return
         
         q = self.pack["questions"][self.current_question]
@@ -393,7 +403,7 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Пакет {pack_id} не найден.")
         return
     try:
-        dt_msk = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+                dt_msk = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
     except ValueError:
         await update.message.reply_text("Неверный формат даты/времени. Используйте: ГГГГ-ММ-ДД ЧЧ:ММ (московское время)")
         return
@@ -681,16 +691,19 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
     
     final_text = f"❓ Вопрос {game.current_question+1}/{len(game.pack['questions'])}\n{q['text']}\n\n{stats_text}\n\n{correct_answer_text}"
     
+    # Сначала снимаем пин
     try:
         await context.bot.unpin_chat_message(chat_id=chat_id, message_id=game.question_msg_id)
     except Exception as e:
         print(f"Не удалось открепить вопрос: {e}")
     
+    # Потом удаляем сообщение с вопросом
     try:
         await context.bot.delete_message(chat_id=chat_id, message_id=game.question_msg_id)
     except Exception as e:
         print(f"Не удалось удалить сообщение с вопросом: {e}")
     
+    # Удаляем видео-таймер
     if game.video_msg_id:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=game.video_msg_id)
@@ -765,6 +778,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
         games.pop(chat_id, None)
         return
     
+    # 3 место
     third_place = None
     for medal in players_ranking:
         if medal["place"] == 3:
@@ -790,6 +804,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(**send_kwargs)
         await asyncio.sleep(3)
     
+    # 2 место
     second_place = None
     for medal in players_ranking:
         if medal["place"] == 2:
@@ -815,6 +830,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(**send_kwargs)
         await asyncio.sleep(3)
     
+    # 1 место с пином
     first_place = players_ranking[0] if players_ranking else None
     
     if first_place:
@@ -840,6 +856,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
             pass
         await asyncio.sleep(3)
     
+    # Полная таблица
     final_lines = ["🏁 Итоговое положение:\n"]
     for medal in players_ranking:
         place = medal["place"]
@@ -866,16 +883,25 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
 
 async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer("Ответ принят ✅")
     user = update.effective_user
     chat_id = update.effective_chat.id
     game = games.get(chat_id)
+    
     if not game or game.status != "active" or game.paused:
+        await query.answer("Квиз не активен", show_alert=False)
         return
+    
+    if user.id in game.answers:
+        await query.answer("Вы уже ответили на этот вопрос!", show_alert=True)
+        return
+    
     try:
         option_idx = int(query.data.split("_")[1])
     except:
+        await query.answer("Ошибка", show_alert=False)
         return
+    
+    await query.answer("Ответ принят ✅", show_alert=False)
     
     now = datetime.now(timezone.utc)
     game.record_answer(user.id, option_idx, now)
@@ -967,11 +993,6 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 medal = "🥉"
             
             correct_percent = row.get("% правильных ответов", 0)
-            if isinstance(correct_percent, str):
-                try:
-                    correct_percent = float(correct_percent)
-                except:
-                    correct_percent = 0
             
             message += f"{medal} {i}. {row['Игрок']}\n"
             message += f"   📊 Игр: {row['Количество игр']}\n"
@@ -1014,11 +1035,12 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         for i, game_record in enumerate(user_games[:10], 1):
             message += f"{i}. {game_record.get('Название квиза', '-')}\n"
-            message += f"   Дата: {game_record.get('Дата', '-')}\n"
-            message += f"   Место: {game_record.get('Место', '-')}\n"
-            message += f"   Очки: {game_record.get('Общий счёт', 0)}\n"
-            message += f"   Среднее время: {game_record.get('Среднее время ответа', '-')} сек\n"
-            message += f"   ELO после игры: {game_record.get('ELO после игры', 0)}\n\n"
+            message += f"   📅 Дата: {game_record.get('Дата', '-')}\n"
+            message += f"   🏆 Место: {game_record.get('Место', '-')}\n"
+            message += f"   ⭐ Очки: {game_record.get('Общий счёт', 0)}\n"
+            message += f"   ⏱️ Среднее время: {game_record.get('Среднее время ответа', '-')} сек\n"
+            message += f"   ✅ % правильных ответов: {game_record.get('% правильных ответов', 0)}%\n"
+            message += f"   🎯 ELO после игры: {game_record.get('ELO после игры', 0)}\n\n"
         
         if len(user_games) > 10:
             message += f"и ещё {len(user_games) - 10} игр..."
