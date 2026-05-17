@@ -13,6 +13,7 @@ from telegram.ext import (
 
 # -------------------- Константы --------------------
 TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "")
+ZAZYVALA_BOT = "@ZazyvalaTag2Bot"
 
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
@@ -50,7 +51,7 @@ class Game:
         self.status = "registration"
         self.registered = {}
         self.current_question = 0
-        self.answers = {}  # user_id -> (option_idx, answer_time, is_correct, points)
+        self.answers = {}
         self.question_start_time = None
         self.reg_msg_id = None
         self.question_msg_id = None
@@ -225,6 +226,20 @@ async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         send_kwargs["message_thread_id"] = game.message_thread_id
     msg = await context.bot.send_message(**send_kwargs)
     game.reg_msg_id = msg.id
+    
+    # Пин сообщения регистрации
+    try:
+        await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.id, disable_notification=False)
+    except Exception as e:
+        print(f"Не удалось закрепить сообщение регистрации: {e}")
+    
+    # Вызов бота-зазывалы
+    call_text = f"/all{ZAZYVALA_BOT} Квиз «{game.pack['title']}» начнётся {start_line.split('\\n')[-1]}. Успейте зарегистрироваться!"
+    call_kwargs = {"chat_id": chat_id, "text": call_text}
+    if game.message_thread_id:
+        call_kwargs["message_thread_id"] = game.message_thread_id
+    await context.bot.send_message(**call_kwargs)
+    
     game.reg_timer_job = context.job_queue.run_repeating(update_reg_timer, interval=10, first=5, chat_id=chat_id, data=chat_id)
 
 async def update_reg_timer(context: ContextTypes.DEFAULT_TYPE):
@@ -351,7 +366,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
     warning_text = (
         f"{mention_text}\n\n"
         f"🚀 Квиз сейчас начнётся! Даём вам 30 секунд зайти в Телеграм, проверить ваш VPN и настроиться быстро, "
-        f"а главное правильно отвечать на вопросы!"
+        f"а главное — правильно отвечать на вопросы!"
     )
     send_kwargs = {"chat_id": chat_id, "text": warning_text}
     if game.message_thread_id:
@@ -381,7 +396,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
         f"{q['text']}"
     )
     
-    # Отправляем видео-таймер отдельным сообщением
+    # Отправляем видео-таймер
     if TIMER_VIDEO_URL:
         try:
             video_msg = await context.bot.send_video(
@@ -397,7 +412,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     
     await asyncio.sleep(0.5)
     
-    # Отправляем вопрос (с картинкой или без, с кнопками)
+    # Отправляем вопрос
     if q.get("image"):
         msg = await context.bot.send_photo(
             photo=q["image"],
@@ -416,10 +431,11 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
     game.question_start_time = datetime.now(timezone.utc)
     game.answers.clear()
     
+    # Пин сообщения с вопросом
     try:
         await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.id, disable_notification=False)
-    except:
-        pass
+    except Exception as e:
+        print(f"Не удалось закрепить вопрос: {e}")
     
     context.job_queue.run_once(end_question, when=20, chat_id=chat_id, data=chat_id)
 
@@ -429,9 +445,15 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
     if not game or game.status != "active":
         return
     
+    # Снимаем пин с вопроса
+    try:
+        await context.bot.unpin_chat_message(chat_id=chat_id, message_id=game.question_msg_id)
+    except Exception as e:
+        print(f"Не удалось открепить вопрос: {e}")
+    
     q = game.pack["questions"][game.current_question]
     
-    # Подсчёт статистики по вариантам
+    # Подсчёт статистики
     total_answers = len(game.answers)
     counts = [0] * len(q["options"])
     for uid, (opt_idx, _, is_correct, _) in game.answers.items():
@@ -455,6 +477,7 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
     
     final_text = f"❓ Вопрос {game.current_question+1}/{len(game.pack['questions'])}\n{q['text']}\n\n{stats_text}\n\n{correct_answer_text}"
     
+    # Удаляем видео-таймер
     if game.video_msg_id:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=game.video_msg_id)
@@ -466,7 +489,7 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
     
-    # Показываем текущий рейтинг (кроме последнего вопроса)
+    # Показываем рейтинг (кроме последнего вопроса)
     is_last_question = (game.current_question == len(game.pack["questions"]) - 1)
     
     if not is_last_question:
@@ -516,7 +539,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
         games.pop(chat_id, None)
         return
     
-    # Определяем уникальные места по очкам
+    # Определяем места
     medals = []
     current_place = 1
     i = 0
@@ -533,7 +556,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
         })
         current_place += len(same_score_players)
     
-    # 1. Сообщение про 3 место (если есть)
+    # 3 место
     third_place = None
     for medal in medals:
         if medal["place"] == 3:
@@ -559,7 +582,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(**send_kwargs)
         await asyncio.sleep(3)
     
-    # 2. Сообщение про 2 место (если есть)
+    # 2 место
     second_place = None
     for medal in medals:
         if medal["place"] == 2:
@@ -585,7 +608,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(**send_kwargs)
         await asyncio.sleep(3)
     
-    # 3. Сообщение про победителя (1 место) с пином
+    # 1 место с пином
     first_place = medals[0] if medals else None
     
     if first_place:
@@ -611,7 +634,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
             pass
         await asyncio.sleep(3)
     
-    # 4. Полные итоговые результаты
+    # Полная таблица
     final_lines = ["🏁 *Итоговое положение:*\n"]
     for idx, medal in enumerate(medals):
         place = medal["place"]
