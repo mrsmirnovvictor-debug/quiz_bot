@@ -1178,7 +1178,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 correct_percent_display = correct_percent / 10
             else:
                 correct_percent_display = correct_percent / 100
-            avg_time_display = avg_time
+            avg_time_display = avg_time / 100
             message += f"{i}. {game_record.get('Название квиза', '-')}\n"
             message += f"   📅 Дата: {game_record.get('Дата', '-')}\n"
             message += f"   🏆 Место: {game_record.get('Место', '-')}\n"
