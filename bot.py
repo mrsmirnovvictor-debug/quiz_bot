@@ -90,7 +90,7 @@ def calculate_elo(score: int, max_score: int, avg_time_correct: float, total_pla
     elo = int(score_percent + speed_bonus + place_bonus + participation_bonus)
     return max(20, min(300, elo))
 
-def create_game_row(game, user_id, username, timestamp):
+async def create_game_row(game, user_id, username, timestamp):
     sheet = init_google_sheets()
     if not sheet:
         return None
@@ -109,12 +109,14 @@ def create_game_row(game, user_id, username, timestamp):
         row.append("-")
         row.append(0)
         row.append(0)
-    games_sheet.append_row(row)
-    all_data = games_sheet.get_all_values()
-    for idx, r in enumerate(all_data[1:], start=2):
-        if r[3] == username and r[0] == timestamp:
-            return idx
-    return None
+    try:
+        games_sheet.append_row(row)
+        await asyncio.sleep(0.5)  # небольшая задержка для синхронизации
+        all_data = games_sheet.get_all_values()
+        return len(all_data)       # номер последней строки
+    except Exception as e:
+        print(f"Ошибка создания строки для {username}: {e}")
+        return None
 
 def update_question_progress(game, user_id, q_idx, answer_text, points, delta, is_correct, row_idx):
     sheet = init_google_sheets()
