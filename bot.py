@@ -90,7 +90,8 @@ def calculate_elo(score: int, max_score: int, avg_time_correct: float, total_pla
     elo = int(score_percent + speed_bonus + place_bonus + participation_bonus)
     return max(20, min(300, elo))
 
-async def create_game_row(game, user_id, username, timestamp):
+def create_game_row(game, user_id, username, timestamp):
+    """Создаёт новую строку в листе Games для игрока и возвращает её номер."""
     sheet = init_google_sheets()
     if not sheet:
         return None
@@ -111,19 +112,24 @@ async def create_game_row(game, user_id, username, timestamp):
         row.append(0)
     try:
         games_sheet.append_row(row)
-        await asyncio.sleep(0.5)  # небольшая задержка для синхронизации
+        # Получаем количество строк после вставки, чтобы узнать номер новой строки
         all_data = games_sheet.get_all_values()
-        return len(all_data)       # номер последней строки
+        row_idx = len(all_data)
+        return row_idx
     except Exception as e:
         print(f"Ошибка создания строки для {username}: {e}")
         return None
 
 def update_question_progress(game, user_id, q_idx, answer_text, points, delta, is_correct, row_idx):
+    """Обновляет уже существующую строку в Games (добавляет ответ, баллы, время и накопительные поля)"""
+    if row_idx is None:
+        print(f"Нет row_idx для пользователя {user_id}, пропускаем сохранение ответа на вопрос {q_idx+1}")
+        return
     sheet = init_google_sheets()
     if not sheet:
         return
     games_sheet, _ = ensure_sheets_exist(sheet)
-    if not games_sheet or not row_idx:
+    if not games_sheet:
         return
     
     row_data = games_sheet.row_values(row_idx)
@@ -158,11 +164,15 @@ def update_question_progress(game, user_id, q_idx, answer_text, points, delta, i
     games_sheet.update_cell(row_idx, total_time_col + 1, current_total_time + delta)
 
 def finalize_game_row(game, user_id, username, timestamp, place, score, avg_time_all, avg_time_correct, correct_percent, elo, row_idx):
+    """Обновляет итоговые поля в строке Games после завершения квиза"""
+    if row_idx is None:
+        print(f"Нет row_idx для {username}, пропускаем финализацию")
+        return
     sheet = init_google_sheets()
     if not sheet:
         return
     games_sheet, _ = ensure_sheets_exist(sheet)
-    if not games_sheet or not row_idx:
+    if not games_sheet:
         return
     
     headers = games_sheet.row_values(1)
@@ -188,6 +198,7 @@ def finalize_game_row(game, user_id, username, timestamp, place, score, avg_time
     games_sheet.update_cell(row_idx, col_idx["Без ответа"] + 1, no_answer)
 
 def update_players_stats(game, players_ranking, avg_times_all, avg_times_correct):
+    """Обновляет общую статистику игроков в листе Players"""
     sheet = init_google_sheets()
     if not sheet:
         return
@@ -198,10 +209,10 @@ def update_players_stats(game, players_ranking, avg_times_all, avg_times_correct
     all_games = games_sheet.get_all_records()
     player_agg = defaultdict(lambda: {
         "total_score": 0,
-        "total_time_all": 0,
-        "total_time_correct": 0,
-        "total_answered": 0,
         "total_correct": 0,
+        "total_incorrect": 0,
+        "total_time": 0,
+        "total_time_correct": 0,
         "total_questions": 0,
         "games_count": 0,
         "max_elo": 0
@@ -224,28 +235,30 @@ def update_players_stats(game, players_ranking, avg_times_all, avg_times_correct
                 return 0
         
         username = row["Игрок"]
+        correct = to_int(row.get("Правильные ответы", 0))
+        incorrect = to_int(row.get("Неправильные ответы", 0))
+        total_questions = to_int(row.get("Количество вопросов", 0))
         score = to_float(row.get("Общий счёт", 0))
         total_time = to_float(row.get("Общее время ответов", 0))
         total_time_correct = to_float(row.get("Общее время правильных ответов", 0))
-        correct = to_int(row.get("Правильные ответы", 0))
-        incorrect = to_int(row.get("Неправильные ответы", 0))
-        total_answered = correct + incorrect
-        total_questions = to_int(row.get("Количество вопросов", 0))
         elo = to_int(row.get("ELO после игры", 0))
         
         player_agg[username]["total_score"] += score
-        player_agg[username]["total_time_all"] += total_time
-        player_agg[username]["total_time_correct"] += total_time_correct
-        player_agg[username]["total_answered"] += total_answered
         player_agg[username]["total_correct"] += correct
+        player_agg[username]["total_incorrect"] += incorrect
+        player_agg[username]["total_time"] += total_time
+        player_agg[username]["total_time_correct"] += total_time_correct
         player_agg[username]["total_questions"] += total_questions
         player_agg[username]["games_count"] += 1
         player_agg[username]["max_elo"] = max(player_agg[username]["max_elo"], elo)
     
     for username, agg in player_agg.items():
         avg_score = agg["total_score"] / agg["games_count"] if agg["games_count"] > 0 else 0
-        avg_time_all = agg["total_time_all"] / agg["total_answered"] if agg["total_answered"] > 0 else 0
-        avg_time_correct = agg["total_time_correct"] / agg["total_correct"] if agg["total_correct"] > 0 else 0
+        total_answered = agg["total_correct"] + agg["total_incorrect"]
+        total_time_sec = agg["total_time"] / 1_000_000
+        avg_time_all = total_time_sec / total_answered if total_answered > 0 else 0
+        total_time_correct_sec = agg["total_time_correct"] / 1_000_000
+        avg_time_correct = total_time_correct_sec / agg["total_correct"] if agg["total_correct"] > 0 else 0
         correct_percent = (agg["total_correct"] / agg["total_questions"]) * 100 if agg["total_questions"] > 0 else 0
         
         existing = players_sheet.find(username)
@@ -545,7 +558,7 @@ async def update_reg_timer(context: ContextTypes.DEFAULT_TYPE):
         f"🎪 ОТКРЫТА РЕГИСТРАЦИЯ НА КВИЗ\n\n"
         f"✏️ Тема квиза: {game.pack['title']}\n"
         f"{start_line}\n\n"
-        f"👥 Список участników ({len(game.registered)}):\n{users_list}"
+        f"👥 Список участников ({len(game.registered)}):\n{users_list}"
     )
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📝 Зарегистрироваться", callback_data="register")],
@@ -625,6 +638,9 @@ async def close_registration_and_start(context: ContextTypes.DEFAULT_TYPE, chat_
         row_idx = create_game_row(game, uid, data["username"], game.game_timestamp)
         if row_idx:
             game.user_rows[uid] = row_idx
+            print(f"Создана строка {row_idx} для {data['username']}")
+        else:
+            print(f"Не удалось создать строку для {data['username']}")
     
     users_list = "\n".join(f"• {p['username']}" for p in game.registered.values())
     start_line = format_datetime_msk_multiline(game.scheduled_start_utc)
@@ -1126,7 +1142,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"Ошибка получения статистики: {e}")
         await update.message.reply_text("❌ Ошибка загрузки статистики.")
 
-# -------------------- Команда /history (исправленная) --------------------
+# -------------------- Команда /history --------------------
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = format_username(user)
@@ -1156,7 +1172,6 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return 0
             avg_time = to_float_val(game_record.get("Среднее время ответа", 0))
             correct_percent = to_float_val(game_record.get("% правильных ответов", 0))
-            # Делим на 100 для коррекции
             avg_time_display = avg_time / 100
             correct_percent_display = correct_percent / 100
             message += f"{i}. {game_record.get('Название квиза', '-')}\n"
