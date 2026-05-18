@@ -543,7 +543,7 @@ async def update_reg_timer(context: ContextTypes.DEFAULT_TYPE):
         f"🎪 ОТКРЫТА РЕГИСТРАЦИЯ НА КВИЗ\n\n"
         f"✏️ Тема квиза: {game.pack['title']}\n"
         f"{start_line}\n\n"
-        f"👥 Список участников ({len(game.registered)}):\n{users_list}"
+        f"👥 Список участników ({len(game.registered)}):\n{users_list}"
     )
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📝 Зарегистрироваться", callback_data="register")],
@@ -1019,7 +1019,7 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# -------------------- Команда /stats (исправленная) --------------------
+# -------------------- Команда /stats --------------------
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔄 Загружаю статистику...")
     sheet = init_google_sheets()
@@ -1034,15 +1034,14 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Пока нет сохранённых результатов.")
             return
         
-        # Получаем данные из Games
         games_sheet = sheet.worksheet("Games")
         all_games = games_sheet.get_all_records()
         player_agg = defaultdict(lambda: {
             "total_score": 0,
             "total_correct": 0,
             "total_incorrect": 0,
-            "total_time": 0,        # микросекунды
-            "total_time_correct": 0, # микросекунды
+            "total_time": 0,
+            "total_time_correct": 0,
             "total_questions": 0,
             "games_count": 0,
             "max_elo": 0
@@ -1069,8 +1068,8 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             incorrect = to_int(row.get("Неправильные ответы", 0))
             total_questions = to_int(row.get("Количество вопросов", 0))
             score = to_float(row.get("Общий счёт", 0))
-            total_time = to_float(row.get("Общее время ответов", 0))   # микросекунды
-            total_time_correct = to_float(row.get("Общее время правильных ответов", 0))  # микросекунды
+            total_time = to_float(row.get("Общее время ответов", 0))
+            total_time_correct = to_float(row.get("Общее время правильных ответов", 0))
             elo = to_int(row.get("ELO после игры", 0))
             
             player_agg[username]["total_score"] += score
@@ -1100,7 +1099,6 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             avg_score = total_score / games_count if games_count > 0 else 0
             
             total_answered = agg.get("total_correct", 0) + agg.get("total_incorrect", 0)
-            # Переводим микросекунды в секунды (делим на 1 000 000)
             total_time_sec = agg.get("total_time", 0) / 1_000_000
             avg_time_all = total_time_sec / total_answered if total_answered > 0 else 0
             
@@ -1126,7 +1124,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"Ошибка получения статистики: {e}")
         await update.message.reply_text("❌ Ошибка загрузки статистики.")
 
-# -------------------- Команда /history --------------------
+# -------------------- Команда /history (исправленная) --------------------
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     username = format_username(user)
