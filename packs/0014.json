@@ -1,0 +1,117 @@
+{
+  "title": "🎵 Быстрый музыкальный квиз. 16 вопросов по 20 секунд",
+  "questions": [
+    {
+      "text": "Кто исполнил песню «Billie Jean»?",
+      "image": "",
+      "options": ["Prince", "Michael Jackson", "Stevie Wonder", "Lionel Richie"],
+      "correct": 1,
+      "comment": "Король поп-музыки Майкл Джексон выпустил этот мегахит в 1983 году."
+    },
+    {
+      "text": "Как называется знаменитая песня группы Queen, в которой есть оперная вставка?",
+      "image": "",
+      "options": ["We Will Rock You", "We Are the Champions", "Bohemian Rhapsody", "The Show Must Go On"],
+      "correct": 2,
+      "comment": "«Bohemian Rhapsody» — шедевр Фредди Меркьюри, сочетающий рок, оперу и балладу."
+    },
+    {
+      "text": "Кто спел хит «Rolling in the Deep»?",
+      "image": "",
+      "options": ["Beyoncé", "Amy Winehouse", "Adele", "Rihanna"],
+      "correct": 2,
+      "comment": "Эта песня принесла Адель три премии «Грэмми» в 2012 году."
+    },
+    {
+      "text": "Какой российский исполнитель поёт: «Влияние ночи очень трудно предсказать. По телу мурашки и ей хочется кричать»?",
+      "image": "",
+      "options": ["Сергей Лазарев", "Дмитрий Маликов", "Филипп Киркоров", "Николай Басков"],
+      "correct": 2,
+      "comment": "Это припев песни Филиппа Киркорова «Цвет настроения синий»."
+    },
+    {
+      "text": "Кто является солистом группы Linkin Park?",
+      "image": "",
+      "options": ["Chester Bennington", "Mike Shinoda", "Brad Delson", "Dave Farrell"],
+      "correct": 0,
+      "comment": "Честер Беннингтон был вокалистом группы до своей трагической смерти в 2017 году."
+    },
+    {
+      "text": "Какой хит группы ABBA принёс им победу на Евровидении в 1974 году?",
+      "image": "",
+      "options": ["Mamma Mia", "Waterloo", "Dancing Queen", "SOS"],
+      "correct": 1,
+      "comment": "«Waterloo» — песня, с которой ABBA победили на конкурсе и стали мировыми звёздами."
+    },
+    {
+      "text": "Кто известен как «Король рок-н-ролла»?",
+      "image": "",
+      "options": ["Chuck Berry", "Elvis Presley", "Little Richard", "Jerry Lee Lewis"],
+      "correct": 1,
+      "comment": "Элвис Пресли — самый продаваемый сольный исполнитель в истории музыки."
+    },
+    {
+      "text": "Какой музыкальный инструмент считается королём джаза?",
+      "image": "",
+      "options": ["Труба", "Саксофон", "Контрабас", "Фортепиано"],
+      "correct": 1,
+      "comment": "Саксофон стал символом джаза благодаря своей выразительности."
+    },
+    {
+      "text": "Кто написал балет «Щелкунчик»?",
+      "image": "",
+      "options": ["Рахманинов", "Чайковский", "Стравинский", "Прокофьев"],
+      "correct": 1,
+      "comment": "Пётр Ильич Чайковский написал этот новогодний балет в 1892 году."
+    },
+    {
+      "text": "Какой трек The Weeknd стал мировым хитом и одним из самых прослушиваемых в Spotify?",
+      "image": "",
+      "options": ["Can't Feel My Face", "The Hills", "Blinding Lights", "Save Your Tears"],
+      "correct": 2,
+      "comment": "«Blinding Lights» — самый прослушиваемый трек в истории Spotify."
+    },
+    {
+      "text": "Кто из этих рэперов выпустил альбом «The Marshall Mathers LP»?",
+      "image": "",
+      "options": ["Dr. Dre", "Snoop Dogg", "Eminem", "50 Cent"],
+      "correct": 2,
+      "comment": "Eminem выпустил этот культовый альбом в 2000 году, он стал одним из самых продаваемых хип-хоп альбомов."
+    },
+    {
+      "text": "Какой музыкальный жанр прославил Фредди Меркьюри?",
+      "image": "",
+      "options": ["Панк-рок", "Хеви-метал", "Рок-н-ролл", "Рок"],
+      "correct": 3,
+      "comment": "Queen играли рок с элементами прогрессива, глэма и оперы."
+    },
+    {
+      "text": "Кто спел песню «Wrecking Ball»?",
+      "image": "",
+      "options": ["Katy Perry", "Lady Gaga", "Miley Cyrus", "Taylor Swift"],
+      "correct": 2,
+      "comment": "Клип на эту песню стал самым просматриваемым на YouTube в 2013 году."
+    },
+    {
+      "text": "Какой музыкант написал «Лунную сонату»?",
+      "image": "",
+      "options": ["Моцарт", "Бах", "Бетховен", "Шопен"],
+      "correct": 2,
+      "comment": "Людвиг ван Бетховен посвятил эту сонату своей ученице Джульетте Гвиччарди."
+    },
+    {
+      "text": "Кто из этих исполнителей является фронтменом группы Coldplay?",
+      "image": "",
+      "options": ["Chris Martin", "Thom Yorke", "Matt Bellamy", "Bono"],
+      "correct": 0,
+      "comment": "Крис Мартин — вокалист и автор песен Coldplay с момента основания группы."
+    },
+    {
+      "text": "Какая песня стала визитной карточкой группы Nirvana?",
+      "image": "",
+      "options": ["Come as You Are", "Lithium", "Smells Like Teen Spirit", "Heart-Shaped Box"],
+      "correct": 2,
+      "comment": "«Smells Like Teen Spirit» (1991) считается гимном поколения X и одним из величайших рок-хитов."
+    }
+  ]
+}
