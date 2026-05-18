@@ -69,7 +69,6 @@ def ensure_sheets_exist(sheet):
         try:
             players_sheet = sheet.worksheet("Players")
         except gspread.WorksheetNotFound:
-            # Убрали колонки "Среднее время ответа" и "Среднее время (правильные)"
             players_sheet = sheet.add_worksheet(title="Players", rows=1, cols=20)
             players_sheet.append_row(["Игрок", "Количество игр", "Всего очков", "Средний балл за квиз",
                                       "% правильных ответов", "ELO"])
@@ -186,7 +185,7 @@ def finalize_game_row(game, user_id, username, timestamp, place, score, avg_time
     games_sheet.update_cell(row_idx, col_idx["Без ответа"] + 1, no_answer)
 
 def update_players_stats(game, players_ranking, avg_times_all, avg_times_correct):
-    """Обновляет общую статистику игроков в листе Players (без средних времён)"""
+    """Обновляет общую статистику игроков в листе Players (только игрок, игры, очки, средний балл, процент, ELO)"""
     sheet = init_google_sheets()
     if not sheet:
         return
@@ -198,9 +197,6 @@ def update_players_stats(game, players_ranking, avg_times_all, avg_times_correct
     player_agg = defaultdict(lambda: {
         "total_score": 0,
         "total_correct": 0,
-        "total_incorrect": 0,
-        "total_time_all": 0,
-        "total_time_correct": 0,
         "total_questions": 0,
         "games_count": 0,
         "max_elo": 0
@@ -223,19 +219,13 @@ def update_players_stats(game, players_ranking, avg_times_all, avg_times_correct
                 return 0
         
         username = row["Игрок"]
-        total_time_all = to_float(row.get("Общее время ответов", 0))
-        total_time_correct = to_float(row.get("Общее время правильных ответов", 0))
         total_correct = to_int(row.get("Правильные ответы", 0))
-        total_incorrect = to_int(row.get("Неправильные ответы", 0))
         total_questions = to_int(row.get("Количество вопросов", 0))
         score = to_float(row.get("Общий счёт", 0))
         elo = to_int(row.get("ELO после игры", 0))
         
         player_agg[username]["total_score"] += score
         player_agg[username]["total_correct"] += total_correct
-        player_agg[username]["total_incorrect"] += total_incorrect
-        player_agg[username]["total_time_all"] += total_time_all
-        player_agg[username]["total_time_correct"] += total_time_correct
         player_agg[username]["total_questions"] += total_questions
         player_agg[username]["games_count"] += 1
         player_agg[username]["max_elo"] = max(player_agg[username]["max_elo"], elo)
@@ -493,7 +483,7 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await start_quiz_sequence(context, chat_id)
 
-# -------------------- Регистрация и запуск --------------------
+# -------------------- Регистрация и запуск (функции, не требующие изменений) --------------------
 async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     game = games.get(chat_id)
     if not game:
@@ -1030,30 +1020,34 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Пока нет сохранённых результатов.")
             return
         
-        # Для каждого игрока нужно вычислить среднее время ответа и среднее время правильных ответов
-        # на основе данных из Games, так как в Players этих колонок больше нет.
+        # Получаем данные из Games для вычисления средних времён
         games_sheet = sheet.worksheet("Games")
         all_games = games_sheet.get_all_records()
-        player_stats_extra = {}
+        player_extra = defaultdict(lambda: {"total_time": 0, "total_answered": 0, "total_time_correct": 0, "total_correct": 0})
         for row in all_games:
-            def to_float_val(v):
+            def to_float(v):
                 if isinstance(v, str):
                     v = v.replace(',', '.')
                 try:
                     return float(v)
                 except:
                     return 0
+            def to_int(v):
+                if isinstance(v, str):
+                    v = v.replace(',', '.')
+                try:
+                    return int(float(v))
+                except:
+                    return 0
             username = row["Игрок"]
-            total_time_all = to_float_val(row.get("Общее время ответов", 0))
-            total_answered = to_float_val(row.get("Правильные ответы", 0)) + to_float_val(row.get("Неправильные ответы", 0))
-            total_time_correct = to_float_val(row.get("Общее время правильных ответов", 0))
-            total_correct = to_float_val(row.get("Правильные ответы", 0))
-            if username not in player_stats_extra:
-                player_stats_extra[username] = {"sum_time_all": 0, "sum_answered": 0, "sum_time_correct": 0, "sum_correct": 0}
-            player_stats_extra[username]["sum_time_all"] += total_time_all
-            player_stats_extra[username]["sum_answered"] += total_answered
-            player_stats_extra[username]["sum_time_correct"] += total_time_correct
-            player_stats_extra[username]["sum_correct"] += total_correct
+            total_time = to_float(row.get("Общее время ответов", 0))
+            total_answered = to_int(row.get("Правильные ответы", 0)) + to_int(row.get("Неправильные ответы", 0))
+            total_time_correct = to_float(row.get("Общее время правильных ответов", 0))
+            total_correct = to_int(row.get("Правильные ответы", 0))
+            player_extra[username]["total_time"] += total_time
+            player_extra[username]["total_answered"] += total_answered
+            player_extra[username]["total_time_correct"] += total_time_correct
+            player_extra[username]["total_correct"] += total_correct
         
         # Сортируем по ELO
         data.sort(key=lambda x: x.get("ELO", 0), reverse=True)
@@ -1068,25 +1062,25 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 medal = "🥉"
             
             username = row["Игрок"]
-            extra = player_stats_extra.get(username, {})
-            total_answered = extra.get("sum_answered", 0)
-            avg_time_all = extra.get("sum_time_all", 0) / total_answered if total_answered > 0 else 0
-            total_correct = extra.get("sum_correct", 0)
-            avg_time_correct = extra.get("sum_time_correct", 0) / total_correct if total_correct > 0 else 0
+            extra = player_extra.get(username, {})
+            total_answered = extra.get("total_answered", 0)
+            avg_time_all = extra.get("total_time", 0) / total_answered if total_answered > 0 else 0
+            total_correct = extra.get("total_correct", 0)
+            avg_time_correct = extra.get("total_time_correct", 0) / total_correct if total_correct > 0 else 0
             correct_percent = row["% правильных ответов"]
             
-            # Делим на 100 для коррекции
-            avg_time_all_display = avg_time_all / 100
-            avg_time_correct_display = avg_time_correct / 100
-            correct_percent_display = correct_percent / 100
+            # Корректируем (делим на 100), так как в таблице значения умножены на 100
+            avg_time_all_disp = avg_time_all / 100
+            avg_time_correct_disp = avg_time_correct / 100
+            correct_percent_disp = correct_percent / 100
             
             message += f"{medal} {i}. {row['Игрок']}\n"
             message += f"   📊 Игр: {row['Количество игр']}\n"
             message += f"   ⭐ Всего очков: {row['Всего очков']}\n"
             message += f"   📈 Средний балл: {row['Средний балл за квиз']}\n"
-            message += f"   ⏱️ Среднее время: {avg_time_all_display:.1f} сек\n"
-            message += f"   ⏱️ Среднее время (правильные): {avg_time_correct_display:.1f} сек\n"
-            message += f"   ✅ % правильных ответов: {correct_percent_display:.1f}%\n"
+            message += f"   ⏱️ Среднее время: {avg_time_all_disp:.1f} сек\n"
+            message += f"   ⏱️ Среднее время (правильные): {avg_time_correct_disp:.1f} сек\n"
+            message += f"   ✅ % правильных ответов: {correct_percent_disp:.1f}%\n"
             message += f"   🎯 ELO: {row['ELO']}\n\n"
         
         await update.message.reply_text(message)
@@ -1115,24 +1109,24 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_games.sort(key=lambda x: x.get("Дата", ""), reverse=True)
         message = f"📜 ИСТОРИЯ ИГРОКА {username}\n\n"
         for i, game_record in enumerate(user_games[:10], 1):
-            def to_float_val(v):
+            def to_float(v):
                 if isinstance(v, str):
                     v = v.replace(',', '.')
                 try:
                     return float(v)
                 except:
                     return 0
-            avg_time = to_float_val(game_record.get("Среднее время ответа", 0))
-            correct_percent = to_float_val(game_record.get("% правильных ответов", 0))
-            # Делим на 100 для коррекции
-            avg_time_display = avg_time / 100
-            correct_percent_display = correct_percent / 100
+            avg_time = to_float(game_record.get("Среднее время ответа", 0))
+            correct_percent = to_float(game_record.get("% правильных ответов", 0))
+            # Корректируем (делим на 100)
+            avg_time_disp = avg_time / 100
+            correct_percent_disp = correct_percent / 100
             message += f"{i}. {game_record.get('Название квиза', '-')}\n"
             message += f"   📅 Дата: {game_record.get('Дата', '-')}\n"
             message += f"   🏆 Место: {game_record.get('Место', '-')}\n"
             message += f"   ⭐ Очки: {game_record.get('Общий счёт', 0)}\n"
-            message += f"   ⏱️ Среднее время: {avg_time_display:.1f} сек\n"
-            message += f"   ✅ % правильных ответов: {correct_percent_display:.1f}%\n"
+            message += f"   ⏱️ Среднее время: {avg_time_disp:.1f} сек\n"
+            message += f"   ✅ % правильных ответов: {correct_percent_disp:.1f}%\n"
             message += f"   🎯 ELO после игры: {game_record.get('ELO после игры', 0)}\n\n"
         
         if len(user_games) > 10:
