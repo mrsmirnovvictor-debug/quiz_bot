@@ -46,7 +46,7 @@ def init_google_sheets():
         sheet = client.open_by_key(GOOGLE_SHEET_ID)
         return sheet
     except Exception as e:
-        print(f"❌ Ошибка подключения к Google Sheets: {e}")
+        print(f"❌ Ошибка подключения: {e}")
         return None
 
 def ensure_sheets_exist(sheet):
@@ -114,11 +114,10 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             correct_percent = (score / max_possible_score) * 100 if max_possible_score > 0 else 0
             elo = calculate_elo(score, max_possible_score, avg_time_correct, len(game.registered), place)
             
-            # Основные данные
             row = [date_str, str(game.chat_id), game.pack["title"], username, place, score, 
                    round(avg_time_all, 2), round(avg_time_correct, 2), elo, round(correct_percent, 2)]
             
-            # Данные по каждому вопросу
+            # Данные по вопросам - если нет ответа, ставим "-"
             answers_detail = player_answers_detail.get(user_id, [])
             for q_idx in range(len(game.pack["questions"])):
                 if q_idx < len(answers_detail):
@@ -143,11 +142,10 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         for player in place_info["players"]:
             username = player["username"]
             score = player["score"]
-            avg_time_all = avg_times_all.get(player["user_id"], 0)
-            avg_time_correct = avg_times_correct.get(player["user_id"], 0)
             max_possible = len(game.pack["questions"]) * 15
             correct_percent = (score / max_possible) * 100 if max_possible > 0 else 0
-            elo = calculate_elo(score, max_possible, avg_time_correct, len(game.registered), place_info["place"])
+            elo = calculate_elo(score, max_possible, avg_times_correct.get(player["user_id"], 0), 
+                               len(game.registered), place_info["place"])
             
             if username in player_stats:
                 stats = player_stats[username]
@@ -155,34 +153,55 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
                 new_games = old_games + 1
                 new_total_score = stats["Всего очков"] + score
                 
-                # Находим строку
                 for idx, row in enumerate(existing_data):
                     if row["Игрок"] == username:
                         row_idx = idx + 2
                         break
                 
-                players_sheet.update(f"B{row_idx}", [[new_games]])
-                players_sheet.update(f"C{row_idx}", [[new_total_score]])
-                players_sheet.update(f"D{row_idx}", [[round(new_total_score / new_games, 2)]])
+                players_sheet.update([[new_games]], f"B{row_idx}")
+                players_sheet.update([[new_total_score]], f"C{row_idx}")
+                players_sheet.update([[round(new_total_score / new_games, 2)]], f"D{row_idx}")
                 
+                # Среднее время ответа (только по отвеченным вопросам)
                 old_avg_all = stats["Среднее время ответа"]
-                new_avg_all = (old_avg_all * old_games + avg_time_all) / new_games if old_avg_all > 0 else avg_time_all
-                players_sheet.update(f"E{row_idx}", [[round(new_avg_all, 2)]])
+                new_avg_all = avg_times_all.get(player["user_id"], 0)
+                if old_avg_all > 0 and new_avg_all > 0:
+                    final_avg_all = (old_avg_all * old_games + new_avg_all) / new_games
+                elif new_avg_all > 0:
+                    final_avg_all = new_avg_all
+                else:
+                    final_avg_all = old_avg_all
+                players_sheet.update([[round(final_avg_all, 2)]], f"E{row_idx}")
                 
+                # Среднее время правильных ответов
                 old_avg_correct = stats["Среднее время (правильные)"]
-                new_avg_correct = (old_avg_correct * old_games + avg_time_correct) / new_games if old_avg_correct > 0 else avg_time_correct
-                players_sheet.update(f"F{row_idx}", [[round(new_avg_correct, 2)]])
+                new_avg_correct = avg_times_correct.get(player["user_id"], 0)
+                if old_avg_correct > 0 and new_avg_correct > 0:
+                    final_avg_correct = (old_avg_correct * old_games + new_avg_correct) / new_games
+                elif new_avg_correct > 0:
+                    final_avg_correct = new_avg_correct
+                else:
+                    final_avg_correct = old_avg_correct
+                players_sheet.update([[round(final_avg_correct, 2)]], f"F{row_idx}")
                 
+                # Процент правильных ответов (общее кол-во правильных / общее кол-во отвеченных вопросов)
                 old_percent = stats["% правильных ответов"]
-                new_percent = (old_percent * old_games + correct_percent) / new_games
-                players_sheet.update(f"G{row_idx}", [[round(new_percent, 2)]])
+                new_percent = correct_percent
+                if old_percent > 0 and new_percent > 0:
+                    final_percent = (old_percent * old_games + new_percent) / new_games
+                elif new_percent > 0:
+                    final_percent = new_percent
+                else:
+                    final_percent = old_percent
+                players_sheet.update([[round(final_percent, 2)]], f"G{row_idx}")
                 
                 new_elo = max(stats["ELO"], elo)
-                players_sheet.update(f"H{row_idx}", [[new_elo]])
+                players_sheet.update([[new_elo]], f"H{row_idx}")
             else:
                 players_sheet.append_row([
                     username, 1, score, round(score, 2),
-                    round(avg_time_all, 2), round(avg_time_correct, 2),
+                    round(avg_times_all.get(player["user_id"], 0), 2),
+                    round(avg_times_correct.get(player["user_id"], 0), 2),
                     round(correct_percent, 2), elo
                 ])
     
@@ -236,6 +255,7 @@ class Game:
         self.pause_after_question = False
         self.user_speed_sum = {}
         self.user_correct_count = {}
+        self.user_total_answered = {}  # количество отвеченных вопросов
         self.current_question_image = ""
         self.user_answers_detail = defaultdict(list)
 
@@ -244,6 +264,7 @@ class Game:
             self.registered[user_id] = {"username": username, "score": 0}
             self.user_speed_sum[user_id] = 0
             self.user_correct_count[user_id] = 0
+            self.user_total_answered[user_id] = 0
 
     def record_answer(self, user_id, option_idx, answer_time: datetime):
         if self.status != "active" or user_id not in self.registered or self.paused:
@@ -274,6 +295,7 @@ class Game:
             self.user_speed_sum[user_id] += delta
             self.user_correct_count[user_id] += 1
         
+        self.user_total_answered[user_id] += 1
         self.user_answers_detail[user_id].append({
             "answer": answer_text,
             "points": points,
@@ -296,7 +318,8 @@ class Game:
                 "username": data["username"],
                 "score": data["score"],
                 "speed_sum": self.user_speed_sum.get(uid, 0),
-                "correct_count": self.user_correct_count.get(uid, 0)
+                "correct_count": self.user_correct_count.get(uid, 0),
+                "total_answered": self.user_total_answered.get(uid, 0)
             })
         players.sort(key=lambda x: (-x["score"], x["speed_sum"]))
         
@@ -321,8 +344,9 @@ class Game:
         avg_times_all = {}
         avg_times_correct = {}
         for uid, answers in self.user_answers_detail.items():
-            times = [a["time"] for a in answers]
-            correct_times = [a["time"] for a in answers if a["is_correct"]]
+            times = [a["time"] for a in answers if a["time"] >= 0]
+            correct_times = [a["time"] for a in answers if a["is_correct"] and a["time"] >= 0]
+            # Среднее только по отвеченным вопросам
             avg_times_all[uid] = sum(times) / len(times) if times else 0
             avg_times_correct[uid] = sum(correct_times) / len(correct_times) if correct_times else 0
         return avg_times_all, avg_times_correct
@@ -356,7 +380,7 @@ def format_datetime_msk_multiline(dt_utc: datetime) -> str:
     else:
         return f"📅 Дата и время начала:\n{msk.strftime('%d.%m.%Y')}, в {msk.strftime('%H:%M')}"
 
-# -------------------- Команда /quiz (сокращена для длины) --------------------
+# -------------------- Команда /quiz --------------------
 async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user = update.effective_user
@@ -754,7 +778,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
     try:
         save_game_results(game, players_ranking, avg_times_all, avg_times_correct, game.user_answers_detail)
     except Exception as e:
-        print(f"Ошибка при сохранении в Google Sheets: {e}")
+        print(f"Ошибка при сохранении: {e}")
     
     if not players_ranking:
         send_kwargs = {"chat_id": chat_id, "text": "Нет участников."}
