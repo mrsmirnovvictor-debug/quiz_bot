@@ -1162,6 +1162,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         user_games.sort(key=lambda x: x.get("Дата", ""), reverse=True)
         message = f"📜 ИСТОРИЯ ИГРОКА {username}\n\n"
+        total_games = len(user_games)
         for i, game_record in enumerate(user_games[:10], 1):
             def to_float_val(v):
                 if isinstance(v, str):
@@ -1172,8 +1173,12 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return 0
             avg_time = to_float_val(game_record.get("Среднее время ответа", 0))
             correct_percent = to_float_val(game_record.get("% правильных ответов", 0))
-            avg_time_display = avg_time / 100
-            correct_percent_display = correct_percent / 100
+            # Корректировка в зависимости от количества игр
+            if total_games == 1:
+                correct_percent_display = correct_percent / 10
+            else:
+                correct_percent_display = correct_percent / 100
+            avg_time_display = avg_time
             message += f"{i}. {game_record.get('Название квиза', '-')}\n"
             message += f"   📅 Дата: {game_record.get('Дата', '-')}\n"
             message += f"   🏆 Место: {game_record.get('Место', '-')}\n"
