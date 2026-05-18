@@ -69,9 +69,9 @@ def ensure_sheets_exist(sheet):
         try:
             players_sheet = sheet.worksheet("Players")
         except gspread.WorksheetNotFound:
+            # Убрали колонки "Среднее время ответа" и "Среднее время (правильные)"
             players_sheet = sheet.add_worksheet(title="Players", rows=1, cols=20)
             players_sheet.append_row(["Игрок", "Количество игр", "Всего очков", "Средний балл за квиз",
-                                      "Среднее время ответа", "Среднее время (правильные)",
                                       "% правильных ответов", "ELO"])
             print("✅ Лист Players создан")
         
@@ -186,7 +186,7 @@ def finalize_game_row(game, user_id, username, timestamp, place, score, avg_time
     games_sheet.update_cell(row_idx, col_idx["Без ответа"] + 1, no_answer)
 
 def update_players_stats(game, players_ranking, avg_times_all, avg_times_correct):
-    """Обновляет общую статистику игроков в листе Players на основе всех записей в Games"""
+    """Обновляет общую статистику игроков в листе Players (без средних времён)"""
     sheet = init_google_sheets()
     if not sheet:
         return
@@ -241,9 +241,6 @@ def update_players_stats(game, players_ranking, avg_times_all, avg_times_correct
         player_agg[username]["max_elo"] = max(player_agg[username]["max_elo"], elo)
     
     for username, agg in player_agg.items():
-        total_answered = agg["total_correct"] + agg["total_incorrect"]
-        avg_time_all = agg["total_time_all"] / total_answered if total_answered > 0 else 0
-        avg_time_correct = agg["total_time_correct"] / agg["total_correct"] if agg["total_correct"] > 0 else 0
         correct_percent = (agg["total_correct"] / agg["total_questions"]) * 100 if agg["total_questions"] > 0 else 0
         avg_score = agg["total_score"] / agg["games_count"] if agg["games_count"] > 0 else 0
         
@@ -253,14 +250,12 @@ def update_players_stats(game, players_ranking, avg_times_all, avg_times_correct
             players_sheet.update_cell(row_idx, 2, agg["games_count"])
             players_sheet.update_cell(row_idx, 3, agg["total_score"])
             players_sheet.update_cell(row_idx, 4, round(avg_score, 2))
-            players_sheet.update_cell(row_idx, 5, round(avg_time_all, 2))
-            players_sheet.update_cell(row_idx, 6, round(avg_time_correct, 2))
-            players_sheet.update_cell(row_idx, 7, round(correct_percent, 2))
-            players_sheet.update_cell(row_idx, 8, agg["max_elo"])
+            players_sheet.update_cell(row_idx, 5, round(correct_percent, 2))
+            players_sheet.update_cell(row_idx, 6, agg["max_elo"])
         else:
             players_sheet.append_row([
                 username, agg["games_count"], agg["total_score"], round(avg_score, 2),
-                round(avg_time_all, 2), round(avg_time_correct, 2), round(correct_percent, 2), agg["max_elo"]
+                round(correct_percent, 2), agg["max_elo"]
             ])
     
     print(f"✅ Общая статистика игроков обновлена")
@@ -1035,6 +1030,32 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Пока нет сохранённых результатов.")
             return
         
+        # Для каждого игрока нужно вычислить среднее время ответа и среднее время правильных ответов
+        # на основе данных из Games, так как в Players этих колонок больше нет.
+        games_sheet = sheet.worksheet("Games")
+        all_games = games_sheet.get_all_records()
+        player_stats_extra = {}
+        for row in all_games:
+            def to_float_val(v):
+                if isinstance(v, str):
+                    v = v.replace(',', '.')
+                try:
+                    return float(v)
+                except:
+                    return 0
+            username = row["Игрок"]
+            total_time_all = to_float_val(row.get("Общее время ответов", 0))
+            total_answered = to_float_val(row.get("Правильные ответы", 0)) + to_float_val(row.get("Неправильные ответы", 0))
+            total_time_correct = to_float_val(row.get("Общее время правильных ответов", 0))
+            total_correct = to_float_val(row.get("Правильные ответы", 0))
+            if username not in player_stats_extra:
+                player_stats_extra[username] = {"sum_time_all": 0, "sum_answered": 0, "sum_time_correct": 0, "sum_correct": 0}
+            player_stats_extra[username]["sum_time_all"] += total_time_all
+            player_stats_extra[username]["sum_answered"] += total_answered
+            player_stats_extra[username]["sum_time_correct"] += total_time_correct
+            player_stats_extra[username]["sum_correct"] += total_correct
+        
+        # Сортируем по ELO
         data.sort(key=lambda x: x.get("ELO", 0), reverse=True)
         message = "🏆 ОБЩАЯ СТАТИСТИКА ИГРОКОВ\n\n"
         for i, row in enumerate(data[:20], 1):
@@ -1046,23 +1067,26 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif i == 3:
                 medal = "🥉"
             
-            def to_float_val(v):
-                if isinstance(v, str):
-                    v = v.replace(',', '.')
-                try:
-                    return float(v)
-                except:
-                    return 0
+            username = row["Игрок"]
+            extra = player_stats_extra.get(username, {})
+            total_answered = extra.get("sum_answered", 0)
+            avg_time_all = extra.get("sum_time_all", 0) / total_answered if total_answered > 0 else 0
+            total_correct = extra.get("sum_correct", 0)
+            avg_time_correct = extra.get("sum_time_correct", 0) / total_correct if total_correct > 0 else 0
+            correct_percent = row["% правильных ответов"]
             
-            avg_time = to_float_val(row["Среднее время ответа"])
-            correct_percent = to_float_val(row["% правильных ответов"])
+            # Делим на 100 для коррекции
+            avg_time_all_display = avg_time_all / 100
+            avg_time_correct_display = avg_time_correct / 100
+            correct_percent_display = correct_percent / 100
             
             message += f"{medal} {i}. {row['Игрок']}\n"
             message += f"   📊 Игр: {row['Количество игр']}\n"
             message += f"   ⭐ Всего очков: {row['Всего очков']}\n"
             message += f"   📈 Средний балл: {row['Средний балл за квиз']}\n"
-            message += f"   ⏱️ Среднее время: {avg_time:.1f} сек\n"
-            message += f"   ✅ % правильных ответов: {correct_percent:.1f}%\n"
+            message += f"   ⏱️ Среднее время: {avg_time_all_display:.1f} сек\n"
+            message += f"   ⏱️ Среднее время (правильные): {avg_time_correct_display:.1f} сек\n"
+            message += f"   ✅ % правильных ответов: {correct_percent_display:.1f}%\n"
             message += f"   🎯 ELO: {row['ELO']}\n\n"
         
         await update.message.reply_text(message)
@@ -1100,12 +1124,15 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return 0
             avg_time = to_float_val(game_record.get("Среднее время ответа", 0))
             correct_percent = to_float_val(game_record.get("% правильных ответов", 0))
+            # Делим на 100 для коррекции
+            avg_time_display = avg_time / 100
+            correct_percent_display = correct_percent / 100
             message += f"{i}. {game_record.get('Название квиза', '-')}\n"
             message += f"   📅 Дата: {game_record.get('Дата', '-')}\n"
             message += f"   🏆 Место: {game_record.get('Место', '-')}\n"
             message += f"   ⭐ Очки: {game_record.get('Общий счёт', 0)}\n"
-            message += f"   ⏱️ Среднее время: {avg_time:.1f} сек\n"
-            message += f"   ✅ % правильных ответов: {correct_percent:.1f}%\n"
+            message += f"   ⏱️ Среднее время: {avg_time_display:.1f} сек\n"
+            message += f"   ✅ % правильных ответов: {correct_percent_display:.1f}%\n"
             message += f"   🎯 ELO после игры: {game_record.get('ELO после игры', 0)}\n\n"
         
         if len(user_games) > 10:
