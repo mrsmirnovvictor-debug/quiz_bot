@@ -1145,21 +1145,24 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_games.sort(key=lambda x: x.get("Дата", ""), reverse=True)
         message = f"📜 ИСТОРИЯ ИГРОКА {username}\n\n"
         for i, game_record in enumerate(user_games[:10], 1):
-            def to_float(v):
+            def to_float_val(v):
                 if isinstance(v, str):
                     v = v.replace(',', '.')
                 try:
                     return float(v)
                 except:
                     return 0
-            avg_time = to_float(game_record.get("Среднее время ответа", 0))
-            correct_percent = to_float(game_record.get("% правильных ответов", 0))
+            avg_time = to_float_val(game_record.get("Среднее время ответа", 0))
+            correct_percent = to_float_val(game_record.get("% правильных ответов", 0))
+            # Делим на 100 для коррекции
+            avg_time_display = avg_time / 100
+            correct_percent_display = correct_percent / 100
             message += f"{i}. {game_record.get('Название квиза', '-')}\n"
             message += f"   📅 Дата: {game_record.get('Дата', '-')}\n"
             message += f"   🏆 Место: {game_record.get('Место', '-')}\n"
             message += f"   ⭐ Очки: {game_record.get('Общий счёт', 0)}\n"
-            message += f"   ⏱️ Среднее время: {avg_time:.1f} сек\n"
-            message += f"   ✅ % правильных ответов: {correct_percent:.1f}%\n"
+            message += f"   ⏱️ Среднее время: {avg_time_display:.1f} сек\n"
+            message += f"   ✅ % правильных ответов: {correct_percent_display:.1f}%\n"
             message += f"   🎯 ELO после игры: {game_record.get('ELO после игры', 0)}\n\n"
         
         if len(user_games) > 10:
