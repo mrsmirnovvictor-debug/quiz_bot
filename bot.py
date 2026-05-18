@@ -91,7 +91,6 @@ def calculate_elo(score: int, max_score: int, avg_time_correct: float, total_pla
     return max(20, min(300, elo))
 
 def create_game_row(game, user_id, username, timestamp):
-    """Создаёт новую строку в листе Games для игрока перед началом квиза"""
     sheet = init_google_sheets()
     if not sheet:
         return None
@@ -118,7 +117,6 @@ def create_game_row(game, user_id, username, timestamp):
     return None
 
 def update_question_progress(game, user_id, q_idx, answer_text, points, delta, is_correct, row_idx):
-    """Обновляет уже существующую строку в Games"""
     sheet = init_google_sheets()
     if not sheet:
         return
@@ -127,7 +125,6 @@ def update_question_progress(game, user_id, q_idx, answer_text, points, delta, i
         return
     
     row_data = games_sheet.row_values(row_idx)
-    # Заменяем запятые на точки для числовых значений
     for i, val in enumerate(row_data):
         if isinstance(val, str) and ',' in val:
             row_data[i] = val.replace(',', '.')
@@ -159,7 +156,6 @@ def update_question_progress(game, user_id, q_idx, answer_text, points, delta, i
     games_sheet.update_cell(row_idx, total_time_col + 1, current_total_time + delta)
 
 def finalize_game_row(game, user_id, username, timestamp, place, score, avg_time_all, avg_time_correct, correct_percent, elo, row_idx):
-    """Обновляет итоговые поля в строке Games"""
     sheet = init_google_sheets()
     if not sheet:
         return
@@ -227,36 +223,47 @@ def update_players_stats(game, players_ranking, avg_times_all, avg_times_correct
                 return 0
         
         username = row["Игрок"]
-        player_agg[username]["total_score"] += to_float(row.get("Общий счёт", 0))
-        player_agg[username]["total_correct"] += to_int(row.get("Правильные ответы", 0))
-        player_agg[username]["total_incorrect"] += to_int(row.get("Неправильные ответы", 0))
-        player_agg[username]["total_time_all"] += to_float(row.get("Общее время ответов", 0))
-        player_agg[username]["total_time_correct"] += to_float(row.get("Общее время правильных ответов", 0))
-        player_agg[username]["total_questions"] += to_int(row.get("Количество вопросов", 0))
+        total_time_all = to_float(row.get("Общее время ответов", 0))
+        total_time_correct = to_float(row.get("Общее время правильных ответов", 0))
+        total_correct = to_int(row.get("Правильные ответы", 0))
+        total_incorrect = to_int(row.get("Неправильные ответы", 0))
+        total_questions = to_int(row.get("Количество вопросов", 0))
+        score = to_float(row.get("Общий счёт", 0))
+        elo = to_int(row.get("ELO после игры", 0))
+        
+        player_agg[username]["total_score"] += score
+        player_agg[username]["total_correct"] += total_correct
+        player_agg[username]["total_incorrect"] += total_incorrect
+        player_agg[username]["total_time_all"] += total_time_all
+        player_agg[username]["total_time_correct"] += total_time_correct
+        player_agg[username]["total_questions"] += total_questions
         player_agg[username]["games_count"] += 1
-        player_agg[username]["max_elo"] = max(player_agg[username]["max_elo"], to_int(row.get("ELO после игры", 0)))
+        player_agg[username]["max_elo"] = max(player_agg[username]["max_elo"], elo)
     
     for username, agg in player_agg.items():
         total_answered = agg["total_correct"] + agg["total_incorrect"]
         avg_time_all = agg["total_time_all"] / total_answered if total_answered > 0 else 0
         avg_time_correct = agg["total_time_correct"] / agg["total_correct"] if agg["total_correct"] > 0 else 0
         correct_percent = (agg["total_correct"] / agg["total_questions"]) * 100 if agg["total_questions"] > 0 else 0
+        avg_score = agg["total_score"] / agg["games_count"] if agg["games_count"] > 0 else 0
         
         existing = players_sheet.find(username)
         if existing:
             row_idx = existing.row
             players_sheet.update_cell(row_idx, 2, agg["games_count"])
             players_sheet.update_cell(row_idx, 3, agg["total_score"])
-            players_sheet.update_cell(row_idx, 4, round(agg["total_score"] / agg["games_count"], 2))
+            players_sheet.update_cell(row_idx, 4, round(avg_score, 2))
             players_sheet.update_cell(row_idx, 5, round(avg_time_all, 2))
             players_sheet.update_cell(row_idx, 6, round(avg_time_correct, 2))
             players_sheet.update_cell(row_idx, 7, round(correct_percent, 2))
             players_sheet.update_cell(row_idx, 8, agg["max_elo"])
         else:
             players_sheet.append_row([
-                username, agg["games_count"], agg["total_score"], round(agg["total_score"] / agg["games_count"], 2),
+                username, agg["games_count"], agg["total_score"], round(avg_score, 2),
                 round(avg_time_all, 2), round(avg_time_correct, 2), round(correct_percent, 2), agg["max_elo"]
             ])
+    
+    print(f"✅ Общая статистика игроков обновлена")
 
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
@@ -1039,7 +1046,6 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif i == 3:
                 medal = "🥉"
             
-            # Преобразуем строковые значения с запятой
             def to_float_val(v):
                 if isinstance(v, str):
                     v = v.replace(',', '.')
@@ -1055,7 +1061,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message += f"   📊 Игр: {row['Количество игр']}\n"
             message += f"   ⭐ Всего очков: {row['Всего очков']}\n"
             message += f"   📈 Средний балл: {row['Средний балл за квиз']}\n"
-            message += f"   ⏱️ Среднее время: {avg_time:.1f} сек\n"       # 1 знак после запятой
+            message += f"   ⏱️ Среднее время: {avg_time:.1f} сек\n"
             message += f"   ✅ % правильных ответов: {correct_percent:.1f}%\n"
             message += f"   🎯 ELO: {row['ELO']}\n\n"
         
