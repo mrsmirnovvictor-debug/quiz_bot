@@ -4,7 +4,7 @@ import re
 import json
 import asyncio
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional, Dict, List, Tuple
 from collections import defaultdict
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -12,9 +12,183 @@ from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler, ContextTypes
 )
 
+# -------------------- Google Sheets импорт --------------------
+try:
+    import gspread
+    from oauth2client.service_account import ServiceAccountCredentials
+    GOOGLE_SHEETS_AVAILABLE = True
+except ImportError:
+    GOOGLE_SHEETS_AVAILABLE = False
+    print("⚠️ gspread не установлен, статистика не будет сохраняться")
+
 # -------------------- Константы --------------------
 TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "")
-ZAZYVALA_BOT = "@ZazyvalaTag2Bot"
+GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS", "")
+GOOGLE_SHEET_ID = os.environ.get("GOOGLE_SHEET_ID", "")
+
+# -------------------- Функции для работы с Google Sheets --------------------
+def init_google_sheets():
+    if not GOOGLE_SHEETS_AVAILABLE:
+        return None
+    if not GOOGLE_CREDENTIALS_JSON:
+        print("⚠️ GOOGLE_CREDENTIALS не заданы")
+        return None
+    if not GOOGLE_SHEET_ID:
+        print("⚠️ GOOGLE_SHEET_ID не задан")
+        return None
+    
+    try:
+        creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        client = gspread.authorize(creds)
+        sheet = client.open_by_key(GOOGLE_SHEET_ID)
+        return sheet
+    except Exception as e:
+        print(f"❌ Ошибка подключения: {e}")
+        return None
+
+def ensure_sheets_exist(sheet):
+    try:
+        try:
+            games_sheet = sheet.worksheet("Games")
+        except gspread.WorksheetNotFound:
+            games_sheet = sheet.add_worksheet(title="Games", rows=1, cols=100)
+            headers = ["Дата", "Chat ID", "Название квиза", "Игрок", "Место", "Общий счёт",
+                       "Количество вопросов", "Правильные ответы", "Неправильные ответы", "Без ответа",
+                       "Общее время ответов", "Общее время правильных ответов",
+                       "Среднее время ответа", "Среднее время (правильные)", "ELO после игры", "% правильных ответов"]
+            for i in range(1, 17):
+                headers.append(f"Вопрос {i} ответ")
+                headers.append(f"Вопрос {i} баллы")
+                headers.append(f"Вопрос {i} время")
+            games_sheet.append_row(headers)
+            print("✅ Лист Games создан")
+        
+        try:
+            players_sheet = sheet.worksheet("Players")
+        except gspread.WorksheetNotFound:
+            players_sheet = sheet.add_worksheet(title="Players", rows=1, cols=20)
+            players_sheet.append_row(["Игрок", "Количество игр", "Всего очков", "Средний балл за квиз",
+                                      "Среднее время ответа", "Среднее время (правильные)",
+                                      "% правильных ответов", "ELO"])
+            print("✅ Лист Players создан")
+        
+        return games_sheet, players_sheet
+    except Exception as e:
+        print(f"Ошибка при создании листов: {e}")
+        return None, None
+
+def calculate_elo(score: int, max_score: int, avg_time_correct: float, total_players: int, place: int) -> int:
+    if max_score == 0:
+        return 20
+    score_percent = (score / max_score) * 100
+    speed_bonus = max(0, 30 - avg_time_correct) if avg_time_correct > 0 else 0
+    place_bonus = (total_players - place + 1) * 5
+    participation_bonus = 20
+    elo = int(score_percent + speed_bonus + place_bonus + participation_bonus)
+    return max(20, min(300, elo))
+
+def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, player_answers_detail):
+    sheet = init_google_sheets()
+    if not sheet:
+        return
+    
+    games_sheet, players_sheet = ensure_sheets_exist(sheet)
+    if not games_sheet or not players_sheet:
+        return
+    
+    now_moscow = datetime.now(timezone.utc) + timedelta(hours=3)
+    date_str = now_moscow.strftime("%Y-%m-%d %H:%M:%S")
+    max_possible_score = len(game.pack["questions"]) * 15
+    total_questions = len(game.pack["questions"])
+    
+    for place_info in players_ranking:
+        place = place_info["place"]
+        for player in place_info["players"]:
+            user_id = player["user_id"]
+            username = player["username"]
+            score = player["score"]
+            correct_count = player["correct_count"]
+            total_answered = sum(1 for a in player_answers_detail.get(user_id, []) if a.get("time", 0) >= 0)
+            incorrect_count = total_answered - correct_count
+            no_answer = total_questions - total_answered
+            avg_time_all = avg_times_all.get(user_id, 0)
+            avg_time_correct = avg_times_correct.get(user_id, 0)
+            correct_percent = (correct_count / total_questions) * 100 if total_questions > 0 else 0
+            elo = calculate_elo(score, max_possible_score, avg_time_correct, len(game.registered), place)
+            
+            row = [date_str, str(game.chat_id), game.pack["title"], username, place, score,
+                   total_questions, correct_count, incorrect_count, no_answer,
+                   round(avg_time_all * total_answered, 2) if total_answered > 0 else 0,
+                   round(avg_time_correct * correct_count, 2) if correct_count > 0 else 0,
+                   round(avg_time_all, 2), round(avg_time_correct, 2), elo, round(correct_percent, 2)]
+            
+            answers_detail = player_answers_detail.get(user_id, [])
+            for q_idx in range(total_questions):
+                if q_idx < len(answers_detail):
+                    row.append(answers_detail[q_idx].get("answer", "-"))
+                    row.append(answers_detail[q_idx].get("points", 0))
+                    row.append(round(answers_detail[q_idx].get("time", 0), 2) if answers_detail[q_idx].get("time") else 0)
+                else:
+                    row.append("-")
+                    row.append(0)
+                    row.append(0)
+            
+            games_sheet.append_row(row)
+    
+    # Обновляем общую статистику игроков в Players
+    try:
+        existing_data = players_sheet.get_all_records()
+        player_stats = {row["Игрок"]: row for row in existing_data}
+    except:
+        player_stats = {}
+    
+    for place_info in players_ranking:
+        for player in place_info["players"]:
+            username = player["username"]
+            score = player["score"]
+            correct_count = player["correct_count"]
+            total_questions = len(game.pack["questions"])
+            correct_percent = (correct_count / total_questions) * 100 if total_questions > 0 else 0
+            avg_time_all = avg_times_all.get(player["user_id"], 0)
+            avg_time_correct = avg_times_correct.get(player["user_id"], 0)
+            elo = calculate_elo(score, max_possible_score, avg_time_correct, len(game.registered), place_info["place"])
+            
+            if username in player_stats:
+                stats = player_stats[username]
+                old_games = stats["Количество игр"]
+                new_games = old_games + 1
+                new_total_score = stats["Всего очков"] + score
+                
+                row_idx = None
+                for idx, row in enumerate(existing_data):
+                    if row["Игрок"] == username:
+                        row_idx = idx + 2
+                        break
+                
+                if row_idx:
+                    new_avg_score = new_total_score / new_games
+                    new_avg_time_all = (stats["Среднее время ответа"] * old_games + avg_time_all) / new_games if avg_time_all > 0 else stats["Среднее время ответа"]
+                    new_avg_time_correct = (stats["Среднее время (правильные)"] * old_games + avg_time_correct) / new_games if avg_time_correct > 0 else stats["Среднее время (правильные)"]
+                    new_correct_percent = (stats["% правильных ответов"] * old_games + correct_percent) / new_games
+                    new_elo = max(stats["ELO"], elo)
+                    
+                    players_sheet.update([[new_games]], f"B{row_idx}")
+                    players_sheet.update([[new_total_score]], f"C{row_idx}")
+                    players_sheet.update([[round(new_avg_score, 2)]], f"D{row_idx}")
+                    players_sheet.update([[round(new_avg_time_all, 2)]], f"E{row_idx}")
+                    players_sheet.update([[round(new_avg_time_correct, 2)]], f"F{row_idx}")
+                    players_sheet.update([[round(new_correct_percent, 2)]], f"G{row_idx}")
+                    players_sheet.update([[new_elo]], f"H{row_idx}")
+            else:
+                players_sheet.append_row([
+                    username, 1, score, round(score, 2),
+                    round(avg_time_all, 2), round(avg_time_correct, 2),
+                    round(correct_percent, 2), elo
+                ])
+    
+    print(f"✅ Результаты сохранены в Google Sheets")
 
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
@@ -55,10 +229,12 @@ class Game:
         self.answers = {}
         self.question_start_time = None
         self.reg_msg_id = None
+        self.reminder_msg_id = None  # ID сообщения-напоминания за 15 минут
         self.question_msg_id = None
         self.video_msg_id = None
         self.reg_timer_job = None
         self.question_timer_job = None
+        self.reminder_timer_job = None
         self.scheduled_start_utc = scheduled_start_utc
         self.paused = False
         self.pause_after_question = False
@@ -84,6 +260,7 @@ class Game:
         q = self.pack["questions"][self.current_question]
         is_correct = (option_idx == q["correct"])
         delta = (answer_time - self.question_start_time).total_seconds()
+        answer_text = q["options"][option_idx]
         
         points = 0
         if is_correct:
@@ -104,6 +281,7 @@ class Game:
         
         self.user_total_answered[user_id] += 1
         self.user_answers_detail[user_id].append({
+            "answer": answer_text,
             "points": points,
             "time": delta,
             "is_correct": is_correct
@@ -143,6 +321,16 @@ class Game:
             current_place += len(same_score_players)
         return ranking
 
+    def get_player_avg_times(self):
+        avg_times_all = {}
+        avg_times_correct = {}
+        for uid, answers in self.user_answers_detail.items():
+            times = [a["time"] for a in answers]
+            correct_times = [a["time"] for a in answers if a["is_correct"]]
+            avg_times_all[uid] = sum(times) / len(times) if times else 0
+            avg_times_correct[uid] = sum(correct_times) / len(correct_times) if correct_times else 0
+        return avg_times_all, avg_times_correct
+
 def load_pack(pack_id: str):
     path = f"packs/{pack_id}.json"
     if not os.path.exists(path):
@@ -160,7 +348,6 @@ async def is_admin(update: Update, user_id: int) -> bool:
     except:
         return False
 
-# -------------------- Функции перевода времени --------------------
 def msk_to_utc(dt_msk: datetime) -> datetime:
     return dt_msk.replace(tzinfo=timezone.utc) - timedelta(hours=3)
 
@@ -229,9 +416,36 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     delay = (scheduled_start_utc - now_utc).total_seconds()
     if delay > 0:
         context.job_queue.run_once(start_quiz_sequence, when=delay, chat_id=chat_id, data=chat_id)
+        # Планируем напоминание за 15 минут до начала (в основную ветку)
+        reminder_delay = delay - 15 * 60  # 15 минут в секундах
+        if reminder_delay > 0:
+            context.job_queue.run_once(send_15_min_reminder, when=reminder_delay, chat_id=chat_id, data=chat_id)
     else:
         await start_quiz_sequence(context, chat_id)
 
+# -------------------- Напоминание за 15 минут --------------------
+async def send_15_min_reminder(context: ContextTypes.DEFAULT_TYPE, chat_id: int = None):
+    if chat_id is None:
+        chat_id = context.job.data
+    game = games.get(chat_id)
+    if not game or game.status != "registration":
+        return
+    
+    # Отправляем сообщение в основную ветку (без message_thread_id)
+    reminder_text = (
+        f"⏰ Через 15 минут начнётся квиз на тему: \"{game.pack['title']}\".\n"
+        f"Успевайте зарегистрироваться по ссылке: {game.reg_msg_link if hasattr(game, 'reg_msg_link') else 'регистрация в этом чате'}"
+    )
+    msg = await context.bot.send_message(chat_id=chat_id, text=reminder_text)
+    game.reminder_msg_id = msg.message_id
+    
+    # Закрепляем сообщение
+    try:
+        await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id, disable_notification=False)
+    except Exception as e:
+        print(f"Не удалось закрепить напоминание: {e}")
+
+# -------------------- Регистрация и запуск --------------------
 async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     game = games.get(chat_id)
     if not game:
@@ -252,17 +466,13 @@ async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         send_kwargs["message_thread_id"] = game.message_thread_id
     msg = await context.bot.send_message(**send_kwargs)
     game.reg_msg_id = msg.id
+    # Сохраняем ссылку на сообщение для напоминания
+    game.reg_msg_link = f"https://t.me/c/{str(chat_id)[4:]}/{msg.message_id}"
     
     try:
         await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.id, disable_notification=False)
     except:
         pass
-    
-    call_text = f"/all{ZAZYVALA_BOT}"
-    call_kwargs = {"chat_id": chat_id, "text": call_text}
-    if game.message_thread_id:
-        call_kwargs["message_thread_id"] = game.message_thread_id
-    await context.bot.send_message(**call_kwargs)
     
     game.reg_timer_job = context.job_queue.run_repeating(update_reg_timer, interval=10, first=5, chat_id=chat_id, data=chat_id)
 
@@ -340,6 +550,9 @@ async def start_early_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         if job.chat_id == chat_id and job.callback == start_quiz_sequence:
             job.schedule_removal()
             break
+        if job.chat_id == chat_id and job.callback == send_15_min_reminder:
+            job.schedule_removal()
+            break
     await close_registration_and_start(context, chat_id, early=True)
 
 async def close_registration_and_start(context: ContextTypes.DEFAULT_TYPE, chat_id: int, early: bool = False):
@@ -349,6 +562,14 @@ async def close_registration_and_start(context: ContextTypes.DEFAULT_TYPE, chat_
     if game.reg_timer_job:
         game.reg_timer_job.schedule_removal()
         game.reg_timer_job = None
+    
+    # Открепляем напоминание, если оно было
+    if game.reminder_msg_id:
+        try:
+            await context.bot.unpin_chat_message(chat_id=chat_id, message_id=game.reminder_msg_id)
+        except:
+            pass
+    
     game.status = "active"
     users_list = "\n".join(f"• {p['username']}" for p in game.registered.values())
     start_line = format_datetime_msk_multiline(game.scheduled_start_utc)
@@ -397,7 +618,7 @@ async def send_pre_start_warning(context: ContextTypes.DEFAULT_TYPE, chat_id: in
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# -------------------- Логика вопросов --------------------
+# -------------------- Логика вопросов (без изменений) --------------------
 async def start_question(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     game = games.get(chat_id)
@@ -561,6 +782,12 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
         return
     
     players_ranking = game.calculate_final_ranking()
+    avg_times_all, avg_times_correct = game.get_player_avg_times()
+    
+    try:
+        save_game_results(game, players_ranking, avg_times_all, avg_times_correct, game.user_answers_detail)
+    except Exception as e:
+        print(f"Ошибка при сохранении в Google Sheets: {e}")
     
     if not players_ranking:
         send_kwargs = {"chat_id": chat_id, "text": "Нет участников."}
@@ -581,10 +808,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
         mentions = []
         for p in third_place["players"]:
             username = p["username"]
-            if username.startswith("@"):
-                mentions.append(username)
-            else:
-                mentions.append(username)
+            mentions.append(username)
         mention_str = " и ".join(mentions)
         if len(third_place["players"]) == 1:
             text_3rd = f"Почетное 3 место занимает {mention_str}. Поздравляем!"
