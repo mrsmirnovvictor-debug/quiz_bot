@@ -959,37 +959,37 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# -------------------- Команда /stats (общая статистика по группе) --------------------
+# -------------------- Команда /stats (только по группе) --------------------
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    await update.message.reply_text("🔄 Загружаю статистику...")
-    
+    await update.message.reply_text("🔄 Загружаю статистику по этой группе...")
+
     sheet = init_google_sheets()
     if not sheet:
         await update.message.reply_text("❌ Статистика временно недоступна.")
         return
-    
+
     try:
         games_sheet = sheet.worksheet("Games")
         all_games = games_sheet.get_all_records()
-        
+
         # Фильтруем только игры текущего чата
         chat_games = [row for row in all_games if str(row.get("Chat ID", "")) == str(chat_id)]
-        
+
         if not chat_games:
             await update.message.reply_text("❌ В этой группе пока нет сыгранных квизов.")
             return
-        
+
         player_agg = defaultdict(lambda: {
-            "total_score": 0,
+            "total_score": 0.0,
             "total_correct": 0,
             "total_incorrect": 0,
-            "total_time": 0,
-            "total_time_correct": 0,
+            "total_time": 0.0,
+            "total_time_correct": 0.0,
             "total_questions": 0,
-            "games_count": 0
+            "games_count": 0,
         })
-        
+
         for row in chat_games:
             def to_float(v):
                 if isinstance(v, str):
@@ -997,7 +997,8 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try:
                     return float(v)
                 except:
-                    return 0
+                    return 0.0
+
             def to_int(v):
                 if isinstance(v, str):
                     v = v.replace(',', '.')
@@ -1005,26 +1006,34 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return int(float(v))
                 except:
                     return 0
-            
-            username = row["Игрок"]
+
+            username = row.get("Игрок", "")
+            if not username:
+                continue
+
             correct = to_int(row.get("Правильные ответы", 0))
             incorrect = to_int(row.get("Неправильные ответы", 0))
             total_questions = to_int(row.get("Количество вопросов", 0))
             score = to_float(row.get("Общий счёт", 0))
-            total_time = to_float(row.get("Общее время ответов", 0))
-            total_time_correct = to_float(row.get("Общее время правильных ответов", 0))
-            
-            player_agg[username]["total_score"] += score
-            player_agg[username]["total_correct"] += correct
-            player_agg[username]["total_incorrect"] += incorrect
-            player_agg[username]["total_time"] += total_time
-            player_agg[username]["total_time_correct"] += total_time_correct
-            player_agg[username]["total_questions"] += total_questions
-            player_agg[username]["games_count"] += 1
-        
-        # Сортируем по суммарным очкам
+            total_time = to_float(row.get("Общее время ответов", 0))      # уже в секундах
+            total_time_correct = to_float(row.get("Общее время правильных ответов", 0))  # в секундах
+
+            agg = player_agg[username]
+            agg["total_score"] += score
+            agg["total_correct"] += correct
+            agg["total_incorrect"] += incorrect
+            agg["total_time"] += total_time
+            agg["total_time_correct"] += total_time_correct
+            agg["total_questions"] += total_questions
+            agg["games_count"] += 1
+
+        if not player_agg:
+            await update.message.reply_text("❌ Нет данных для отображения.")
+            return
+
+        # Сортируем по общему счёту
         sorted_players = sorted(player_agg.items(), key=lambda x: x[1]["total_score"], reverse=True)
-        
+
         message = "🏆 ОБЩАЯ СТАТИСТИКА ПО ГРУППЕ\n\n"
         for i, (username, agg) in enumerate(sorted_players[:20], 1):
             medal = ""
@@ -1034,69 +1043,82 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 medal = "🥈"
             elif i == 3:
                 medal = "🥉"
-            
+
+            games_count = agg["games_count"]
+            total_score = agg["total_score"]
+            avg_score = total_score / games_count if games_count > 0 else 0
+
             total_answered = agg["total_correct"] + agg["total_incorrect"]
-            total_time_sec = agg["total_time"] / 1_000_000
-            avg_time_all = total_time_sec / total_answered if total_answered > 0 else 0
-            
-            total_time_correct_sec = agg["total_time_correct"] / 1_000_000
-            avg_time_correct = total_time_correct_sec / agg["total_correct"] if agg["total_correct"] > 0 else 0
-            
-            correct_percent = (agg["total_correct"] / agg["total_questions"]) * 100 if agg["total_questions"] > 0 else 0
-            avg_score = agg["total_score"] / agg["games_count"] if agg["games_count"] > 0 else 0
-            
+            total_time = agg["total_time"]
+            avg_time_all = total_time / total_answered if total_answered > 0 else 0
+
+            total_time_correct = agg["total_time_correct"]
+            total_correct = agg["total_correct"]
+            avg_time_correct = total_time_correct / total_correct if total_correct > 0 else 0
+
+            total_questions = agg["total_questions"]
+            correct_percent = (agg["total_correct"] / total_questions) * 100 if total_questions > 0 else 0
+
             message += f"{medal} {i}. {username}\n"
-            message += f"   📊 Игр: {agg['games_count']}\n"
-            message += f"   ⭐ Всего очков: {agg['total_score']:.1f}\n"
+            message += f"   📊 Игр: {games_count}\n"
+            message += f"   ⭐ Всего очков: {total_score:.1f}\n"
             message += f"   📈 Средний балл: {avg_score:.1f}\n"
             message += f"   ⏱️ Среднее время: {avg_time_all:.1f} сек\n"
             message += f"   ⏱️ Среднее время (правильные): {avg_time_correct:.1f} сек\n"
             message += f"   ✅ % правильных ответов: {correct_percent:.1f}%\n\n"
-        
+
         await update.message.reply_text(message)
+
     except Exception as e:
         print(f"Ошибка получения статистики: {e}")
         await update.message.reply_text("❌ Ошибка загрузки статистики.")
 
-# -------------------- Команда /history (история игрока в этой группе) --------------------
+
+# -------------------- Команда /history (только в личку, по всем группам) --------------------
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Проверяем, что команда вызвана в личном чате
+    if update.effective_chat.type != "private":
+        await update.message.reply_text(
+            "📩 История ваших игр доступна только в личных сообщениях с ботом.\n"
+            "Пожалуйста, напишите /history мне в личку."
+        )
+        return
+
     user = update.effective_user
     username = format_username(user)
-    chat_id = update.effective_chat.id
-    
     await update.message.reply_text("🔄 Загружаю вашу историю...")
-    
+
     sheet = init_google_sheets()
     if not sheet:
         await update.message.reply_text("❌ История временно недоступна.")
         return
-    
+
     try:
         games_sheet = sheet.worksheet("Games")
         all_games = games_sheet.get_all_records()
-        
-        # Фильтруем по Chat ID и по имени игрока
-        user_games = [row for row in all_games if str(row.get("Chat ID", "")) == str(chat_id) and row.get("Игрок") == username]
-        
+
+        # Фильтруем все игры этого игрока (во всех группах)
+        user_games = [row for row in all_games if row.get("Игрок") == username]
+
         if not user_games:
-            await update.message.reply_text(f"❌ {username}, у вас пока нет сыгранных квизов в этой группе.")
+            await update.message.reply_text(f"❌ {username}, у вас пока нет сыгранных квизов.")
             return
-        
+
         user_games.sort(key=lambda x: x.get("Дата", ""), reverse=True)
-        message = f"📜 ИСТОРИЯ ИГРОКА {username} В ЭТОЙ ГРУППЕ\n\n"
-        
+
+        message = f"📜 ИСТОРИЯ ИГРОКА {username} (ВСЕ ГРУППЫ)\n\n"
         for i, game_record in enumerate(user_games[:10], 1):
-            def to_float(v):
+            def to_float_val(v):
                 if isinstance(v, str):
                     v = v.replace(',', '.')
                 try:
                     return float(v)
                 except:
-                    return 0
-            
-            avg_time = to_float(game_record.get("Среднее время ответа", 0))
-            correct_percent = to_float(game_record.get("% правильных ответов", 0))
-            
+                    return 0.0
+
+            avg_time = to_float_val(game_record.get("Среднее время ответа", 0))   # уже секунды
+            correct_percent = to_float_val(game_record.get("% правильных ответов", 0))  # уже проценты
+
             message += f"{i}. {game_record.get('Название квиза', '-')}\n"
             message += f"   📅 Дата: {game_record.get('Дата', '-')}\n"
             message += f"   🏆 Место: {game_record.get('Место', '-')}\n"
@@ -1104,11 +1126,12 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message += f"   ⏱️ Среднее время: {avg_time:.1f} сек\n"
             message += f"   ✅ % правильных ответов: {correct_percent:.1f}%\n"
             message += f"   🎯 ELO после игры: {game_record.get('ELO после игры', 0)}\n\n"
-        
+
         if len(user_games) > 10:
             message += f"и ещё {len(user_games) - 10} игр..."
-        
+
         await update.message.reply_text(message)
+
     except Exception as e:
         print(f"Ошибка получения истории: {e}")
         await update.message.reply_text("❌ Ошибка загрузки истории.")
