@@ -103,6 +103,7 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
     max_possible_score = len(game.pack["questions"]) * 15
     total_questions = len(game.pack["questions"])
     
+    # Добавляем строки в Games
     for place_info in players_ranking:
         place = place_info["place"]
         for player in place_info["players"]:
@@ -137,56 +138,106 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             
             games_sheet.append_row(row)
     
-    # Обновляем общую статистику игроков в Players
+    # ---- Пересчет статистики Players на основе всех данных Games ----
     try:
-        existing_data = players_sheet.get_all_records()
-        player_stats = {row["Игрок"]: row for row in existing_data}
-    except:
-        player_stats = {}
+        all_games = games_sheet.get_all_records()
+    except Exception as e:
+        print(f"Ошибка чтения Games для пересчета Players: {e}")
+        return
     
-    for place_info in players_ranking:
-        for player in place_info["players"]:
-            username = player["username"]
-            score = player["score"]
-            correct_count = player["correct_count"]
-            total_questions = len(game.pack["questions"])
-            correct_percent = (correct_count / total_questions) * 100 if total_questions > 0 else 0
-            avg_time_all = avg_times_all.get(player["user_id"], 0)
-            avg_time_correct = avg_times_correct.get(player["user_id"], 0)
-            elo = calculate_elo(score, max_possible_score, avg_time_correct, len(game.registered), place_info["place"])
-            
-            if username in player_stats:
-                stats = player_stats[username]
-                old_games = stats["Количество игр"]
-                new_games = old_games + 1
-                new_total_score = stats["Всего очков"] + score
-                
-                row_idx = None
-                for idx, row in enumerate(existing_data):
-                    if row["Игрок"] == username:
-                        row_idx = idx + 2
-                        break
-                
-                if row_idx:
-                    new_avg_score = new_total_score / new_games
-                    new_avg_time_all = (stats["Среднее время ответа"] * old_games + avg_time_all) / new_games if avg_time_all > 0 else stats["Среднее время ответа"]
-                    new_avg_time_correct = (stats["Среднее время (правильные)"] * old_games + avg_time_correct) / new_games if avg_time_correct > 0 else stats["Среднее время (правильные)"]
-                    new_correct_percent = (stats["% правильных ответов"] * old_games + correct_percent) / new_games
-                    new_elo = max(stats["ELO"], elo)
-                    
-                    players_sheet.update([[new_games]], f"B{row_idx}")
-                    players_sheet.update([[new_total_score]], f"C{row_idx}")
-                    players_sheet.update([[round(new_avg_score, 2)]], f"D{row_idx}")
-                    players_sheet.update([[round(new_avg_time_all, 2)]], f"E{row_idx}")
-                    players_sheet.update([[round(new_avg_time_correct, 2)]], f"F{row_idx}")
-                    players_sheet.update([[round(new_correct_percent, 2)]], f"G{row_idx}")
-                    players_sheet.update([[new_elo]], f"H{row_idx}")
-            else:
-                players_sheet.append_row([
-                    username, 1, score, round(score, 2),
-                    round(avg_time_all, 2), round(avg_time_correct, 2),
-                    round(correct_percent, 2), elo
-                ])
+    player_stats = {}
+    for row in all_games:
+        username = row.get("Игрок")
+        if not username:
+            continue
+        
+        # Числовые значения
+        def to_float(v):
+            if isinstance(v, str):
+                v = v.replace(',', '.')
+            try:
+                return float(v)
+            except:
+                return 0.0
+        
+        def to_int(v):
+            if isinstance(v, str):
+                v = v.replace(',', '.')
+            try:
+                return int(float(v))
+            except:
+                return 0
+        
+        score = to_float(row.get("Общий счёт", 0))
+        total_questions = to_int(row.get("Количество вопросов", 0))
+        correct = to_int(row.get("Правильные ответы", 0))
+        incorrect = to_int(row.get("Неправильные ответы", 0))
+        total_time_all = to_float(row.get("Общее время ответов", 0))
+        total_time_correct = to_float(row.get("Общее время правильных ответов", 0))
+        elo = to_float(row.get("ELO после игры", 0))
+        
+        if username not in player_stats:
+            player_stats[username] = {
+                "games_count": 0,
+                "total_score": 0.0,
+                "total_questions": 0,
+                "total_correct": 0,
+                "total_incorrect": 0,
+                "total_time_all": 0.0,
+                "total_time_correct": 0.0,
+                "elos": []
+            }
+        stats = player_stats[username]
+        stats["games_count"] += 1
+        stats["total_score"] += score
+        stats["total_questions"] += total_questions
+        stats["total_correct"] += correct
+        stats["total_incorrect"] += incorrect
+        stats["total_time_all"] += total_time_all
+        stats["total_time_correct"] += total_time_correct
+        stats["elos"].append(elo)
+    
+    # Подготовка новых данных для Players
+    new_rows = []
+    for username, stats in player_stats.items():
+        games_count = stats["games_count"]
+        total_score = stats["total_score"]
+        avg_score = total_score / games_count if games_count > 0 else 0
+        
+        total_correct = stats["total_correct"]
+        total_incorrect = stats["total_incorrect"]
+        answered = total_correct + total_incorrect
+        avg_time_all = stats["total_time_all"] / answered if answered > 0 else 0
+        avg_time_correct = stats["total_time_correct"] / total_correct if total_correct > 0 else 0
+        
+        total_questions = stats["total_questions"]
+        percent_correct = (total_correct / total_questions) * 100 if total_questions > 0 else 0
+        
+        avg_elo = int(round(sum(stats["elos"]) / len(stats["elos"]))) if stats["elos"] else 0
+        
+        new_rows.append([
+            username,
+            games_count,
+            round(total_score, 2),
+            round(avg_score, 2),
+            round(avg_time_all, 2),
+            round(avg_time_correct, 2),
+            round(percent_correct, 2),
+            avg_elo
+        ])
+    
+    # Очищаем Players (кроме заголовка) и записываем новые данные
+    try:
+        # Получаем текущее количество строк
+        all_cells = players_sheet.get_all_values()
+        if len(all_cells) > 1:
+            players_sheet.delete_rows(2, len(all_cells) - 1)  # удаляем все строки после заголовка
+        # Заголовок уже есть (должен быть создан ensure_sheets_exist)
+        if new_rows:
+            players_sheet.append_rows(new_rows, value_input_option='USER_ENTERED')
+        print(f"✅ Статистика Players обновлена для {len(new_rows)} игроков")
+    except Exception as e:
+        print(f"Ошибка обновления Players: {e}")
     
     print(f"✅ Результаты сохранены в Google Sheets")
 
