@@ -103,7 +103,7 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
     max_possible_score = len(game.pack["questions"]) * 15
     total_questions = len(game.pack["questions"])
     
-    # Добавляем строки в Games
+    # ---------- 1. Добавляем строки в лист Games ----------
     for place_info in players_ranking:
         place = place_info["place"]
         for player in place_info["players"]:
@@ -119,11 +119,14 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             correct_percent = (correct_count / total_questions) * 100 if total_questions > 0 else 0
             elo = calculate_elo(score, max_possible_score, avg_time_correct, len(game.registered), place)
             
+            # Время в Games сохраняем в СЕКУНДАХ (без умножения на 100)
             row = [date_str, str(game.chat_id), game.pack["title"], username, place, score,
                    total_questions, correct_count, incorrect_count, no_answer,
-                   round(avg_time_all * total_answered, 2) if total_answered > 0 else 0,
-                   round(avg_time_correct * correct_count, 2) if correct_count > 0 else 0,
-                   round(avg_time_all, 2), round(avg_time_correct, 2), elo, round(correct_percent, 2)]
+                   round(avg_time_all * total_answered, 2),   # Общее время ответов (секунды)
+                   round(avg_time_correct * correct_count, 2), # Общее время правильных ответов (секунды)
+                   round(avg_time_all, 2),   # Среднее время ответа (секунды)
+                   round(avg_time_correct, 2), # Среднее время правильных ответов (секунды)
+                   elo, round(correct_percent, 2)]
             
             answers_detail = player_answers_detail.get(user_id, [])
             for q_idx in range(total_questions):
@@ -138,7 +141,7 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             
             games_sheet.append_row(row)
     
-    # ---- Пересчет статистики Players на основе всех данных Games ----
+    # ---------- 2. Полностью пересчитываем статистику для Players ----------
     try:
         all_games = games_sheet.get_all_records()
     except Exception as e:
@@ -151,7 +154,6 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         if not username:
             continue
         
-        # Числовые значения
         def to_float(v):
             if isinstance(v, str):
                 v = v.replace(',', '.')
@@ -172,8 +174,8 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         total_questions = to_int(row.get("Количество вопросов", 0))
         correct = to_int(row.get("Правильные ответы", 0))
         incorrect = to_int(row.get("Неправильные ответы", 0))
-        total_time_all = to_float(row.get("Общее время ответов", 0))
-        total_time_correct = to_float(row.get("Общее время правильных ответов", 0))
+        total_time_all = to_float(row.get("Общее время ответов", 0))      # уже в секундах
+        total_time_correct = to_float(row.get("Общее время правильных ответов", 0))  # уже в секундах
         elo = to_float(row.get("ELO после игры", 0))
         
         if username not in player_stats:
@@ -197,7 +199,7 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         stats["total_time_correct"] += total_time_correct
         stats["elos"].append(elo)
     
-    # Подготовка новых данных для Players
+    # Формируем новые строки для Players
     new_rows = []
     for username, stats in player_stats.items():
         games_count = stats["games_count"]
@@ -215,24 +217,31 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         
         avg_elo = int(round(sum(stats["elos"]) / len(stats["elos"]))) if stats["elos"] else 0
         
+        # ДЕЛИМ НА 100 при записи в Players, потому что в Games хранится в сотых?
+        # На самом деле мы теперь пишем в Games в СЕКУНДАХ, поэтому делить не нужно.
+        # Но если в Google Sheets уже старые данные, то они в сотых.
+        # Для совместимости проверяем: если среднее время > 100, значит это сотые, делим на 100
+        if avg_time_all > 100:
+            avg_time_all = avg_time_all / 100
+        if avg_time_correct > 100:
+            avg_time_correct = avg_time_correct / 100
+        
         new_rows.append([
             username,
             games_count,
-            round(total_score, 2),
-            round(avg_score, 2),
-            round(avg_time_all, 2),
-            round(avg_time_correct, 2),
-            round(percent_correct, 2),
+            round(total_score),  # Целое число
+            round(avg_score, 1),
+            round(avg_time_all, 1),
+            round(avg_time_correct, 1),
+            round(percent_correct, 1),
             avg_elo
         ])
     
-    # Очищаем Players (кроме заголовка) и записываем новые данные
+    # ---------- 3. Очищаем Players и записываем новые данные ----------
     try:
-        # Получаем текущее количество строк
         all_cells = players_sheet.get_all_values()
         if len(all_cells) > 1:
-            players_sheet.delete_rows(2, len(all_cells) - 1)  # удаляем все строки после заголовка
-        # Заголовок уже есть (должен быть создан ensure_sheets_exist)
+            players_sheet.delete_rows(2, len(all_cells) - 1)
         if new_rows:
             players_sheet.append_rows(new_rows, value_input_option='USER_ENTERED')
         print(f"✅ Статистика Players обновлена для {len(new_rows)} игроков")
@@ -1066,8 +1075,17 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             incorrect = to_int(row.get("Неправильные ответы", 0))
             total_questions = to_int(row.get("Количество вопросов", 0))
             score = to_float(row.get("Общий счёт", 0))
-            total_time = to_float(row.get("Общее время ответов", 0)) \ 100    # уже в секундах
-            total_time_correct = to_float(row.get("Общее время правильных ответов", 0)) \ 100  # в секундах
+            
+            # Время в Games может быть в сотых или в секундах
+            total_time = to_float(row.get("Общее время ответов", 0))
+            total_time_correct = to_float(row.get("Общее время правильных ответов", 0))
+            
+            # Если время > 100 секунд (максимальное время ответа за игру ~ 20*16=320 сек),
+            # но если > 1000 - точно сотые (было 42480 -> 424.8 сек)
+            if total_time > 1000:
+                total_time = total_time / 100
+            if total_time_correct > 1000:
+                total_time_correct = total_time_correct / 100
 
             agg = player_agg[username]
             agg["total_score"] += score
@@ -1112,7 +1130,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             message += f"{medal} {i}. {username}\n"
             message += f"   📊 Игр: {games_count}\n"
-            message += f"   ⭐ Всего очков: {total_score:.1f}\n"
+            message += f"   ⭐ Всего очков: {total_score:.0f}\n"  # Целое число
             message += f"   📈 Средний балл: {avg_score:.1f}\n"
             message += f"   ⏱️ Среднее время: {avg_time_all:.1f} сек\n"
             message += f"   ⏱️ Среднее время (правильные): {avg_time_correct:.1f} сек\n"
@@ -1167,13 +1185,19 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except:
                     return 0.0
 
-            avg_time = to_float_val(game_record.get("Среднее время ответа", 0))   # уже секунды
-            correct_percent = to_float_val(game_record.get("% правильных ответов", 0))  # уже проценты
+            avg_time = to_float_val(game_record.get("Среднее время ответа", 0))
+            correct_percent = to_float_val(game_record.get("% правильных ответов", 0))
+            
+            # Коррекция для старых данных (если > 100, значит сотые)
+            if avg_time > 100:
+                avg_time = avg_time / 100
+            if correct_percent > 100:
+                correct_percent = correct_percent / 100
 
             message += f"{i}. {game_record.get('Название квиза', '-')}\n"
             message += f"   📅 Дата: {game_record.get('Дата', '-')}\n"
             message += f"   🏆 Место: {game_record.get('Место', '-')}\n"
-            message += f"   ⭐ Очки: {game_record.get('Общий счёт', 0)}\n"
+            message += f"   ⭐ Очки: {game_record.get('Общий счёт', 0):.0f}\n"
             message += f"   ⏱️ Среднее время: {avg_time:.1f} сек\n"
             message += f"   ✅ % правильных ответов: {correct_percent:.1f}%\n"
             message += f"   🎯 ELO после игры: {game_record.get('ELO после игры', 0)}\n\n"
