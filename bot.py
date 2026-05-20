@@ -124,8 +124,8 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
                    total_questions, correct_count, incorrect_count, no_answer,
                    round(avg_time_all * total_answered, 2),   # K: Общее время ответов (сек)
                    round(avg_time_correct * correct_count, 2), # L: Общее время правильных (сек)
-                   round(avg_time_all, 2),   # M: Среднее время ответа (сек)
-                   round(avg_time_correct, 2), # N: Среднее время правильных (сек)
+                   round(avg_time_all, 2),   # M: Среднее время ответа (сек) - вспомогательное
+                   round(avg_time_correct, 2), # N: Среднее время правильных (сек) - вспомогательное
                    elo, round(correct_percent, 2)]
             
             answers_detail = player_answers_detail.get(user_id, [])
@@ -174,8 +174,8 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         total_questions = to_int(row.get("Количество вопросов", 0))
         correct = to_int(row.get("Правильные ответы", 0))
         incorrect = to_int(row.get("Неправильные ответы", 0))
-        total_time_all = to_float(row.get("Общее время ответов", 0))      # уже в секундах
-        total_time_correct = to_float(row.get("Общее время правильных ответов", 0))  # уже в секундах
+        total_time_all = to_float(row.get("Общее время ответов", 0))      # колонка K
+        total_time_correct = to_float(row.get("Общее время правильных ответов", 0))  # колонка L
         elo = to_float(row.get("ELO после игры", 0))
         
         if username not in player_stats:
@@ -185,8 +185,8 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
                 "total_questions": 0,
                 "total_correct": 0,
                 "total_incorrect": 0,
-                "total_time_all": 0.0,
-                "total_time_correct": 0.0,
+                "total_time_all": 0.0,      # сумма K
+                "total_time_correct": 0.0,  # сумма L
                 "elos": []
             }
         stats = player_stats[username]
@@ -199,7 +199,7 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         stats["total_time_correct"] += total_time_correct
         stats["elos"].append(elo)
     
-    # Формируем новые строки для Players
+    # Формируем новые строки для Players с ПРАВИЛЬНЫМИ формулами
     new_rows = []
     for username, stats in player_stats.items():
         games_count = stats["games_count"]
@@ -208,8 +208,12 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         
         total_correct = stats["total_correct"]
         total_incorrect = stats["total_incorrect"]
-        answered = total_correct + total_incorrect
-        avg_time_all = stats["total_time_all"] / answered if answered > 0 else 0
+        total_answered = total_correct + total_incorrect
+        
+        # ПРАВИЛЬНАЯ формула: среднее время ответа = сумма K / (H + I)
+        avg_time_all = stats["total_time_all"] / total_answered if total_answered > 0 else 0
+        
+        # ПРАВИЛЬНАЯ формула: среднее время правильных = сумма L / H
         avg_time_correct = stats["total_time_correct"] / total_correct if total_correct > 0 else 0
         
         total_questions = stats["total_questions"]
@@ -220,9 +224,9 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         new_rows.append([
             username,
             games_count,
-            round(total_score),     # целое число
+            round(total_score),      # целое число
             round(avg_score, 1),
-            round(avg_time_all, 1),
+            round(avg_time_all, 1),   # теперь 4.9, а не 4.1
             round(avg_time_correct, 1),
             round(percent_correct, 1),
             avg_elo
