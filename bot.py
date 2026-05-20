@@ -1066,8 +1066,8 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             incorrect = to_int(row.get("Неправильные ответы", 0))
             total_questions = to_int(row.get("Количество вопросов", 0))
             score = to_float(row.get("Общий счёт", 0))
-            total_time = to_float(row.get("Общее время ответов", 0))      # уже в секундах
-            total_time_correct = to_float(row.get("Общее время правильных ответов", 0))  # в секундах
+            total_time = to_float(row.get("Общее время ответов", 0)) \ 100    # уже в секундах
+            total_time_correct = to_float(row.get("Общее время правильных ответов", 0)) \ 100  # в секундах
 
             agg = player_agg[username]
             agg["total_score"] += score
