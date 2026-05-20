@@ -119,13 +119,13 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             correct_percent = (correct_count / total_questions) * 100 if total_questions > 0 else 0
             elo = calculate_elo(score, max_possible_score, avg_time_correct, len(game.registered), place)
             
-            # Время в Games сохраняем в СЕКУНДАХ (без умножения на 100)
+            # Время в секундах (НЕ умножаем на 100)
             row = [date_str, str(game.chat_id), game.pack["title"], username, place, score,
                    total_questions, correct_count, incorrect_count, no_answer,
-                   round(avg_time_all * total_answered, 2),   # Общее время ответов (секунды)
-                   round(avg_time_correct * correct_count, 2), # Общее время правильных ответов (секунды)
-                   round(avg_time_all, 2),   # Среднее время ответа (секунды)
-                   round(avg_time_correct, 2), # Среднее время правильных ответов (секунды)
+                   round(avg_time_all * total_answered, 2),   # K: Общее время ответов (сек)
+                   round(avg_time_correct * correct_count, 2), # L: Общее время правильных (сек)
+                   round(avg_time_all, 2),   # M: Среднее время ответа (сек)
+                   round(avg_time_correct, 2), # N: Среднее время правильных (сек)
                    elo, round(correct_percent, 2)]
             
             answers_detail = player_answers_detail.get(user_id, [])
@@ -217,19 +217,10 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         
         avg_elo = int(round(sum(stats["elos"]) / len(stats["elos"]))) if stats["elos"] else 0
         
-        # ДЕЛИМ НА 100 при записи в Players, потому что в Games хранится в сотых?
-        # На самом деле мы теперь пишем в Games в СЕКУНДАХ, поэтому делить не нужно.
-        # Но если в Google Sheets уже старые данные, то они в сотых.
-        # Для совместимости проверяем: если среднее время > 100, значит это сотые, делим на 100
-        if avg_time_all > 100:
-            avg_time_all = avg_time_all / 100
-        if avg_time_correct > 100:
-            avg_time_correct = avg_time_correct / 100
-        
         new_rows.append([
             username,
             games_count,
-            round(total_score),  # Целое число
+            round(total_score),     # целое число
             round(avg_score, 1),
             round(avg_time_all, 1),
             round(avg_time_correct, 1),
@@ -1019,7 +1010,7 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# -------------------- Команда /stats (только по группе) --------------------
+# -------------------- Команда /stats (общая статистика по группе) --------------------
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     await update.message.reply_text("🔄 Загружаю статистику по этой группе...")
@@ -1044,7 +1035,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "total_score": 0.0,
             "total_correct": 0,
             "total_incorrect": 0,
-            "total_time": 0.0,
+            "total_time_all": 0.0,
             "total_time_correct": 0.0,
             "total_questions": 0,
             "games_count": 0,
@@ -1076,22 +1067,15 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             total_questions = to_int(row.get("Количество вопросов", 0))
             score = to_float(row.get("Общий счёт", 0))
             
-            # Время в Games может быть в сотых или в секундах
-            total_time = to_float(row.get("Общее время ответов", 0))
+            # Используем колонки K и L (общее время в секундах)
+            total_time_all = to_float(row.get("Общее время ответов", 0))
             total_time_correct = to_float(row.get("Общее время правильных ответов", 0))
-            
-            # Если время > 100 секунд (максимальное время ответа за игру ~ 20*16=320 сек),
-            # но если > 1000 - точно сотые (было 42480 -> 424.8 сек)
-            if total_time > 1000:
-                total_time = total_time / 100
-            if total_time_correct > 1000:
-                total_time_correct = total_time_correct / 100
 
             agg = player_agg[username]
             agg["total_score"] += score
             agg["total_correct"] += correct
             agg["total_incorrect"] += incorrect
-            agg["total_time"] += total_time
+            agg["total_time_all"] += total_time_all
             agg["total_time_correct"] += total_time_correct
             agg["total_questions"] += total_questions
             agg["games_count"] += 1
@@ -1118,19 +1102,15 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             avg_score = total_score / games_count if games_count > 0 else 0
 
             total_answered = agg["total_correct"] + agg["total_incorrect"]
-            total_time = agg["total_time"]
-            avg_time_all = total_time / total_answered if total_answered > 0 else 0
+            avg_time_all = agg["total_time_all"] / total_answered if total_answered > 0 else 0
+            avg_time_correct = agg["total_time_correct"] / agg["total_correct"] if agg["total_correct"] > 0 else 0
 
-            total_time_correct = agg["total_time_correct"]
-            total_correct = agg["total_correct"]
-            avg_time_correct = total_time_correct / total_correct if total_correct > 0 else 0
-
-            total_questions = agg["total_questions"]
-            correct_percent = (agg["total_correct"] / total_questions) * 100 if total_questions > 0 else 0
+            total_questions_sum = agg["total_questions"]
+            correct_percent = (agg["total_correct"] / total_questions_sum) * 100 if total_questions_sum > 0 else 0
 
             message += f"{medal} {i}. {username}\n"
             message += f"   📊 Игр: {games_count}\n"
-            message += f"   ⭐ Всего очков: {total_score:.0f}\n"  # Целое число
+            message += f"   ⭐ Всего очков: {total_score:.0f}\n"
             message += f"   📈 Средний балл: {avg_score:.1f}\n"
             message += f"   ⏱️ Среднее время: {avg_time_all:.1f} сек\n"
             message += f"   ⏱️ Среднее время (правильные): {avg_time_correct:.1f} сек\n"
@@ -1141,7 +1121,6 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Ошибка получения статистики: {e}")
         await update.message.reply_text("❌ Ошибка загрузки статистики.")
-
 
 # -------------------- Команда /history (только в личку, по всем группам) --------------------
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1187,12 +1166,6 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             avg_time = to_float_val(game_record.get("Среднее время ответа", 0))
             correct_percent = to_float_val(game_record.get("% правильных ответов", 0))
-            
-            # Коррекция для старых данных (если > 100, значит сотые)
-            if avg_time > 100:
-                avg_time = avg_time / 100
-            if correct_percent > 100:
-                correct_percent = correct_percent / 100
 
             message += f"{i}. {game_record.get('Название квиза', '-')}\n"
             message += f"   📅 Дата: {game_record.get('Дата', '-')}\n"
@@ -1211,6 +1184,41 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"Ошибка получения истории: {e}")
         await update.message.reply_text("❌ Ошибка загрузки истории.")
 
+# -------------------- Диагностическая команда /debug_stats --------------------
+async def debug_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    await update.message.reply_text("🔍 Получаю сырые данные...")
+    
+    sheet = init_google_sheets()
+    if not sheet:
+        await update.message.reply_text("❌ Нет доступа к Sheets")
+        return
+    
+    try:
+        games_sheet = sheet.worksheet("Games")
+        all_games = games_sheet.get_all_records()
+        
+        chat_games = [row for row in all_games if str(row.get("Chat ID", "")) == str(chat_id)]
+        
+        if not chat_games:
+            await update.message.reply_text("Нет игр")
+            return
+        
+        message = "🔍 Сырые данные (первые 5 игр):\n\n"
+        for i, row in enumerate(chat_games[:5], 1):
+            message += f"Игра {i}:\n"
+            message += f"  Игрок: {row.get('Игрок')}\n"
+            message += f"  K (Общее время ответов): {row.get('Общее время ответов')}\n"
+            message += f"  L (Общее время правильных): {row.get('Общее время правильных ответов')}\n"
+            message += f"  M (Среднее время ответа): {row.get('Среднее время ответа')}\n"
+            message += f"  N (Среднее время правильные): {row.get('Среднее время (правильные)')}\n"
+            message += f"  Правильные ответы: {row.get('Правильные ответы')}\n"
+            message += f"  Кол-во вопросов: {row.get('Количество вопросов')}\n\n"
+        
+        await update.message.reply_text(message)
+    except Exception as e:
+        await update.message.reply_text(f"Ошибка: {e}")
+
 # -------------------- ЗАПУСК --------------------
 def main():
     token = os.environ.get("BOT_TOKEN")
@@ -1224,6 +1232,7 @@ def main():
     app.add_handler(CommandHandler("abort", abort_quiz))
     app.add_handler(CommandHandler("stats", stats_command))
     app.add_handler(CommandHandler("history", history_command))
+    app.add_handler(CommandHandler("debug_stats", debug_stats_command))  # диагностическая команда
     app.add_handler(CallbackQueryHandler(register_callback, pattern="register"))
     app.add_handler(CallbackQueryHandler(start_early_callback, pattern="start_early"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
