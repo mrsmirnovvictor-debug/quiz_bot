@@ -103,7 +103,7 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
     max_possible_score = len(game.pack["questions"]) * 15
     total_questions = len(game.pack["questions"])
     
-    # ---------- 1. Добавляем строки в лист Games (в СОТЫХ) ----------
+    # ---------- 1. Добавляем строки в лист Games (в СОТЫХ как ЦЕЛЫЕ ЧИСЛА) ----------
     for place_info in players_ranking:
         place = place_info["place"]
         for player in place_info["players"]:
@@ -119,13 +119,18 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             correct_percent = (correct_count / total_questions) * 100 if total_questions > 0 else 0
             elo = calculate_elo(score, max_possible_score, avg_time_correct, len(game.registered), place)
             
-            # Время сохраняем в СОТЫХ (умножаем на 100)
+            # Вычисляем значения в СОТЫХ как ЦЕЛЫЕ ЧИСЛА
+            total_time_all_hundredths = int(round(avg_time_all * total_answered * 100))
+            total_time_correct_hundredths = int(round(avg_time_correct * correct_count * 100))
+            avg_time_all_hundredths = int(round(avg_time_all * 100))
+            avg_time_correct_hundredths = int(round(avg_time_correct * 100))
+            
             row = [date_str, str(game.chat_id), game.pack["title"], username, place, score,
                    total_questions, correct_count, incorrect_count, no_answer,
-                   round(avg_time_all * total_answered * 100, 0),   # K: Общее время ответов (сотые)
-                   round(avg_time_correct * correct_count * 100, 0), # L: Общее время правильных (сотые)
-                   round(avg_time_all * 100, 0),   # M: Среднее время ответа (сотые)
-                   round(avg_time_correct * 100, 0), # N: Среднее время правильных (сотые)
+                   total_time_all_hundredths,      # K: Общее время ответов (целые сотые)
+                   total_time_correct_hundredths,  # L: Общее время правильных (целые сотые)
+                   avg_time_all_hundredths,        # M: Среднее время ответа (целые сотые)
+                   avg_time_correct_hundredths,    # N: Среднее время правильных (целые сотые)
                    elo, round(correct_percent, 2)]
             
             answers_detail = player_answers_detail.get(user_id, [])
@@ -133,7 +138,8 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
                 if q_idx < len(answers_detail):
                     row.append(answers_detail[q_idx].get("answer", "-"))
                     row.append(answers_detail[q_idx].get("points", 0))
-                    row.append(round(answers_detail[q_idx].get("time", 0) * 100, 0) if answers_detail[q_idx].get("time") else 0)
+                    time_hundredths = int(round(answers_detail[q_idx].get("time", 0) * 100))
+                    row.append(time_hundredths)
                 else:
                     row.append("-")
                     row.append(0)
@@ -175,13 +181,23 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         correct = to_int(row.get("Правильные ответы", 0))
         incorrect = to_int(row.get("Неправильные ответы", 0))
         
-        # Читаем данные в СОТЫХ, потом делим на 100
+        # Читаем данные - они могут быть как целыми (сотые), так и десятичными (секунды)
         total_time_all_raw = to_float(row.get("Общее время ответов", 0))
         total_time_correct_raw = to_float(row.get("Общее время правильных ответов", 0))
         
-        # Преобразуем в секунды
-        total_time_all = total_time_all_raw / 100 if total_time_all_raw > 0 else 0
-        total_time_correct = total_time_correct_raw / 100 if total_time_correct_raw > 0 else 0
+        # Определяем формат: если значение > 1000, это скорее всего сотые (10487 -> 104.87)
+        # Если значение < 1000 и есть дробная часть, это секунды
+        if total_time_all_raw > 1000 or (total_time_all_raw == int(total_time_all_raw) and total_time_all_raw > 100):
+            # Это сотые, делим на 100
+            total_time_all = total_time_all_raw / 100
+        else:
+            # Это уже секунды
+            total_time_all = total_time_all_raw
+        
+        if total_time_correct_raw > 1000 or (total_time_correct_raw == int(total_time_correct_raw) and total_time_correct_raw > 100):
+            total_time_correct = total_time_correct_raw / 100
+        else:
+            total_time_correct = total_time_correct_raw
         
         elo = to_float(row.get("ELO после игры", 0))
         
@@ -192,8 +208,8 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
                 "total_questions": 0,
                 "total_correct": 0,
                 "total_incorrect": 0,
-                "total_time_all": 0.0,      # сумма K (в секундах)
-                "total_time_correct": 0.0,  # сумма L (в секундах)
+                "total_time_all": 0.0,
+                "total_time_correct": 0.0,
                 "elos": []
             }
         stats = player_stats[username]
@@ -217,10 +233,7 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         total_incorrect = stats["total_incorrect"]
         total_answered = total_correct + total_incorrect
         
-        # Среднее время ответа = сумма K (сек) / (H + I)
         avg_time_all = stats["total_time_all"] / total_answered if total_answered > 0 else 0
-        
-        # Среднее время правильных = сумма L (сек) / H
         avg_time_correct = stats["total_time_correct"] / total_correct if total_correct > 0 else 0
         
         total_questions = stats["total_questions"]
@@ -231,7 +244,7 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         new_rows.append([
             username,
             games_count,
-            round(total_score),      # целое число
+            round(total_score),
             round(avg_score, 1),
             round(avg_time_all, 1),
             round(avg_time_correct, 1),
@@ -241,13 +254,10 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
     
     # ---------- 3. Очищаем Players и записываем новые данные ----------
     try:
-        # Получаем все строки листа
         all_cells = players_sheet.get_all_values()
         if len(all_cells) > 1:
-            # Удаляем все строки после заголовка
             players_sheet.delete_rows(2, len(all_cells) - 1)
         if new_rows:
-            # Добавляем новые строки
             players_sheet.append_rows(new_rows, value_input_option='USER_ENTERED')
         print(f"✅ Статистика Players обновлена для {len(new_rows)} игроков")
     except Exception as e:
@@ -1038,7 +1048,6 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         games_sheet = sheet.worksheet("Games")
         all_games = games_sheet.get_all_records()
 
-        # Фильтруем только игры текущего чата
         chat_games = [row for row in all_games if str(row.get("Chat ID", "")) == str(chat_id)]
 
         if not chat_games:
@@ -1081,12 +1090,19 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             total_questions = to_int(row.get("Количество вопросов", 0))
             score = to_float(row.get("Общий счёт", 0))
             
-            # Читаем в сотых и преобразуем в секунды
             total_time_all_raw = to_float(row.get("Общее время ответов", 0))
             total_time_correct_raw = to_float(row.get("Общее время правильных ответов", 0))
             
-            total_time_all = total_time_all_raw / 100 if total_time_all_raw > 0 else 0
-            total_time_correct = total_time_correct_raw / 100 if total_time_correct_raw > 0 else 0
+            # Определяем формат данных
+            if total_time_all_raw > 1000 or (total_time_all_raw == int(total_time_all_raw) and total_time_all_raw > 100):
+                total_time_all = total_time_all_raw / 100
+            else:
+                total_time_all = total_time_all_raw
+            
+            if total_time_correct_raw > 1000 or (total_time_correct_raw == int(total_time_correct_raw) and total_time_correct_raw > 100):
+                total_time_correct = total_time_correct_raw / 100
+            else:
+                total_time_correct = total_time_correct_raw
 
             agg = player_agg[username]
             agg["total_score"] += score
