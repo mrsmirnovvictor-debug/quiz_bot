@@ -505,24 +505,21 @@ async def send_15_min_reminder(context: ContextTypes.DEFAULT_TYPE, chat_id: int 
     if not game or game.status != "registration":
         return
 
-    # Ссылка на сообщение с регистрацией (оно находится в нужном топике)
     reg_link = f"https://t.me/c/{str(chat_id)[4:]}/{game.reg_msg_id}"
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📝 Перейти к регистрации", url=reg_link)]
+    ])
 
-    reminder_text = (
-        f"⏰ Через 15 минут начнётся квиз на тему: \"{game.pack['title']}\".\n"
-        f"➡️ [Нажмите сюда, чтобы перейти к регистрации]({reg_link})"
-    )
+    reminder_text = f"⏰ Через 15 минут начнётся квиз на тему: \"{game.pack['title']}\".\nУспевайте зарегистрироваться!"
 
-    # Отправляем в ОСНОВНУЮ ветку (без message_thread_id)
+    # Отправляем в основную ветку
     msg = await context.bot.send_message(
         chat_id=chat_id,
         text=reminder_text,
-        disable_web_page_preview=True,
-        parse_mode="Markdown"
+        reply_markup=keyboard
     )
     game.reminder_msg_id = msg.message_id
 
-    # Закрепляем сообщение в основной ветке (если нужно)
     try:
         await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id, disable_notification=False)
     except Exception as e:
