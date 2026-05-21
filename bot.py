@@ -505,14 +505,19 @@ async def send_15_min_reminder(context: ContextTypes.DEFAULT_TYPE, chat_id: int 
     if not game or game.status != "registration":
         return
 
-    reg_link = f"https://t.me/c/{str(chat_id)[4:]}/{game.reg_msg_id}"
+    # Формируем правильную ссылку с учётом темы
+    chat_id_for_link = str(chat_id)[4:] if str(chat_id).startswith('-100') else str(chat_id)
+    thread_param = f"?thread={game.message_thread_id}" if game.message_thread_id else ""
+    reg_link = f"https://t.me/c/{chat_id_for_link}/{game.reg_msg_id}{thread_param}"
+
+    # Текст с кнопкой (надёжнее)
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📝 Перейти к регистрации", url=reg_link)]
     ])
 
     reminder_text = f"⏰ Через 15 минут начнётся квиз на тему: \"{game.pack['title']}\".\nУспевайте зарегистрироваться!"
 
-    # Отправляем в основную ветку
+    # Отправляем в основную ветку (без message_thread_id)
     msg = await context.bot.send_message(
         chat_id=chat_id,
         text=reminder_text,
