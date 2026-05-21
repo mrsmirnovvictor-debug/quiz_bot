@@ -505,19 +505,26 @@ async def send_15_min_reminder(context: ContextTypes.DEFAULT_TYPE, chat_id: int 
     if not game or game.status != "registration":
         return
 
-    # Формируем правильную ссылку с учётом темы
-    chat_id_for_link = str(chat_id)[4:] if str(chat_id).startswith('-100') else str(chat_id)
-    thread_param = f"?thread={game.message_thread_id}" if game.message_thread_id else ""
-    reg_link = f"https://t.me/c/{chat_id_for_link}/{game.reg_msg_id}{thread_param}"
+    # Формируем корректную ссылку для перехода в тему (форум)
+    # Убираем '-100' из ID группы, если есть
+    chat_id_for_link = str(chat_id).replace('-100', '')
+    # Добавляем параметр ?thread=ID_темы, если квиз в отдельной ветке
+    if game.message_thread_id:
+        reg_link = f"https://t.me/c/{chat_id_for_link}/{game.reg_msg_id}?thread={game.message_thread_id}"
+    else:
+        reg_link = f"https://t.me/c/{chat_id_for_link}/{game.reg_msg_id}"
 
-    # Текст с кнопкой (надёжнее)
+    # Кнопка для перехода к регистрации
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📝 Перейти к регистрации", url=reg_link)]
     ])
 
-    reminder_text = f"⏰ Через 15 минут начнётся квиз на тему: \"{game.pack['title']}\".\nУспевайте зарегистрироваться!"
+    reminder_text = (
+        f"⏰ Через 15 минут начнётся квиз на тему: \"{game.pack['title']}\".\n"
+        f"Нажмите на кнопку, чтобы перейти в ветку регистрации."
+    )
 
-    # Отправляем в основную ветку (без message_thread_id)
+    # Отправляем в ОСНОВНУЮ ветку (без message_thread_id)
     msg = await context.bot.send_message(
         chat_id=chat_id,
         text=reminder_text,
@@ -529,7 +536,7 @@ async def send_15_min_reminder(context: ContextTypes.DEFAULT_TYPE, chat_id: int 
         await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id, disable_notification=False)
     except Exception as e:
         print(f"Не удалось закрепить напоминание: {e}")
-
+        
 # -------------------- Регистрация и запуск --------------------
 async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     game = games.get(chat_id)
