@@ -504,14 +504,23 @@ async def send_15_min_reminder(context: ContextTypes.DEFAULT_TYPE, chat_id: int 
     game = games.get(chat_id)
     if not game or game.status != "registration":
         return
-    
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📝 Зарегистрироваться", callback_data="register")]
+    ])
+
     reminder_text = (
         f"⏰ Через 15 минут начнётся квиз на тему: \"{game.pack['title']}\".\n"
-        f"Успевайте зарегистрироваться по ссылке: {game.reg_msg_link if hasattr(game, 'reg_msg_link') else 'регистрация в этом чате'}"
+        f"Успевайте зарегистрироваться!"
     )
-    msg = await context.bot.send_message(chat_id=chat_id, text=reminder_text)
+
+    send_kwargs = {"chat_id": chat_id, "text": reminder_text, "reply_markup": keyboard}
+    if game.message_thread_id:
+        send_kwargs["message_thread_id"] = game.message_thread_id
+
+    msg = await context.bot.send_message(**send_kwargs)
     game.reminder_msg_id = msg.message_id
-    
+
     try:
         await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id, disable_notification=False)
     except Exception as e:
