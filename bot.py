@@ -103,7 +103,7 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
     max_possible_score = len(game.pack["questions"]) * 15
     total_questions = len(game.pack["questions"])
     
-    # ---------- 1. Добавляем строки в лист Games (в СОТЫХ как ЦЕЛЫЕ ЧИСЛА) ----------
+    # ---------- 1. Добавляем строки в лист Games (в сотых) ----------
     for place_info in players_ranking:
         place = place_info["place"]
         for player in place_info["players"]:
@@ -119,7 +119,7 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             correct_percent = (correct_count / total_questions) * 100 if total_questions > 0 else 0
             elo = calculate_elo(score, max_possible_score, avg_time_correct, len(game.registered), place)
             
-            # Вычисляем значения в СОТЫХ как ЦЕЛЫЕ ЧИСЛА
+            # Время сохраняем в сотых (целые числа)
             total_time_all_hundredths = int(round(avg_time_all * total_answered * 100))
             total_time_correct_hundredths = int(round(avg_time_correct * correct_count * 100))
             avg_time_all_hundredths = int(round(avg_time_all * 100))
@@ -127,10 +127,10 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             
             row = [date_str, str(game.chat_id), game.pack["title"], username, place, score,
                    total_questions, correct_count, incorrect_count, no_answer,
-                   total_time_all_hundredths,      # K: Общее время ответов (целые сотые)
-                   total_time_correct_hundredths,  # L: Общее время правильных (целые сотые)
-                   avg_time_all_hundredths,        # M: Среднее время ответа (целые сотые)
-                   avg_time_correct_hundredths,    # N: Среднее время правильных (целые сотые)
+                   total_time_all_hundredths,
+                   total_time_correct_hundredths,
+                   avg_time_all_hundredths,
+                   avg_time_correct_hundredths,
                    elo, round(correct_percent, 2)]
             
             answers_detail = player_answers_detail.get(user_id, [])
@@ -181,17 +181,13 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         correct = to_int(row.get("Правильные ответы", 0))
         incorrect = to_int(row.get("Неправильные ответы", 0))
         
-        # Читаем данные - они могут быть как целыми (сотые), так и десятичными (секунды)
         total_time_all_raw = to_float(row.get("Общее время ответов", 0))
         total_time_correct_raw = to_float(row.get("Общее время правильных ответов", 0))
         
-        # Определяем формат: если значение > 1000, это скорее всего сотые (10487 -> 104.87)
-        # Если значение < 1000 и есть дробная часть, это секунды
+        # Определяем формат (сотые или секунды)
         if total_time_all_raw > 1000 or (total_time_all_raw == int(total_time_all_raw) and total_time_all_raw > 100):
-            # Это сотые, делим на 100
             total_time_all = total_time_all_raw / 100
         else:
-            # Это уже секунды
             total_time_all = total_time_all_raw
         
         if total_time_correct_raw > 1000 or (total_time_correct_raw == int(total_time_correct_raw) and total_time_correct_raw > 100):
@@ -222,7 +218,6 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         stats["total_time_correct"] += total_time_correct
         stats["elos"].append(elo)
     
-    # Формируем новые строки для Players
     new_rows = []
     for username, stats in player_stats.items():
         games_count = stats["games_count"]
@@ -304,12 +299,10 @@ class Game:
         self.answers = {}
         self.question_start_time = None
         self.reg_msg_id = None
-        self.reminder_msg_id = None
         self.question_msg_id = None
         self.video_msg_id = None
         self.reg_timer_job = None
         self.question_timer_job = None
-        self.reminder_timer_job = None
         self.scheduled_start_utc = scheduled_start_utc
         self.paused = False
         self.pause_after_question = False
@@ -491,52 +484,10 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     delay = (scheduled_start_utc - now_utc).total_seconds()
     if delay > 0:
         context.job_queue.run_once(start_quiz_sequence, when=delay, chat_id=chat_id, data=chat_id)
-        reminder_delay = delay - 15 * 60
-        if reminder_delay > 0:
-            context.job_queue.run_once(send_15_min_reminder, when=reminder_delay, chat_id=chat_id, data=chat_id)
+        # 15-минутное напоминание удалено
     else:
         await start_quiz_sequence(context, chat_id)
 
-# -------------------- Напоминание за 15 минут --------------------
-async def send_15_min_reminder(context: ContextTypes.DEFAULT_TYPE, chat_id: int = None):
-    if chat_id is None:
-        chat_id = context.job.data
-    game = games.get(chat_id)
-    if not game or game.status != "registration":
-        return
-
-    # Формируем корректную ссылку для перехода в тему (форум)
-    # Убираем '-100' из ID группы, если есть
-    chat_id_for_link = str(chat_id).replace('-100', '')
-    # Добавляем параметр ?thread=ID_темы, если квиз в отдельной ветке
-    if game.message_thread_id:
-        reg_link = f"https://t.me/c/{chat_id_for_link}/{game.reg_msg_id}?thread={game.message_thread_id}"
-    else:
-        reg_link = f"https://t.me/c/{chat_id_for_link}/{game.reg_msg_id}"
-
-    # Кнопка для перехода к регистрации
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📝 Перейти к регистрации", url=reg_link)]
-    ])
-
-    reminder_text = (
-        f"⏰ Через 15 минут начнётся квиз на тему: \"{game.pack['title']}\".\n"
-        f"Нажмите на кнопку, чтобы перейти в ветку регистрации."
-    )
-
-    # Отправляем в ОСНОВНУЮ ветку (без message_thread_id)
-    msg = await context.bot.send_message(
-        chat_id=chat_id,
-        text=reminder_text,
-        reply_markup=keyboard
-    )
-    game.reminder_msg_id = msg.message_id
-
-    try:
-        await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id, disable_notification=False)
-    except Exception as e:
-        print(f"Не удалось закрепить напоминание: {e}")
-        
 # -------------------- Регистрация и запуск --------------------
 async def open_registration(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     game = games.get(chat_id)
@@ -641,9 +592,6 @@ async def start_early_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         if job.chat_id == chat_id and job.callback == start_quiz_sequence:
             job.schedule_removal()
             break
-        if job.chat_id == chat_id and job.callback == send_15_min_reminder:
-            job.schedule_removal()
-            break
     await close_registration_and_start(context, chat_id, early=True)
 
 async def close_registration_and_start(context: ContextTypes.DEFAULT_TYPE, chat_id: int, early: bool = False):
@@ -653,12 +601,6 @@ async def close_registration_and_start(context: ContextTypes.DEFAULT_TYPE, chat_
     if game.reg_timer_job:
         game.reg_timer_job.schedule_removal()
         game.reg_timer_job = None
-    
-    if game.reminder_msg_id:
-        try:
-            await context.bot.unpin_chat_message(chat_id=chat_id, message_id=game.reminder_msg_id)
-        except:
-            pass
     
     game.status = "active"
     users_list = "\n".join(f"• {p['username']}" for p in game.registered.values())
@@ -1079,8 +1021,8 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "total_score": 0.0,
             "total_correct": 0,
             "total_incorrect": 0,
-            "total_time_all": 0.0,      # сумма K (в секундах)
-            "total_time_correct": 0.0,  # сумма L (в секундах)
+            "total_time_all": 0.0,
+            "total_time_correct": 0.0,
             "total_questions": 0,
             "games_count": 0,
         })
@@ -1111,11 +1053,10 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             total_questions = to_int(row.get("Количество вопросов", 0))
             score = to_float(row.get("Общий счёт", 0))
             
-            # Читаем K и L - они могут быть в сотых или секундах
             total_time_all_raw = to_float(row.get("Общее время ответов", 0))
             total_time_correct_raw = to_float(row.get("Общее время правильных ответов", 0))
             
-            # Определяем формат: если значение > 1000, это сотые (10487 -> 104.87)
+            # Автоопределение формата
             if total_time_all_raw > 1000 or (total_time_all_raw == int(total_time_all_raw) and total_time_all_raw > 100):
                 total_time_all = total_time_all_raw / 100
             else:
@@ -1178,7 +1119,6 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # -------------------- Команда /history (только в личку, по всем группам) --------------------
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Проверяем, что команда вызвана в личном чате
     if update.effective_chat.type != "private":
         await update.message.reply_text(
             "📩 История ваших игр доступна только в личных сообщениях с ботом.\n"
@@ -1199,7 +1139,6 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         games_sheet = sheet.worksheet("Games")
         all_games = games_sheet.get_all_records()
 
-        # Фильтруем все игры этого игрока (во всех группах)
         user_games = [row for row in all_games if row.get("Игрок") == username]
 
         if not user_games:
@@ -1218,11 +1157,9 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except:
                     return 0.0
 
-            # Читаем значения (они в сотых)
             avg_time_raw = to_float_val(game_record.get("Среднее время ответа", 0))
             correct_percent_raw = to_float_val(game_record.get("% правильных ответов", 0))
             
-            # Делим на 100, так как в таблице хранятся сотые
             avg_time = avg_time_raw / 100 if avg_time_raw > 0 else 0
             correct_percent = correct_percent_raw / 100 if correct_percent_raw > 0 else 0
 
@@ -1243,41 +1180,6 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"Ошибка получения истории: {e}")
         await update.message.reply_text("❌ Ошибка загрузки истории.")
 
-# -------------------- Диагностическая команда /debug_stats --------------------
-async def debug_stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    await update.message.reply_text("🔍 Получаю сырые данные...")
-    
-    sheet = init_google_sheets()
-    if not sheet:
-        await update.message.reply_text("❌ Нет доступа к Sheets")
-        return
-    
-    try:
-        games_sheet = sheet.worksheet("Games")
-        all_games = games_sheet.get_all_records()
-        
-        chat_games = [row for row in all_games if str(row.get("Chat ID", "")) == str(chat_id)]
-        
-        if not chat_games:
-            await update.message.reply_text("Нет игр")
-            return
-        
-        message = "🔍 Сырые данные (первые 5 игр):\n\n"
-        for i, row in enumerate(chat_games[:5], 1):
-            message += f"Игра {i}:\n"
-            message += f"  Игрок: {row.get('Игрок')}\n"
-            message += f"  K (Общее время ответов): {row.get('Общее время ответов')}\n"
-            message += f"  L (Общее время правильных): {row.get('Общее время правильных ответов')}\n"
-            message += f"  M (Среднее время ответа): {row.get('Среднее время ответа')}\n"
-            message += f"  N (Среднее время правильные): {row.get('Среднее время (правильные)')}\n"
-            message += f"  Правильные ответы: {row.get('Правильные ответы')}\n"
-            message += f"  Кол-во вопросов: {row.get('Количество вопросов')}\n\n"
-        
-        await update.message.reply_text(message)
-    except Exception as e:
-        await update.message.reply_text(f"Ошибка: {e}")
-
 # -------------------- ЗАПУСК --------------------
 def main():
     token = os.environ.get("BOT_TOKEN")
@@ -1291,7 +1193,6 @@ def main():
     app.add_handler(CommandHandler("abort", abort_quiz))
     app.add_handler(CommandHandler("stats", stats_command))
     app.add_handler(CommandHandler("history", history_command))
-    app.add_handler(CommandHandler("debug_stats", debug_stats_command))  # диагностическая команда
     app.add_handler(CallbackQueryHandler(register_callback, pattern="register"))
     app.add_handler(CallbackQueryHandler(start_early_callback, pattern="start_early"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
