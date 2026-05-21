@@ -1048,6 +1048,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         games_sheet = sheet.worksheet("Games")
         all_games = games_sheet.get_all_records()
 
+        # Фильтруем только игры текущего чата
         chat_games = [row for row in all_games if str(row.get("Chat ID", "")) == str(chat_id)]
 
         if not chat_games:
@@ -1058,8 +1059,8 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "total_score": 0.0,
             "total_correct": 0,
             "total_incorrect": 0,
-            "total_time_all": 0.0,
-            "total_time_correct": 0.0,
+            "total_time_all": 0.0,      # сумма K (в секундах)
+            "total_time_correct": 0.0,  # сумма L (в секундах)
             "total_questions": 0,
             "games_count": 0,
         })
@@ -1090,10 +1091,11 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             total_questions = to_int(row.get("Количество вопросов", 0))
             score = to_float(row.get("Общий счёт", 0))
             
+            # Читаем K и L - они могут быть в сотых или секундах
             total_time_all_raw = to_float(row.get("Общее время ответов", 0))
             total_time_correct_raw = to_float(row.get("Общее время правильных ответов", 0))
             
-            # Определяем формат данных
+            # Определяем формат: если значение > 1000, это сотые (10487 -> 104.87)
             if total_time_all_raw > 1000 or (total_time_all_raw == int(total_time_all_raw) and total_time_all_raw > 100):
                 total_time_all = total_time_all_raw / 100
             else:
@@ -1196,8 +1198,13 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except:
                     return 0.0
 
-            avg_time = to_float_val(game_record.get("Среднее время ответа", 0))
-            correct_percent = to_float_val(game_record.get("% правильных ответов", 0))
+            # Читаем значения (они в сотых)
+            avg_time_raw = to_float_val(game_record.get("Среднее время ответа", 0))
+            correct_percent_raw = to_float_val(game_record.get("% правильных ответов", 0))
+            
+            # Делим на 100, так как в таблице хранятся сотые
+            avg_time = avg_time_raw / 100 if avg_time_raw > 0 else 0
+            correct_percent = correct_percent_raw / 100 if correct_percent_raw > 0 else 0
 
             message += f"{i}. {game_record.get('Название квиза', '-')}\n"
             message += f"   📅 Дата: {game_record.get('Дата', '-')}\n"
