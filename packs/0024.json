@@ -11,7 +11,7 @@
     {
       "text": "Выберите правильный фразовый глагол со значением «продолжать делать что-то, несмотря на трудности».",
       "image": "",
-      "options": ["run over", "carry on", "turn away", "give op"],
+      "options": ["run over", "carry on", "turn away", "give up"],
       "correct": 1,
       "comment": "Carry on — продолжать"
     },
