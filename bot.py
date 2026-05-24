@@ -1179,6 +1179,154 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Ошибка получения истории: {e}")
         await update.message.reply_text("❌ Ошибка загрузки истории.")
+        
+# -------------------- Команда /refresh (принудительный пересчёт Players) --------------------
+async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Проверяем, что команду выполняет администратор (опционально)
+    user = update.effective_user
+    chat_id = update.effective_chat.id
+    
+    # Можно разрешить только администраторам группы
+    try:
+        member = await context.bot.get_chat_member(chat_id, user.id)
+        is_admin = member.status in ("creator", "administrator")
+    except:
+        is_admin = False
+    
+    if not is_admin:
+        await update.message.reply_text("❌ Только администраторы группы могут использовать эту команду.")
+        return
+    
+    await update.message.reply_text("🔄 Пересчитываю статистику Players из данных Games...")
+    
+    sheet = init_google_sheets()
+    if not sheet:
+        await update.message.reply_text("❌ Нет доступа к Google Sheets.")
+        return
+    
+    try:
+        games_sheet = sheet.worksheet("Games")
+        players_sheet = sheet.worksheet("Players")
+        
+        all_games = games_sheet.get_all_records()
+        
+        if not all_games:
+            await update.message.reply_text("❌ В листе Games нет данных для пересчёта.")
+            return
+        
+        # Агрегируем статистику по игрокам
+        player_stats = {}
+        
+        for row in all_games:
+            username = row.get("Игрок")
+            if not username:
+                continue
+            
+            def to_float(v):
+                if isinstance(v, str):
+                    v = v.replace(',', '.')
+                try:
+                    return float(v)
+                except:
+                    return 0.0
+            
+            def to_int(v):
+                if isinstance(v, str):
+                    v = v.replace(',', '.')
+                try:
+                    return int(float(v))
+                except:
+                    return 0
+            
+            score = to_float(row.get("Общий счёт", 0))
+            total_questions = to_int(row.get("Количество вопросов", 0))
+            correct = to_int(row.get("Правильные ответы", 0))
+            incorrect = to_int(row.get("Неправильные ответы", 0))
+            
+            total_time_all_raw = to_float(row.get("Общее время ответов", 0))
+            total_time_correct_raw = to_float(row.get("Общее время правильных ответов", 0))
+            
+            # Определяем формат (сотые или секунды)
+            if total_time_all_raw > 1000 or (total_time_all_raw == int(total_time_all_raw) and total_time_all_raw > 100):
+                total_time_all = total_time_all_raw / 100
+            else:
+                total_time_all = total_time_all_raw
+            
+            if total_time_correct_raw > 1000 or (total_time_correct_raw == int(total_time_correct_raw) and total_time_correct_raw > 100):
+                total_time_correct = total_time_correct_raw / 100
+            else:
+                total_time_correct = total_time_correct_raw
+            
+            elo = to_float(row.get("ELO после игры", 0))
+            
+            if username not in player_stats:
+                player_stats[username] = {
+                    "games_count": 0,
+                    "total_score": 0.0,
+                    "total_questions": 0,
+                    "total_correct": 0,
+                    "total_incorrect": 0,
+                    "total_time_all": 0.0,
+                    "total_time_correct": 0.0,
+                    "elos": []
+                }
+            
+            stats = player_stats[username]
+            stats["games_count"] += 1
+            stats["total_score"] += score
+            stats["total_questions"] += total_questions
+            stats["total_correct"] += correct
+            stats["total_incorrect"] += incorrect
+            stats["total_time_all"] += total_time_all
+            stats["total_time_correct"] += total_time_correct
+            stats["elos"].append(elo)
+        
+        # Формируем новые строки для Players
+        new_rows = []
+        for username, stats in player_stats.items():
+            games_count = stats["games_count"]
+            total_score = stats["total_score"]
+            avg_score = total_score / games_count if games_count > 0 else 0
+            
+            total_correct = stats["total_correct"]
+            total_incorrect = stats["total_incorrect"]
+            total_answered = total_correct + total_incorrect
+            
+            avg_time_all = stats["total_time_all"] / total_answered if total_answered > 0 else 0
+            avg_time_correct = stats["total_time_correct"] / total_correct if total_correct > 0 else 0
+            
+            total_questions = stats["total_questions"]
+            percent_correct = (total_correct / total_questions) * 100 if total_questions > 0 else 0
+            
+            avg_elo = int(round(sum(stats["elos"]) / len(stats["elos"]))) if stats["elos"] else 0
+            
+            new_rows.append([
+                username,
+                games_count,
+                round(total_score),
+                round(avg_score, 1),
+                round(avg_time_all, 1),
+                round(avg_time_correct, 1),
+                round(percent_correct, 1),
+                avg_elo
+            ])
+        
+        if not new_rows:
+            await update.message.reply_text("❌ Нет данных для записи в Players.")
+            return
+        
+        # Очищаем Players и записываем новые данные
+        all_cells = players_sheet.get_all_values()
+        if len(all_cells) > 1:
+            players_sheet.delete_rows(2, len(all_cells) - 1)
+        
+        players_sheet.append_rows(new_rows, value_input_option='USER_ENTERED')
+        
+        await update.message.reply_text(f"✅ Статистика Players обновлена!\n\n📊 Обработано игроков: {len(new_rows)}\n📊 Всего игр в базе: {len(all_games)}")
+        
+    except Exception as e:
+        print(f"Ошибка при пересчёте Players: {e}")
+        await update.message.reply_text(f"❌ Ошибка при пересчёте: {e}")
 
 # -------------------- ЗАПУСК --------------------
 def main():
@@ -1193,6 +1341,7 @@ def main():
     app.add_handler(CommandHandler("abort", abort_quiz))
     app.add_handler(CommandHandler("stats", stats_command))
     app.add_handler(CommandHandler("history", history_command))
+    app.add_handler(CommandHandler("refresh", refresh_players_command))
     app.add_handler(CallbackQueryHandler(register_callback, pattern="register"))
     app.add_handler(CallbackQueryHandler(start_early_callback, pattern="start_early"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
