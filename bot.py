@@ -1184,7 +1184,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # -------------------- Удаление сообщений во время активной игры --------------------
 async def delete_chat_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Удаляет любые сообщения пользователей, если в чате активна игра с флагом delete_messages."""
+    """Удаляет сообщения пользователей только в той ветке (топике), где идёт квиз."""
     chat_id = update.effective_chat.id
     message = update.effective_message
     
@@ -1192,17 +1192,25 @@ async def delete_chat_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     if message.from_user and message.from_user.id == context.bot.id:
         return
     
-    # Не удаляем команды, которые могут понадобиться для управления (начинаются с /)
+    # Не удаляем команды для управления
     if message.text and message.text.startswith('/'):
         return
     
     game = games.get(chat_id)
-    if game and game.delete_messages:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message.message_id)
-        except Exception as e:
-            # Может не быть прав на удаление – просто игнорируем
-            print(f"Не удалось удалить сообщение {message.message_id} в чате {chat_id}: {e}")
+    if not game or not game.delete_messages:
+        return
+    
+    # Получаем ID ветки, в которой находится сообщение
+    message_thread_id = message.message_thread_id
+    
+    # Если квиз идёт в определённой ветке, а сообщение — в другой — пропускаем
+    if game.message_thread_id is not None and message_thread_id != game.message_thread_id:
+        return
+    
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id=message.message_id)
+    except Exception as e:
+        print(f"Не удалось удалить сообщение {message.message_id}: {e}")
 
 # -------------------- ЗАПУСК --------------------
 def main():
