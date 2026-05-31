@@ -1,0 +1,117 @@
+{
+  "title": "🌍 Узнай город Европы по картинке. 16 вопросов по 20 секунд",
+  "questions": [
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/1.jpg",
+      "options": ["Париж", "Лион", "Марсель", "Бордо"],
+      "correct": 2,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/2.jpg",
+      "options": ["Рим", "Милан", "Неаполь", "Ватикан"],
+      "correct": 1,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/3.jpg",
+      "options": ["Лондон", "Манчестер", "Ливерпуль", "Бирмингем"],
+      "correct": 2,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/4.jpg",
+      "options": ["Барселона", "Мадрид", "Валенсия", "Севилья"],
+      "correct": 0,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/5.jpg",
+      "options": ["Берлин", "Мюнхен", "Гамбург", "Кёльн"],
+      "correct": 1,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/6.jpg",
+      "options": ["Амстердам", "Роттердам", "Гаага", "Утрехт"],
+      "correct": 2,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/7.jpg",
+      "options": ["Прага", "Брно", "Острава", "Пльзень"],
+      "correct": 0,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/8.jpg",
+      "options": ["Вена", "Зальцбург", "Грац", "Линц"],
+      "correct": 3,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/9.jpeg",
+      "options": ["Любляна", "Кишенев", "Братислава", "Подгорица"],
+      "correct": 1,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/10.jpg",
+      "options": ["Венеция", "Флоренция", "Болонья", "Генуя"],
+      "correct": 1,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/11.jpg",
+      "options": ["Лиссабон", "Мадрид", "Брага", "Порту"],
+      "correct": 3,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/12.jpg",
+      "options": ["Афины", "Салоники", "Патры", "Ираклион"],
+      "correct": 3,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/13.jpg",
+      "options": ["Стокгольм", "Гётеборг", "Мальмё", "Уппсала"],
+      "correct": 2,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/14.jpg",
+      "options": ["Копенгаген", "Орхус", "Оденсе", "Ольборг"],
+      "correct": 0,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/15.jpg",
+      "options": ["Хельсинки", "Осло", "Стокгольм", "Рига"],
+      "correct": 2,
+      "comment": ""
+    },
+    {
+      "text": "Какой город изображён на картинке?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/cities/16.jpg",
+      "options": ["Дублин", "Эдинбург", "Кардифф", "Белфаст"],
+      "correct": 3,
+      "comment": ""
+    }
+  ]
+}
