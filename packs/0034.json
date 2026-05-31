@@ -1,0 +1,117 @@
+{
+  "title": "🇬🇧 Английский B1-B2: лексика, идиомы, фразовые глаголы, предлоги. 16 вопросов по 20 секунд",
+  "questions": [
+    {
+      "text": "Что означает идиома «to hit the nail on the head»?",
+      "image": "",
+      "options": ["Промахнуться мимо", "Попасть в точку", "Медленно работать", "Сломать что-то"],
+      "correct": 1,
+      "comment": "To hit the nail on the head — точно описать проблему, сказать правильную вещь."
+    },
+    {
+      "text": "Выберите правильный фразовый глагол со значением «продолжать делать что-то, несмотря на трудности».",
+      "image": "",
+      "options": ["run out", "carry on", "turn off", "give up"],
+      "correct": 1,
+      "comment": "Carry on — продолжать."
+    },
+    {
+      "text": "Что означает слово «awkward»?",
+      "image": "",
+      "options": ["Грациозный", "Неловкий", "Смелый", "Удобный"],
+      "correct": 1,
+      "comment": "Awkward — вызывающий неловкость, неуклюжий."
+    },
+    {
+      "text": "Какой предлог нужен: «She is interested ______ learning Chinese.»",
+      "image": "",
+      "options": ["at", "for", "in", "on"],
+      "correct": 2,
+      "comment": "Interested in — интересоваться чем-то."
+    },
+    {
+      "text": "Что означает фразовый глагол «to look forward to»?",
+      "image": "",
+      "options": ["Заботиться", "Искать", "Ждать с нетерпением", "Оглядываться назад"],
+      "correct": 2,
+      "comment": "Look forward to + ing — с нетерпением ждать."
+    },
+    {
+      "text": "Какое слово является синонимом «очень умный»?",
+      "image": "",
+      "options": ["Dull", "Brilliant", "Ordinary", "Slow"],
+      "correct": 1,
+      "comment": "Brilliant — блестящий, очень умный."
+    },
+    {
+      "text": "Идиома «to be under the weather» означает...",
+      "image": "",
+      "options": ["Быть в хорошем настроении", "Плохо себя чувствовать", "Попасть под дождём", "Быть на улице"],
+      "correct": 1,
+      "comment": "Under the weather — неважно себя чувствовать, приболеть."
+    },
+    {
+      "text": "Выберите правильный фразовый глагол: «I can't ______ a solution to this problem.» (придумать, найти)",
+      "image": "",
+      "options": ["run into", "go through", "come up with", "get over"],
+      "correct": 2,
+      "comment": "Come up with — придумать, найти (идею, решение)."
+    },
+    {
+      "text": "Что означает слово «embarrassed»?",
+      "image": "",
+      "options": ["Взволнованный", "Удивлённый", "Сердитый", "Смущённый, пристыженный"],
+      "correct": 3,
+      "comment": "Embarrassed — чувство неловкости, стыда."
+    },
+    {
+      "text": "Какой предлог: «They apologized ______ being late.»",
+      "image": "",
+      "options": ["about", "of", "for", "with"],
+      "correct": 2,
+      "comment": "Apologize for — извиняться за что-то."
+    },
+    {
+      "text": "Идиома «to cost an arm and a leg» значит...",
+      "image": "",
+      "options": ["Стоить дёшево", "Потерять конечность", "Расплатиться здоровьем", "Стоить очень дорого"],
+      "correct": 3,
+      "comment": "To cost an arm and a leg — быть очень дорогим."
+    },
+    {
+      "text": "Фразовый глагол «to run out of» означает...",
+      "image": "",
+      "options": ["Выбежать из", "Управлять чем-то", "Закончиться (о запасах)", "Случайно встретить"],
+      "correct": 2,
+      "comment": "Run out of — исчерпать запас, закончиться (We ran out of milk)."
+    },
+    {
+      "text": "Что означает слово «reliable»?",
+      "image": "",
+      "options": ["Быстрый", "Надёжный", "Сложный", "Дорогой"],
+      "correct": 1,
+      "comment": "Reliable — на которого можно положиться, надёжный."
+    },
+    {
+      "text": "Выберите правильный предлог: «He is good ______ mathematics.»",
+      "image": "",
+      "options": ["on", "at", "for", "in"],
+      "correct": 1,
+      "comment": "Good at — хорошо умеет что-то делать."
+    },
+    {
+      "text": "Что означает идиома «to break the ice»?",
+      "image": "",
+      "options": ["Начать ссору", "Разбить лёд буквально", "Наладить общение, растопить лёд", "Закончить разговор"],
+      "correct": 2,
+      "comment": "To break the ice — сделать первый шаг к знакомству, снять напряжение."
+    },
+    {
+      "text": "Фразовый глагол «to give up» значит...",
+      "image": "",
+      "options": ["Поднимать", "Отдавать", "Выходить", "Сдаваться, бросать"],
+      "correct": 3,
+      "comment": "Give up — переставать пытаться, сдаваться; бросать привычку."
+    }
+  ]
+}
