@@ -81,14 +81,14 @@
     {
       "text": "Какая модель стала первой в новом электрическом суббренде Hyundai Ioniq?",
       "image": "",
-      "options": ["Hyundai Ioniq 6", "Hyundai Ioniq 9", "Hyundai Ioniq 5", "Hyundai Kona Electric"],
-      "correct": 2,
+      "options": ["Hyundai Ioniq 3", "Hyundai Ioniq 5", "Hyundai Ioniq 6", "Hyundai Ioniq 9"],
+      "correct": 1,
       "comment": "Ioniq 5 (2021) — первый автомобиль в линейке Ioniq как отдельного электрического бренда."
     },
     {
       "text": "На картинке — современный рамный внедорожник, вдохновлённый классическим Land Rover Defender. Какая это модель?",
       "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/auto/13.jfif",
-      "options": ["Land Rover Defender 110", "Mercedes-Benz G-Class", "Ineos Grenadier", "Ford Bronco"],
+      "options": ["GAC Yue 7", "Mercedes-Benz G-Class", "Ineos Grenadier", "Suzuki Jimny"],
       "correct": 2,
       "comment": "Ineos Grenadier (2022) — наследник старого Defender, с рамной конструкцией."
     },
