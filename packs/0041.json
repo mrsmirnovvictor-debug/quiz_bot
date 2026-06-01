@@ -1,0 +1,117 @@
+{
+  "title": "🚘 Современные автомобили: 2015–2025. 16 вопросов по 20 секунд",
+  "questions": [
+    {
+      "text": "Какой серийный электромобиль стал первым Mercedes-Benz, построенным на платформе EVA?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/auto/1.jfif",
+      "options": ["Mercedes-Benz EQS", "Mercedes-Benz EQE", "Mercedes-Benz EQA", "Mercedes-Benz EQC"],
+      "correct": 0,
+      "comment": "Mercedes-Benz EQS (2021) — первый серийный электромобиль на платформе EVA (Electric Vehicle Architecture)."
+    },
+    {
+      "text": "Какая модель BMW стала первой, получившей полностью электрическую версию под брендом «i»?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/auto/2.jpg",
+      "options": ["BMW i4", "BMW i3", "BMW iX", "BMW i8"],
+      "correct": 1,
+      "comment": "BMW i3 (2013) — первый серийный электромобиль суббренда BMW i."
+    },
+    {
+      "text": "Какой серийный Lamborghini получил двигатель V12 и три электромотора (гибридная установка)?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/auto/3.jfif",
+      "options": ["Lamborghini Aventador SVJ", "Lamborghini Revuelto", "Lamborghini Sian", "Lamborghini Countach LPI 800-4"],
+      "correct": 1,
+      "comment": "Revuelto (2023) — первый гибридный суперкар Lamborghini с V12 и тремя электромоторами, суммарная мощность 1015 л.с."
+    },
+    {
+      "text": "Какой электромобиль стал первой серийной моделью российского бренда Evolute, представленной в 2022 году?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/auto/4.jfif",
+      "options": ["Evolute i-JOY", "Evolute i-VAN", "Evolute i-PRO", "Evolute i-SPACE"],
+      "correct": 2,
+      "comment": "Evolute i-PRO (седан) — первая модель марки, запущенная в Липецкой области. i-JOY появился позже."
+    },
+    {
+      "text": "На картинке — купеобразный кроссовер с «парящей» крышей и выдвижными дверными ручками. Какая это модель?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/auto/5.jfif",
+      "options": ["Ford Mustang Mach-E", "Volkswagen ID.4", "Tesla Model Y", "Kia EV6"],
+      "correct": 2,
+      "comment": "Tesla Model Y (2020) — самый продаваемый электромобиль в мире в 2023 году."
+    },
+    {
+      "text": "Какой гиперкар установил абсолютный рекорд круга среди серийных автомобилей на Нюрбургринге в 2022 году?",
+      "image": "",
+      "options": ["Porsche 911 GT2 RS", "Mercedes-AMG One", "Lamborghini Aventador SVJ", "Tesla Model S Plaid"],
+      "correct": 1,
+      "comment": "Mercedes-AMG One (2022) — гибрид с технологиями F1, проехал круг за 6:35.183."
+    },
+    {
+      "text": "Какой китайский электрический гиперкар установил рекорды на Нюрбургринге и является полностью электрическим (без ДВС)?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/auto/7.jpg",
+      "options": ["BYD Han", "Nio EP9", "Xpeng P7", "Hongqi S9"],
+      "correct": 1,
+      "comment": "Nio EP9 (2016) — электрический гиперкар, который установил рекорд на Нюрбургринге (6:45.90) для электромобилей."
+    },
+    {
+      "text": "Какая компания разработала технологию резонансной беспроводной зарядки электромобилей, лицензируемую BMW, Hyundai и другими производителями?",
+      "image": "",
+      "options": ["Plugless Power", "Conductix-Wampfler", "Qualcomm Halo", "WiTricity"],
+      "correct": 3,
+      "comment": "WiTricity — ведущий разработчик резонансной беспроводной зарядки, поставляет решения для BMW, Hyundai и др."
+    },
+    {
+      "text": "На картинке — пикап с угловатым дизайном, фарами в виде тонкой полоски и возможностью подзарядки от солнечных панелей. Какая модель?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/auto/9.jfif",
+      "options": ["Rivian R1T", "Ford F-150 Lightning", "Tesla Cybertruck", "GMC Hummer EV"],
+      "correct": 2,
+      "comment": "Tesla Cybertruck (2023) — уникальный дизайн, опциональные солнечные панели для подзарядки."
+    },
+    {
+      "text": "Какой автопроизводитель первым в мире начал массовое производство водородных автомобилей на топливных элементах (с 2014 года)?",
+      "image": "",
+      "options": ["Honda (Clarity Fuel Cell)", "Toyota (Mirai)", "Hyundai (Nexo)", "BMW (i Hydrogen NEXT)"],
+      "correct": 1,
+      "comment": "Toyota Mirai выпускается с 2014 года и стала первым массовым водородным автомобилем на топливных элементах."
+    },
+    {
+      "text": "Какой хорватский гиперкар с четырьмя электромоторами имеет мощность 1914 л.с. и разгоняется до 100 км/ч за 1.81 секунды?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/auto/11.png",
+      "options": ["Aspark Owl", "Pininfarina Battista", "Czinger 21C", "Rimac Nevera"],
+      "correct": 3,
+      "comment": "Rimac Nevera развивает 1914 л.с. и долгое время удерживала множество мировых рекордов среди серийных электромобилей."
+    },
+    {
+      "text": "Какая модель стала первой в новом электрическом суббренде Hyundai Ioniq?",
+      "image": "",
+      "options": ["Hyundai Ioniq 6", "Hyundai Ioniq 9", "Hyundai Ioniq 5", "Hyundai Kona Electric"],
+      "correct": 2,
+      "comment": "Ioniq 5 (2021) — первый автомобиль в линейке Ioniq как отдельного электрического бренда."
+    },
+    {
+      "text": "На картинке — современный рамный внедорожник, вдохновлённый классическим Land Rover Defender. Какая это модель?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/auto/13.jfif",
+      "options": ["Land Rover Defender 110", "Mercedes-Benz G-Class", "Ineos Grenadier", "Ford Bronco"],
+      "correct": 2,
+      "comment": "Ineos Grenadier (2022) — наследник старого Defender, с рамной конструкцией."
+    },
+    {
+      "text": "Какая компания разработала ультракомпактную skateboard-платформу с управлением, встроенным в колесные модули (steer-by-wire, brake-by-wire, drive-by-wire)?",
+      "image": "",
+      "options": ["Rivian", "Canoo", "Arrival", "REE Automotive"],
+      "correct": 3,
+      "comment": "REE Automotive создала платформу с колесными модулями REEcorners, где интегрированы все системы управления, освобождая пол салона."
+    },
+    {
+      "text": "Какая модель стала финальной специальной серией Lamborghini с атмосферным двигателем V10?",
+      "image": "",
+      "options": ["Huracán STO", "Gallardo LP570-4", "Aventador Ultimae", "Huracán STJ"],
+      "correct": 3,
+      "comment": "Huracán STJ (2024) — последняя ограниченная серия Lamborghini с атмосферным V10, выпущена тиражом 10 штук."
+    },
+    {
+      "text": "Какой автопроизводитель первым начал серийное производство электромобилей с 800-вольтовой архитектурой, что позволяет заряжаться на сверхбыстрых станциях?",
+      "image": "",
+      "options": ["Audi (e-tron GT)", "Hyundai (Ioniq 5)", "Kia (EV6)", "Porsche (Taycan)"],
+      "correct": 3,
+      "comment": "Porsche Taycan (2019) стал первым серийным электромобилем с 800-вольтовой системой, обеспечивающей зарядку до 270 кВт."
+    }
+  ]
+}
