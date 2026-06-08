@@ -1128,6 +1128,60 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Ошибка получения статистики: {e}")
         await update.message.reply_text("❌ Ошибка загрузки статистики.")
+        
+# -------------------- Команда /games (список всех доступных квизов) --------------------
+async def games_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Проверяем, что команда вызвана в личном чате
+    if update.effective_chat.type != "private":
+        await update.message.reply_text(
+            "📩 Список доступных квизов я могу отправить только в личные сообщения.\n"
+            "Пожалуйста, напишите /games мне в личку."
+        )
+        return
+
+    # Получаем список файлов в папке packs
+    packs_dir = "packs"
+    if not os.path.exists(packs_dir):
+        await update.message.reply_text("❌ Папка с квизами не найдена.")
+        return
+
+    files = [f for f in os.listdir(packs_dir) if f.endswith(".json")]
+    if not files:
+        await update.message.reply_text("❌ Нет доступных квизов.")
+        return
+
+    # Сортируем по имени файла
+    files.sort()
+
+    message_lines = ["📚 Список доступных квизов:\n"]
+    for file in files:
+        pack_id = file[:-5]  # удаляем .json
+        if len(pack_id) != 4 or not pack_id.isdigit():
+            continue  # пропускаем файлы с неправильным именем
+        try:
+            with open(os.path.join(packs_dir, file), "r", encoding="utf-8") as f:
+                data = json.load(f)
+                title = data.get("title", "Без названия")
+                # Обрезаем слишком длинные названия
+                if len(title) > 50:
+                    title = title[:47] + "..."
+                message_lines.append(f"`{pack_id}` — {title}")
+        except Exception as e:
+            print(f"Ошибка чтения {file}: {e}")
+            message_lines.append(f"`{pack_id}` — [Ошибка чтения]")
+
+    if len(message_lines) == 1:
+        await update.message.reply_text("❌ Нет корректных файлов квизов.")
+        return
+
+    # Отправляем сообщение частями, если оно длинное
+    final_message = "\n".join(message_lines)
+    if len(final_message) > 4096:
+        # Разбиваем на части
+        for i in range(0, len(final_message), 4000):
+            await update.message.reply_text(final_message[i:i+4000])
+    else:
+        await update.message.reply_text(final_message, parse_mode="Markdown")
 
 # -------------------- Команда /history (только в личку, по всем группам) --------------------
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1395,6 +1449,7 @@ def main():
     app.add_handler(CommandHandler("stats", stats_command))
     app.add_handler(CommandHandler("history", history_command))
     app.add_handler(CommandHandler("refresh", refresh_players_command))
+    app.add_handler(CommandHandler("games", games_command))
     app.add_handler(CallbackQueryHandler(register_callback, pattern="register"))
     app.add_handler(CallbackQueryHandler(start_early_callback, pattern="start_early"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
