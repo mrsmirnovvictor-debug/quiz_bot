@@ -1582,92 +1582,59 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет данных для отображения рейтинга.")
         return
 
-    # Функция для преобразования значения в нормальный формат ELO
-    def parse_elo_value(val):
-        if val is None or val == "":
+    # Функция для нормализации ELO (если пришло в сотых, делим на 100)
+    def normalize_elo(value):
+        if value is None or value == "":
             return 0.0
-        # Приводим к строке
-        s = str(val).strip().replace(',', '.')
-        # Пытаемся преобразовать в число
         try:
-            num = float(s)
+            v = float(str(value).replace(',', '.'))
+            # Если значение целое и больше 100, вероятно, это сотые
+            if v.is_integer() and v > 100:
+                return v / 100
+            return v
         except:
             return 0.0
-        # Если число целое и похоже на "сотые"
-        if num.is_integer():
-            # Если целое число из 4 цифр и < 3000, то делим на 10
-            if 1000 <= num < 3000:
-                return num / 10
-            # Если целое число из 4 цифр и >= 3000, или из 5 и более цифр, то делим на 100
-            elif num >= 3000:
-                return num / 100
-            # Иначе оставляем как есть (например, 128.7 уже float)
-        return num
 
-    # Функция для преобразования дельты ELO
-    def parse_delta_value(val):
-        if val is None or val == "":
-            return None
-        s = str(val).strip().replace(',', '.')
-        # Убираем знак для анализа длины
-        sign = 1
-        if s.startswith('-'):
-            sign = -1
-            s = s[1:]
-        elif s.startswith('+'):
-            s = s[1:]
-        # Проверяем, является ли строка числом
-        try:
-            num = float(s)
-        except:
-            return None
-        # Если число целое и имеет от 1 до 4 цифр, применяем правила
-        if num.is_integer():
-            int_part = int(abs(num))
-            len_digits = len(str(int_part))
-            if len_digits == 4:
-                # 4 цифры -> 12,34
-                result = int_part / 100
-            elif len_digits == 3:
-                # 3 цифры -> 3,18
-                result = int_part / 100
-            elif len_digits == 2:
-                # 2 цифры -> 0,10
-                result = int_part / 100
-            elif len_digits == 1:
-                # 1 цифра -> 3,00
-                result = float(int_part)
-            else:
-                result = num / 100 if num > 100 else num
+    # Обрабатываем записи, вычисляем дельту самостоятельно
+    processed = []
+    for row in records:
+        username = row.get("Игрок", "")
+        games_last = row.get("Игр на последнюю дату игр", 0)
+        elo_last = normalize_elo(row.get("Среднее ELO на текущий момент", 0))
+        elo_prev = normalize_elo(row.get("Среднее ELO на предпоследнюю дату игр", 0))
+        place_last = row.get("Текущее место", 0)
+        delta_place = row.get("Изменение места")
+
+        # Вычисляем изменение ELO
+        if elo_prev == 0:
+            delta_elo = None  # NEW
         else:
-            # Уже есть десятичная часть
-            result = num
-        return sign * result
+            delta_elo = elo_last - elo_prev
+
+        processed.append({
+            "username": username,
+            "games_last": games_last,
+            "elo_last": elo_last,
+            "place_last": place_last,
+            "delta_elo": delta_elo,
+            "delta_place": delta_place
+        })
 
     # Сортируем по текущему месту
-    records.sort(key=lambda x: x.get("Текущее место", 999))
+    processed.sort(key=lambda x: x["place_last"])
 
-    message_lines = ["📊 ДИНАМИКА РЕЙТИНГА\n"]
+    message_lines = ["📊 ДИНАМИКА РЕЙТИНГА (последние два периода)\n"]
     message_lines.append("```")
     message_lines.append(f"{'#':>2} {'Игрок':<20} {'Игр':>3} {'ELO':>6} {'ΔELO':>8}")
     message_lines.append("-" * 45)
 
-    for row in records:
-        username = row.get("Игрок", "")
-        games_last = row.get("Игр на последнюю дату игр", 0)
-
-        # Среднее ELO на текущий момент
-        elo_raw = row.get("Среднее ELO на текущий момент", 0)
-        elo_val = parse_elo_value(elo_raw)
-        elo_display = round(elo_val, 0)  # Округляем до целого
-
-        place_last = row.get("Текущее место", 0)
-
-        # Изменение ELO
-        delta_raw = row.get("Изменение ELO")
-        delta_val = parse_delta_value(delta_raw)
-
-        delta_place = row.get("Изменение места")
+    for item in processed:
+        username = item["username"]
+        games_last = item["games_last"]
+        elo_last = round(item["elo_last"])  # округляем до целого
+        place_last = item["place_last"]
+        delta_elo = item["delta_elo"]
+        delta_place = item["delta_place"]
 
         # Символ изменения места
         if delta_place is None:
@@ -1680,14 +1647,14 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             place_symbol = " "
 
         # Форматируем дельту ELO
-        if delta_val is None:
+        if delta_elo is None:
             delta_elo_str = "   NEW"
         else:
-            sign = "+" if delta_val >= 0 else ""
-            delta_elo_str = f"{sign}{delta_val:.1f}"
+            sign = "+" if delta_elo >= 0 else ""
+            delta_elo_str = f"{sign}{delta_elo:.1f}"
 
         short_name = username[:20] if len(username) > 20 else username
-        line = f"{place_symbol}{place_last:2} {short_name:<20} {games_last:3} {elo_display:6.0f} {delta_elo_str:>8}"
+        line = f"{place_symbol}{place_last:2} {short_name:<20} {games_last:3} {elo_last:6.0f} {delta_elo_str:>8}"
         message_lines.append(line)
 
     message_lines.append("```")
