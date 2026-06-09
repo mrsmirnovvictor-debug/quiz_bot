@@ -1276,6 +1276,142 @@ async def delete_chat_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as e:
         print(f"Не удалось удалить сообщение {message.message_id}: {e}")
 
+# -------------------- Обновление листа Ranking --------------------
+def update_ranking(chat_id: int):
+    """Создаёт/обновляет лист Ranking_{chat_id} с динамикой рейтинга по последним двум датам квизов."""
+    sheet = init_google_sheets()
+    if not sheet:
+        print("❌ Нет доступа к Google Sheets для обновления Ranking")
+        return
+
+    try:
+        games_sheet = sheet.worksheet("Games")
+        all_games = games_sheet.get_all_records()
+    except Exception as e:
+        print(f"Ошибка чтения Games для Ranking: {e}")
+        return
+
+    # Фильтруем игры только этого чата
+    chat_games = [row for row in all_games if str(row.get("Chat ID", "")) == str(chat_id)]
+    if not chat_games:
+        print(f"Нет игр для чата {chat_id}, Ranking не создаётся")
+        return
+
+    # Сортируем по дате (от старых к новым)
+    chat_games.sort(key=lambda x: x.get("Дата", ""))
+
+    # Получаем уникальные даты проведения квизов
+    unique_dates = sorted(set(row["Дата"] for row in chat_games))
+    if len(unique_dates) < 2:
+        print("Недостаточно дат для построения динамики (нужно хотя бы две разные даты)")
+        return
+    last_date = unique_dates[-1]
+    prev_date = unique_dates[-2]
+
+    # Функция для получения накопленной статистики игрока на определённую дату (включительно)
+    def get_stats_up_to(date_limit):
+        stats = {}
+        for row in chat_games:
+            if row["Дата"] > date_limit:
+                continue
+            username = row.get("Игрок")
+            if not username:
+                continue
+            elo = row.get("ELO после игры", 0)
+            if username not in stats:
+                stats[username] = {"games": 0, "elo_sum": 0.0}
+            stats[username]["games"] += 1
+            stats[username]["elo_sum"] += elo
+        return stats
+
+    prev_stats = get_stats_up_to(prev_date)
+    last_stats = get_stats_up_to(last_date)
+
+    # Определяем калиброванных игроков (>=10 игр на последнюю дату)
+    calibrated_players = [u for u, data in last_stats.items() if data["games"] >= 10]
+    if not calibrated_players:
+        print("Нет игроков с 10+ играми на последнюю дату")
+        return
+
+    # Для каждого калиброванного игрока вычисляем показатели на prev и last
+    ranking_rows = []
+    for username in calibrated_players:
+        games_prev = prev_stats.get(username, {}).get("games", 0)
+        elo_prev = prev_stats.get(username, {}).get("elo_sum", 0) if games_prev >= 10 else None
+        games_last = last_stats[username]["games"]
+        elo_last = last_stats[username]["elo_sum"]
+
+        # Если игрок не был калиброван на предпоследнюю дату (менее 10 игр), считаем его новым
+        if games_prev < 10:
+            elo_prev = None
+            place_prev = None
+        else:
+            # Место на предпоследнюю дату среди калиброванных на ту дату
+            pass
+
+    # Пересчитаем места отдельно для prev и last среди всех калиброванных на каждую дату
+    # Калиброванные на prev — те, у кого games_prev >= 10
+    prev_calibrated = [u for u, data in prev_stats.items() if data["games"] >= 10]
+    prev_calibrated.sort(key=lambda u: prev_stats[u]["elo_sum"], reverse=True)
+    prev_places = {u: i+1 for i, u in enumerate(prev_calibrated)}
+
+    last_calibrated = calibrated_players
+    last_calibrated.sort(key=lambda u: last_stats[u]["elo_sum"], reverse=True)
+    last_places = {u: i+1 for i, u in enumerate(last_calibrated)}
+
+    # Формируем строки
+    for username in last_calibrated:
+        games_prev = prev_stats.get(username, {}).get("games", 0)
+        elo_prev = prev_stats.get(username, {}).get("elo_sum", 0) if games_prev >= 10 else None
+        games_last = last_stats[username]["games"]
+        elo_last = last_stats[username]["elo_sum"]
+        place_prev = prev_places.get(username) if games_prev >= 10 else None
+        place_last = last_places[username]
+
+        # Изменения
+        if place_prev is None:
+            delta_place = None  # NEW
+            delta_elo = None
+        else:
+            delta_place = place_prev - place_last  # положительное = место улучшилось (число уменьшилось)
+            delta_elo = elo_last - elo_prev
+
+        ranking_rows.append([
+            username,
+            prev_date,
+            games_prev if games_prev >= 10 else None,
+            elo_prev if elo_prev is not None else None,
+            place_prev,
+            last_date,
+            games_last,
+            elo_last,
+            place_last,
+            delta_elo,
+            delta_place
+        ])
+
+    # Сортируем по текущему месту (place_last)
+    ranking_rows.sort(key=lambda x: x[8])
+
+    # Создаём/обновляем лист Ranking_{chat_id}
+    ranking_sheet_name = f"Ranking_{chat_id}"
+    try:
+        ranking_sheet = sheet.worksheet(ranking_sheet_name)
+        all_cells = ranking_sheet.get_all_values()
+        if len(all_cells) > 1:
+            ranking_sheet.delete_rows(2, len(all_cells) - 1)
+    except gspread.WorksheetNotFound:
+        ranking_sheet = sheet.add_worksheet(title=ranking_sheet_name, rows=1, cols=20)
+
+    # Заголовки
+    headers = ["Игрок", "Дата предпоследних игр", "Игр на предпоследнюю дату", "ELO на предпоследнюю дату", "Место на предпоследнюю дату",
+               "Дата последних игр", "Игр на последнюю дату", "ELO на последнюю дату", "Место на последнюю дату",
+               "Изменение ELO", "Изменение места"]
+    ranking_sheet.append_row(headers)
+    if ranking_rows:
+        ranking_sheet.append_rows(ranking_rows)
+    print(f"✅ Лист {ranking_sheet_name} обновлён для чата {chat_id}")
+
 # -------------------- Команда /refresh (принудительный пересчёт Players для группы) --------------------
 async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проверяем, что команду выполняет администратор
@@ -1429,11 +1565,78 @@ async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_
         
         players_sheet.append_rows(new_rows, value_input_option='USER_ENTERED')
         
+        # Дополнительно обновляем лист Ranking
+        update_ranking(chat_id)
+        
         await update.message.reply_text(f"✅ Статистика Players для этой группы обновлена!\n\n📊 Обработано игроков: {len(new_rows)}\n📊 Всего игр в группе: {len(chat_games)}")
         
     except Exception as e:
         print(f"Ошибка при пересчёте Players: {e}")
         await update.message.reply_text(f"❌ Ошибка при пересчёте: {e}")
+
+# -------------------- Команда /rank (вывод рейтинговой таблицы) --------------------
+async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("📊 Команда /rank работает только в группах.")
+        return
+
+    sheet = init_google_sheets()
+    if not sheet:
+        await update.message.reply_text("❌ Статистика недоступна.")
+        return
+
+    ranking_sheet_name = f"Ranking_{chat_id}"
+    try:
+        ranking_sheet = sheet.worksheet(ranking_sheet_name)
+        records = ranking_sheet.get_all_records()
+    except gspread.WorksheetNotFound:
+        await update.message.reply_text("❌ Рейтинг ещё не сформирован. Дождитесь обновления статистики (/refresh).")
+        return
+
+    if not records:
+        await update.message.reply_text("❌ Нет данных для отображения рейтинга.")
+        return
+
+    # Сортируем по текущему месту (место на последнюю дату)
+    records.sort(key=lambda x: x.get("Место на последнюю дату", 999))
+
+    message_lines = ["📊 ДИНАМИКА РЕЙТИНГА (последние два периода)\n"]
+    message_lines.append("```")
+    message_lines.append(f"{' ':2} {'#':2} {'Игрок':<20} {'Игр':>3} {'ELO':>4} {'ΔELO':>5} {'Δместо':>6}")
+    message_lines.append("-" * 50)
+
+    for row in records:
+        username = row.get("Игрок", "")
+        games_last = row.get("Игр на последнюю дату", 0)
+        elo_last = row.get("ELO на последнюю дату", 0)
+        place_last = row.get("Место на последнюю дату", 0)
+        delta_place = row.get("Изменение места")
+        delta_elo = row.get("Изменение ELO")
+
+        # Символ изменения места
+        if delta_place is None:
+            place_symbol = "🆕"
+        elif delta_place > 0:
+            place_symbol = "↑"
+        elif delta_place < 0:
+            place_symbol = "↓"
+        else:
+            place_symbol = "⚪"
+
+        # Форматируем изменения
+        if delta_elo is None:
+            delta_elo_str = "NEW"
+        else:
+            sign = "+" if delta_elo >= 0 else ""
+            delta_elo_str = f"{sign}{int(delta_elo)}"
+
+        short_name = username[:20] if len(username) > 20 else username
+        line = f"{place_symbol} {place_last:2} {short_name:<20} {games_last:3} {elo_last:4.0f} {delta_elo_str:>5} {place_symbol:>6}"
+        message_lines.append(line)
+
+    message_lines.append("```")
+    await update.message.reply_text("\n".join(message_lines), parse_mode="Markdown")
 
 # -------------------- ЗАПУСК --------------------
 def main():
@@ -1450,11 +1653,12 @@ def main():
     app.add_handler(CommandHandler("history", history_command))
     app.add_handler(CommandHandler("refresh", refresh_players_command))
     app.add_handler(CommandHandler("games", games_command))
+    app.add_handler(CommandHandler("rank", rank_command))
     app.add_handler(CallbackQueryHandler(register_callback, pattern="register"))
     app.add_handler(CallbackQueryHandler(start_early_callback, pattern="start_early"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
     
-    # Обработчик удаления сообщений (должен быть последним или с низким приоритетом)
+    # Обработчик удаления сообщений
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, delete_chat_messages), group=1)
 
     print("🚀 Бот запущен в режиме polling")
