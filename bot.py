@@ -1300,8 +1300,8 @@ def update_ranking(chat_id: int):
     # Сортируем по дате (от старых к новым)
     chat_games.sort(key=lambda x: x.get("Дата", ""))
 
-    # Получаем уникальные даты проведения квизов
-    unique_dates = sorted(set(row["Дата"] for row in chat_games))
+    # Получаем уникальные календарные даты (без времени)
+    unique_dates = sorted(set(row["Дата"].split()[0] for row in chat_games))
     if len(unique_dates) < 2:
         print("Недостаточно дат для построения динамики (нужно хотя бы две разные даты)")
         return
@@ -1309,10 +1309,12 @@ def update_ranking(chat_id: int):
     prev_date = unique_dates[-2]
 
     # Функция для получения накопленной статистики игрока на определённую дату (включительно)
+    # Принимает строку даты в формате YYYY-MM-DD
     def get_stats_up_to(date_limit):
         stats = {}
         for row in chat_games:
-            if row["Дата"] > date_limit:
+            row_date = row["Дата"].split()[0]  # только YYYY-MM-DD
+            if row_date > date_limit:
                 continue
             username = row.get("Игрок")
             if not username:
