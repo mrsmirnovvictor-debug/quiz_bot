@@ -1595,18 +1595,30 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Сортируем по текущему месту
     records.sort(key=lambda x: x.get("Текущее место", 999))
 
-    message_lines = ["📊 ДИНАМИКА РЕЙТИНГА (последние два периода)\n"]
+    message_lines = ["📊 ДИНАМИКА РЕЙТИНГА\n"]
     message_lines.append("```")
-    message_lines.append(f"{' ':2} {'#':2} {'Игрок':<20} {'Игр':>3} {'ELO':>4} {'ΔELO':>5} {'Δместо':>6}")
-    message_lines.append("-" * 50)
+    message_lines.append(f"{'#':>2} {'Игрок':<20} {'Игр':>3} {'ELO':>6} {'ΔELO':>8}")
+    message_lines.append("-" * 45)
 
     for row in records:
         username = row.get("Игрок", "")
         games_last = row.get("Игр на последнюю дату игр", 0)
-        elo_last = row.get("Среднее ELO на текущий момент", 0)
+        # Среднее ELO на текущий момент
+        elo_last_raw = row.get("Среднее ELO на текущий момент", 0)
+        # Преобразуем в число, если строка
+        if isinstance(elo_last_raw, str):
+            elo_last_raw = float(elo_last_raw.replace(',', '.'))
+        elo_last = round(elo_last_raw, 2)
         place_last = row.get("Текущее место", 0)
+        delta_elo_raw = row.get("Изменение ELO")
+        if delta_elo_raw is not None:
+            if isinstance(delta_elo_raw, str):
+                delta_elo_raw = float(delta_elo_raw.replace(',', '.'))
+            delta_elo = round(delta_elo_raw, 2)
+        else:
+            delta_elo = None
+
         delta_place = row.get("Изменение места")
-        delta_elo = row.get("Изменение ELO")
 
         # Символ изменения места
         if delta_place is None:
@@ -1616,17 +1628,17 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif delta_place < 0:
             place_symbol = "↓"
         else:
-            place_symbol = "⚪"
+            place_symbol = " "
 
-        # Форматируем изменения
+        # Форматируем дельту ELO
         if delta_elo is None:
-            delta_elo_str = "NEW"
+            delta_elo_str = "   NEW"
         else:
             sign = "+" if delta_elo >= 0 else ""
-            delta_elo_str = f"{sign}{delta_elo:.1f}"
+            delta_elo_str = f"{sign}{delta_elo:.2f}"
 
         short_name = username[:20] if len(username) > 20 else username
-        line = f"{place_symbol} {place_last:2} {short_name:<20} {games_last:3} {elo_last:4.0f} {delta_elo_str:>5} {place_symbol:>6}"
+        line = f"{place_symbol}{place_last:2} {short_name:<20} {games_last:3} {elo_last:6.1f} {delta_elo_str:>8}"
         message_lines.append(line)
 
     message_lines.append("```")
