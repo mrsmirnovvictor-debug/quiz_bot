@@ -1582,7 +1582,7 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет данных для отображения рейтинга.")
         return
 
-    # Функция для преобразования значения в нормальный формат ELO (без изменений)
+    # Функция для нормализации ELO
     def parse_elo_value(val):
         if val is None or val == "":
             return 0.0
@@ -1603,8 +1603,8 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     message_lines = ["📊 ДИНАМИКА РЕЙТИНГА\n"]
     message_lines.append("```")
-    message_lines.append(f"{'#':>2} {'Игрок':<20} {'Игр':>3} {'ELO':>6} {'ΔELO':>8}")
-    message_lines.append("-" * 45)
+    message_lines.append(f"{'#':>2} {'Δм':>3} {'Игрок':<20} {'Игр':>3} {'ELO':>6} {'ΔELO':>8}")
+    message_lines.append("-" * 50)
 
     for row in records:
         username = row.get("Игрок", "")
@@ -1615,30 +1615,43 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elo_current = parse_elo_value(elo_current_raw)
         elo_display = round(elo_current, 0)
 
-        # Предыдущий ELO (если есть)
+        # Предыдущий ELO
         elo_prev_raw = row.get("Среднее ELO на предпоследнюю дату игр", 0)
         elo_prev = parse_elo_value(elo_prev_raw)
 
         place_last = row.get("Текущее место", 0)
         delta_place = row.get("Изменение места")
 
-        # Вычисляем изменение ELO самостоятельно
+        # Символ изменения места и строка для изменения позиции
+        if delta_place is None:
+            place_symbol = "🆕"
+            delta_place_str = "   "  # пусто для новых
+        elif delta_place > 0:
+            place_symbol = "↑"
+            delta_place_str = f"+{delta_place}"
+        elif delta_place < 0:
+            place_symbol = "↓"
+            delta_place_str = f"{delta_place}"
+        else:
+            place_symbol = " "
+            delta_place_str = "0"
+
+        # Скобки для изменения места
+        if delta_place is None:
+            place_change_display = "   "
+        elif delta_place == 0:
+            place_change_display = " (-)"
+        elif delta_place > 0:
+            place_change_display = f"(+{delta_place})"
+        else:
+            place_change_display = f"({delta_place})"
+
+        # Вычисляем дельту ELO
         if elo_prev == 0 or elo_prev_raw is None or elo_prev_raw == "":
-            delta_elo = None  # NEW
+            delta_elo = None
         else:
             delta_elo = elo_current - elo_prev
 
-        # Символ изменения места
-        if delta_place is None:
-            place_symbol = "🆕"
-        elif delta_place > 0:
-            place_symbol = "↑"
-        elif delta_place < 0:
-            place_symbol = "↓"
-        else:
-            place_symbol = " "
-
-        # Форматируем дельту ELO
         if delta_elo is None:
             delta_elo_str = "   NEW"
         else:
@@ -1646,7 +1659,9 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             delta_elo_str = f"{sign}{delta_elo:.1f}"
 
         short_name = username[:20] if len(username) > 20 else username
-        line = f"{place_symbol}{place_last:2} {short_name:<20} {games_last:3} {elo_display:6.0f} {delta_elo_str:>8}"
+
+        # Формируем строку: символ, место, скобка с изменением, имя, игры, ELO, дельта ELO
+        line = f"{place_symbol}{place_last:2} {place_change_display:<5} {short_name:<20} {games_last:3} {elo_display:6.0f} {delta_elo_str:>8}"
         message_lines.append(line)
 
     message_lines.append("```")
