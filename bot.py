@@ -1582,59 +1582,51 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет данных для отображения рейтинга.")
         return
 
-    # Функция для нормализации ELO (если пришло в сотых, делим на 100)
-    def normalize_elo(value):
-        if value is None or value == "":
+    # Функция для преобразования значения в нормальный формат ELO (без изменений)
+    def parse_elo_value(val):
+        if val is None or val == "":
             return 0.0
+        s = str(val).strip().replace(',', '.')
         try:
-            v = float(str(value).replace(',', '.'))
-            # Если значение целое и больше 100, вероятно, это сотые
-            if v.is_integer() and v > 100:
-                return v / 100
-            return v
+            num = float(s)
         except:
             return 0.0
-
-    # Обрабатываем записи, вычисляем дельту самостоятельно
-    processed = []
-    for row in records:
-        username = row.get("Игрок", "")
-        games_last = row.get("Игр на последнюю дату игр", 0)
-        elo_last = normalize_elo(row.get("Среднее ELO на текущий момент", 0))
-        elo_prev = normalize_elo(row.get("Среднее ELO на предпоследнюю дату игр", 0))
-        place_last = row.get("Текущее место", 0)
-        delta_place = row.get("Изменение места")
-
-        # Вычисляем изменение ELO
-        if elo_prev == 0:
-            delta_elo = None  # NEW
-        else:
-            delta_elo = elo_last - elo_prev
-
-        processed.append({
-            "username": username,
-            "games_last": games_last,
-            "elo_last": elo_last,
-            "place_last": place_last,
-            "delta_elo": delta_elo,
-            "delta_place": delta_place
-        })
+        if num.is_integer():
+            if 1000 <= num < 3000:
+                return num / 10
+            elif num >= 3000:
+                return num / 100
+        return num
 
     # Сортируем по текущему месту
-    processed.sort(key=lambda x: x["place_last"])
+    records.sort(key=lambda x: x.get("Текущее место", 999))
 
-    message_lines = ["📊 ДИНАМИКА РЕЙТИНГА (последние два периода)\n"]
+    message_lines = ["📊 ДИНАМИКА РЕЙТИНГА\n"]
     message_lines.append("```")
     message_lines.append(f"{'#':>2} {'Игрок':<20} {'Игр':>3} {'ELO':>6} {'ΔELO':>8}")
     message_lines.append("-" * 45)
 
-    for item in processed:
-        username = item["username"]
-        games_last = item["games_last"]
-        elo_last = round(item["elo_last"])  # округляем до целого
-        place_last = item["place_last"]
-        delta_elo = item["delta_elo"]
-        delta_place = item["delta_place"]
+    for row in records:
+        username = row.get("Игрок", "")
+        games_last = row.get("Игр на последнюю дату игр", 0)
+
+        # Текущий ELO
+        elo_current_raw = row.get("Среднее ELO на текущий момент", 0)
+        elo_current = parse_elo_value(elo_current_raw)
+        elo_display = round(elo_current, 0)
+
+        # Предыдущий ELO (если есть)
+        elo_prev_raw = row.get("Среднее ELO на предпоследнюю дату игр", 0)
+        elo_prev = parse_elo_value(elo_prev_raw)
+
+        place_last = row.get("Текущее место", 0)
+        delta_place = row.get("Изменение места")
+
+        # Вычисляем изменение ELO самостоятельно
+        if elo_prev == 0 or elo_prev_raw is None or elo_prev_raw == "":
+            delta_elo = None  # NEW
+        else:
+            delta_elo = elo_current - elo_prev
 
         # Символ изменения места
         if delta_place is None:
@@ -1654,7 +1646,7 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             delta_elo_str = f"{sign}{delta_elo:.1f}"
 
         short_name = username[:20] if len(username) > 20 else username
-        line = f"{place_symbol}{place_last:2} {short_name:<20} {games_last:3} {elo_last:6.0f} {delta_elo_str:>8}"
+        line = f"{place_symbol}{place_last:2} {short_name:<20} {games_last:3} {elo_display:6.0f} {delta_elo_str:>8}"
         message_lines.append(line)
 
     message_lines.append("```")
