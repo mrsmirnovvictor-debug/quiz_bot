@@ -1593,36 +1593,36 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for row in records:
         username = row.get("Игрок", "")
         games_last = row.get("Игр на последнюю дату игр", 0)
-        
+
         # Среднее ELO на текущий момент
         elo_last_raw = row.get("Среднее ELO на текущий момент", 0)
         if isinstance(elo_last_raw, str):
             elo_last_raw = elo_last_raw.replace(',', '.')
         try:
-            elo_last_val = float(elo_last_raw)
+            elo_val = float(elo_last_raw)
         except:
-            elo_last_val = 0.0
-        # Автоопределение формата (если значение > 100, скорее всего оно в сотых)
-        if elo_last_val > 100 or (elo_last_val == int(elo_last_val) and elo_last_val > 50):
-            elo_last = elo_last_val / 100
-        else:
-            elo_last = elo_last_val
-        
+            elo_val = 0.0
+
+        # Если значение слишком большое (вероятно, в сотых) — делим на 100
+        if elo_val > 500:
+            elo_val = elo_val / 100
+
+        elo_last = round(elo_val, 1)
+
         place_last = row.get("Текущее место", 0)
-        
+
         delta_elo_raw = row.get("Изменение ELO")
         if delta_elo_raw is not None:
             if isinstance(delta_elo_raw, str):
                 delta_elo_raw = delta_elo_raw.replace(',', '.')
             try:
-                delta_elo_val = float(delta_elo_raw)
+                delta_val = float(delta_elo_raw)
             except:
-                delta_elo_val = None
-            if delta_elo_val is not None:
-                if abs(delta_elo_val) > 100 or (delta_elo_val == int(delta_elo_val) and abs(delta_elo_val) > 50):
-                    delta_elo = delta_elo_val / 100
-                else:
-                    delta_elo = delta_elo_val
+                delta_val = None
+            if delta_val is not None:
+                if abs(delta_val) > 500:
+                    delta_val = delta_val / 100
+                delta_elo = round(delta_val, 1)
             else:
                 delta_elo = None
         else:
