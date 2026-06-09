@@ -1278,7 +1278,7 @@ async def delete_chat_messages(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # -------------------- Обновление листа Ranking --------------------
 def update_ranking(chat_id: int):
-    """Создаёт/обновляет лист Ranking_{chat_id} с динамикой рейтинга по последним двум датам квизов."""
+    """Создаёт/обновляет лист Ranking_{chat_id} с динамикой среднего ELO по последним двум датам квизов."""
     sheet = init_google_sheets()
     if not sheet:
         print("❌ Нет доступа к Google Sheets для обновления Ranking")
@@ -1333,60 +1333,43 @@ def update_ranking(chat_id: int):
         print("Нет игроков с 10+ играми на последнюю дату")
         return
 
-    # Для каждого калиброванного игрока вычисляем показатели на prev и last
-    ranking_rows = []
-    for username in calibrated_players:
-        games_prev = prev_stats.get(username, {}).get("games", 0)
-        elo_prev = prev_stats.get(username, {}).get("elo_sum", 0) if games_prev >= 10 else None
-        games_last = last_stats[username]["games"]
-        elo_last = last_stats[username]["elo_sum"]
-
-        # Если игрок не был калиброван на предпоследнюю дату (менее 10 игр), считаем его новым
-        if games_prev < 10:
-            elo_prev = None
-            place_prev = None
-        else:
-            # Место на предпоследнюю дату среди калиброванных на ту дату
-            pass
-
     # Пересчитаем места отдельно для prev и last среди всех калиброванных на каждую дату
-    # Калиброванные на prev — те, у кого games_prev >= 10
     prev_calibrated = [u for u, data in prev_stats.items() if data["games"] >= 10]
-    prev_calibrated.sort(key=lambda u: prev_stats[u]["elo_sum"], reverse=True)
+    prev_calibrated.sort(key=lambda u: prev_stats[u]["elo_sum"] / prev_stats[u]["games"], reverse=True)
     prev_places = {u: i+1 for i, u in enumerate(prev_calibrated)}
 
     last_calibrated = calibrated_players
-    last_calibrated.sort(key=lambda u: last_stats[u]["elo_sum"], reverse=True)
+    last_calibrated.sort(key=lambda u: last_stats[u]["elo_sum"] / last_stats[u]["games"], reverse=True)
     last_places = {u: i+1 for i, u in enumerate(last_calibrated)}
 
-    # Формируем строки
+    ranking_rows = []
     for username in last_calibrated:
         games_prev = prev_stats.get(username, {}).get("games", 0)
-        elo_prev = prev_stats.get(username, {}).get("elo_sum", 0) if games_prev >= 10 else None
+        elo_prev_avg = (prev_stats[username]["elo_sum"] / games_prev) if games_prev >= 10 else None
         games_last = last_stats[username]["games"]
-        elo_last = last_stats[username]["elo_sum"]
+        elo_last_avg = last_stats[username]["elo_sum"] / games_last
+
         place_prev = prev_places.get(username) if games_prev >= 10 else None
         place_last = last_places[username]
 
-        # Изменения
         if place_prev is None:
-            delta_place = None  # NEW
+            delta_place = None
             delta_elo = None
         else:
-            delta_place = place_prev - place_last  # положительное = место улучшилось (число уменьшилось)
-            delta_elo = elo_last - elo_prev
+            delta_place = place_prev - place_last
+            delta_elo = elo_last_avg - elo_prev_avg
 
         ranking_rows.append([
             username,
             prev_date,
             games_prev if games_prev >= 10 else None,
-            elo_prev if elo_prev is not None else None,
+            round(elo_prev_avg, 2) if elo_prev_avg is not None else None,
             place_prev,
             last_date,
             games_last,
-            elo_last,
+            round(elo_last_avg, 2),
             place_last,
-            delta_elo,
+            round(delta_elo, 2) if delta_elo is not None else None,
             delta_place
         ])
 
@@ -1403,10 +1386,19 @@ def update_ranking(chat_id: int):
     except gspread.WorksheetNotFound:
         ranking_sheet = sheet.add_worksheet(title=ranking_sheet_name, rows=1, cols=20)
 
-    # Заголовки
-    headers = ["Игрок", "Дата предпоследних игр", "Игр на предпоследнюю дату", "ELO на предпоследнюю дату", "Место на предпоследнюю дату",
-               "Дата последних игр", "Игр на последнюю дату", "ELO на последнюю дату", "Место на последнюю дату",
-               "Изменение ELO", "Изменение места"]
+    headers = [
+        "Игрок",
+        "Предпоследняя дата игр",
+        "Игр на предпоследнюю дату игр",
+        "Среднее ELO на предпоследнюю дату игр",
+        "Место на предпоследнюю дату игр",
+        "Последняя дата игр",
+        "Игр на последнюю дату игр",
+        "Среднее ELO на текущий момент",
+        "Текущее место",
+        "Изменение ELO",
+        "Изменение места"
+    ]
     ranking_sheet.append_row(headers)
     if ranking_rows:
         ranking_sheet.append_rows(ranking_rows)
@@ -1598,8 +1590,8 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет данных для отображения рейтинга.")
         return
 
-    # Сортируем по текущему месту (место на последнюю дату)
-    records.sort(key=lambda x: x.get("Место на последнюю дату", 999))
+    # Сортируем по текущему месту
+    records.sort(key=lambda x: x.get("Текущее место", 999))
 
     message_lines = ["📊 ДИНАМИКА РЕЙТИНГА (последние два периода)\n"]
     message_lines.append("```")
@@ -1608,9 +1600,9 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for row in records:
         username = row.get("Игрок", "")
-        games_last = row.get("Игр на последнюю дату", 0)
-        elo_last = row.get("ELO на последнюю дату", 0)
-        place_last = row.get("Место на последнюю дату", 0)
+        games_last = row.get("Игр на последнюю дату игр", 0)
+        elo_last = row.get("Среднее ELO на текущий момент", 0)
+        place_last = row.get("Текущее место", 0)
         delta_place = row.get("Изменение места")
         delta_elo = row.get("Изменение ELO")
 
@@ -1629,7 +1621,7 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             delta_elo_str = "NEW"
         else:
             sign = "+" if delta_elo >= 0 else ""
-            delta_elo_str = f"{sign}{int(delta_elo)}"
+            delta_elo_str = f"{sign}{delta_elo:.1f}"
 
         short_name = username[:20] if len(username) > 20 else username
         line = f"{place_symbol} {place_last:2} {short_name:<20} {games_last:3} {elo_last:4.0f} {delta_elo_str:>5} {place_symbol:>6}"
