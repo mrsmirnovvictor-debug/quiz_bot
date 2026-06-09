@@ -1309,11 +1309,10 @@ def update_ranking(chat_id: int):
     prev_date = unique_dates[-2]
 
     # Функция для получения накопленной статистики игрока на определённую дату (включительно)
-    # Принимает строку даты в формате YYYY-MM-DD
     def get_stats_up_to(date_limit):
         stats = {}
         for row in chat_games:
-            row_date = row["Дата"].split()[0]  # только YYYY-MM-DD
+            row_date = row["Дата"].split()[0]
             if row_date > date_limit:
                 continue
             username = row.get("Игрок")
@@ -1335,7 +1334,6 @@ def update_ranking(chat_id: int):
         print("Нет игроков с 10+ играми на последнюю дату")
         return
 
-    # Пересчитаем места отдельно для prev и last среди всех калиброванных на каждую дату
     prev_calibrated = [u for u, data in prev_stats.items() if data["games"] >= 10]
     prev_calibrated.sort(key=lambda u: prev_stats[u]["elo_sum"] / prev_stats[u]["games"], reverse=True)
     prev_places = {u: i+1 for i, u in enumerate(prev_calibrated)}
@@ -1347,7 +1345,10 @@ def update_ranking(chat_id: int):
     ranking_rows = []
     for username in last_calibrated:
         games_prev = prev_stats.get(username, {}).get("games", 0)
-        elo_prev_avg = (prev_stats[username]["elo_sum"] / games_prev) if games_prev >= 10 else None
+        if games_prev >= 10:
+            elo_prev_avg = prev_stats[username]["elo_sum"] / games_prev
+        else:
+            elo_prev_avg = None
         games_last = last_stats[username]["games"]
         elo_last_avg = last_stats[username]["elo_sum"] / games_last
 
@@ -1375,10 +1376,8 @@ def update_ranking(chat_id: int):
             delta_place
         ])
 
-    # Сортируем по текущему месту (place_last)
     ranking_rows.sort(key=lambda x: x[8])
 
-    # Создаём/обновляем лист Ranking_{chat_id}
     ranking_sheet_name = f"Ranking_{chat_id}"
     try:
         ranking_sheet = sheet.worksheet(ranking_sheet_name)
@@ -1433,7 +1432,6 @@ async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_
         games_sheet = sheet.worksheet("Games")
         players_sheet_name = f"Players_{chat_id}"
         
-        # Проверяем, существует ли лист Players для этого чата, если нет — создаём
         try:
             players_sheet = sheet.worksheet(players_sheet_name)
         except gspread.WorksheetNotFound:
@@ -1444,17 +1442,13 @@ async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_
             await update.message.reply_text(f"📄 Создан новый лист {players_sheet_name}")
         
         all_games = games_sheet.get_all_records()
-        
-        # Фильтруем только игры текущего чата
         chat_games = [row for row in all_games if str(row.get("Chat ID", "")) == str(chat_id)]
         
         if not chat_games:
             await update.message.reply_text("❌ В этой группе пока нет сыгранных квизов.")
             return
         
-        # Агрегируем статистику по игрокам
         player_stats = {}
-        
         for row in chat_games:
             username = row.get("Игрок")
             if not username:
@@ -1484,7 +1478,6 @@ async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_
             total_time_all_raw = to_float(row.get("Общее время ответов", 0))
             total_time_correct_raw = to_float(row.get("Общее время правильных ответов", 0))
             
-            # Автоопределение формата
             if total_time_all_raw > 1000 or (total_time_all_raw == int(total_time_all_raw) and total_time_all_raw > 100):
                 total_time_all = total_time_all_raw / 100
             else:
@@ -1518,7 +1511,6 @@ async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_
             stats["total_time_correct"] += total_time_correct
             stats["elos"].append(elo)
         
-        # Формируем новые строки для Players
         new_rows = []
         for username, stats in player_stats.items():
             games_count = stats["games_count"]
@@ -1552,14 +1544,12 @@ async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_
             await update.message.reply_text("❌ Нет данных для записи в Players.")
             return
         
-        # Очищаем Players и записываем новые данные
         all_cells = players_sheet.get_all_values()
         if len(all_cells) > 1:
             players_sheet.delete_rows(2, len(all_cells) - 1)
         
         players_sheet.append_rows(new_rows, value_input_option='USER_ENTERED')
         
-        # Дополнительно обновляем лист Ranking
         update_ranking(chat_id)
         
         await update.message.reply_text(f"✅ Статистика Players для этой группы обновлена!\n\n📊 Обработано игроков: {len(new_rows)}\n📊 Всего игр в группе: {len(chat_games)}")
@@ -1595,7 +1585,7 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Сортируем по текущему месту
     records.sort(key=lambda x: x.get("Текущее место", 999))
 
-    message_lines = ["📊 ДИНАМИКА РЕЙТИНГА\n"]
+    message_lines = ["📊 ДИНАМИКА РЕЙТИНГА (последние два периода)\n"]
     message_lines.append("```")
     message_lines.append(f"{'#':>2} {'Игрок':<20} {'Игр':>3} {'ELO':>6} {'ΔELO':>8}")
     message_lines.append("-" * 45)
@@ -1603,18 +1593,38 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for row in records:
         username = row.get("Игрок", "")
         games_last = row.get("Игр на последнюю дату игр", 0)
+        
         # Среднее ELO на текущий момент
         elo_last_raw = row.get("Среднее ELO на текущий момент", 0)
-        # Преобразуем в число, если строка
         if isinstance(elo_last_raw, str):
-            elo_last_raw = float(elo_last_raw.replace(',', '.'))
-        elo_last = round(elo_last_raw, 2)
+            elo_last_raw = elo_last_raw.replace(',', '.')
+        try:
+            elo_last_val = float(elo_last_raw)
+        except:
+            elo_last_val = 0.0
+        # Автоопределение формата (если значение > 100, скорее всего оно в сотых)
+        if elo_last_val > 100 or (elo_last_val == int(elo_last_val) and elo_last_val > 50):
+            elo_last = elo_last_val / 100
+        else:
+            elo_last = elo_last_val
+        
         place_last = row.get("Текущее место", 0)
+        
         delta_elo_raw = row.get("Изменение ELO")
         if delta_elo_raw is not None:
             if isinstance(delta_elo_raw, str):
-                delta_elo_raw = float(delta_elo_raw.replace(',', '.'))
-            delta_elo = round(delta_elo_raw, 2)
+                delta_elo_raw = delta_elo_raw.replace(',', '.')
+            try:
+                delta_elo_val = float(delta_elo_raw)
+            except:
+                delta_elo_val = None
+            if delta_elo_val is not None:
+                if abs(delta_elo_val) > 100 or (delta_elo_val == int(delta_elo_val) and abs(delta_elo_val) > 50):
+                    delta_elo = delta_elo_val / 100
+                else:
+                    delta_elo = delta_elo_val
+            else:
+                delta_elo = None
         else:
             delta_elo = None
 
@@ -1635,7 +1645,7 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             delta_elo_str = "   NEW"
         else:
             sign = "+" if delta_elo >= 0 else ""
-            delta_elo_str = f"{sign}{delta_elo:.2f}"
+            delta_elo_str = f"{sign}{delta_elo:.1f}"
 
         short_name = username[:20] if len(username) > 20 else username
         line = f"{place_symbol}{place_last:2} {short_name:<20} {games_last:3} {elo_last:6.1f} {delta_elo_str:>8}"
