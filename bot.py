@@ -1582,10 +1582,72 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет данных для отображения рейтинга.")
         return
 
+    # Функция для преобразования значения в нормальный формат ELO
+    def parse_elo_value(val):
+        if val is None or val == "":
+            return 0.0
+        # Приводим к строке
+        s = str(val).strip().replace(',', '.')
+        # Пытаемся преобразовать в число
+        try:
+            num = float(s)
+        except:
+            return 0.0
+        # Если число целое и похоже на "сотые"
+        if num.is_integer():
+            # Если целое число из 4 цифр и < 3000, то делим на 10
+            if 1000 <= num < 3000:
+                return num / 10
+            # Если целое число из 4 цифр и >= 3000, или из 5 и более цифр, то делим на 100
+            elif num >= 3000:
+                return num / 100
+            # Иначе оставляем как есть (например, 128.7 уже float)
+        return num
+
+    # Функция для преобразования дельты ELO
+    def parse_delta_value(val):
+        if val is None or val == "":
+            return None
+        s = str(val).strip().replace(',', '.')
+        # Убираем знак для анализа длины
+        sign = 1
+        if s.startswith('-'):
+            sign = -1
+            s = s[1:]
+        elif s.startswith('+'):
+            s = s[1:]
+        # Проверяем, является ли строка числом
+        try:
+            num = float(s)
+        except:
+            return None
+        # Если число целое и имеет от 1 до 4 цифр, применяем правила
+        if num.is_integer():
+            int_part = int(abs(num))
+            len_digits = len(str(int_part))
+            if len_digits == 4:
+                # 4 цифры -> 12,34
+                result = int_part / 100
+            elif len_digits == 3:
+                # 3 цифры -> 3,18
+                result = int_part / 100
+            elif len_digits == 2:
+                # 2 цифры -> 0,10
+                result = int_part / 100
+            elif len_digits == 1:
+                # 1 цифра -> 3,00
+                result = float(int_part)
+            else:
+                result = num / 100 if num > 100 else num
+        else:
+            # Уже есть десятичная часть
+            result = num
+        return sign * result
+
     # Сортируем по текущему месту
     records.sort(key=lambda x: x.get("Текущее место", 999))
 
-    message_lines = ["📊 ДИНАМИКА РЕЙТИНГА (последние два периода)\n"]
+    message_lines = ["📊 ДИНАМИКА РЕЙТИНГА\n"]
     message_lines.append("```")
     message_lines.append(f"{'#':>2} {'Игрок':<20} {'Игр':>3} {'ELO':>6} {'ΔELO':>8}")
     message_lines.append("-" * 45)
@@ -1595,43 +1657,15 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         games_last = row.get("Игр на последнюю дату игр", 0)
 
         # Среднее ELO на текущий момент
-        elo_last_raw = row.get("Среднее ELO на текущий момент", 0)
-        if isinstance(elo_last_raw, str):
-            elo_last_raw = elo_last_raw.replace(',', '.')
-        try:
-            elo_val = float(elo_last_raw)
-        except:
-            elo_val = 0.0
-
-        # Если значение слишком большое (вероятно, в сотых) — делим на 100
-        if abs(elo_val) > 500:
-            elo_val = elo_val / 100
-        elo_last = round(elo_val, 1)
+        elo_raw = row.get("Среднее ELO на текущий момент", 0)
+        elo_val = parse_elo_value(elo_raw)
+        elo_display = round(elo_val, 0)  # Округляем до целого
 
         place_last = row.get("Текущее место", 0)
 
         # Изменение ELO
-        delta_elo_raw = row.get("Изменение ELO")
-        if delta_elo_raw is not None and delta_elo_raw != "":
-            try:
-                if isinstance(delta_elo_raw, str):
-                    delta_elo_raw = delta_elo_raw.replace(',', '.')
-                delta_val = float(delta_elo_raw)
-            except:
-                delta_val = None
-
-            if delta_val is not None:
-                # Если значение является целым (нет дробной части) — это скорее всего сотые
-                if delta_val.is_integer():
-                    delta_val = delta_val / 100
-                # Дополнительная проверка: если абсолютное значение > 500, делим на 100
-                if abs(delta_val) > 500:
-                    delta_val = delta_val / 100
-                delta_elo = round(delta_val, 1)
-            else:
-                delta_elo = None
-        else:
-            delta_elo = None
+        delta_raw = row.get("Изменение ELO")
+        delta_val = parse_delta_value(delta_raw)
 
         delta_place = row.get("Изменение места")
 
@@ -1646,14 +1680,14 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             place_symbol = " "
 
         # Форматируем дельту ELO
-        if delta_elo is None:
+        if delta_val is None:
             delta_elo_str = "   NEW"
         else:
-            sign = "+" if delta_elo >= 0 else ""
-            delta_elo_str = f"{sign}{delta_elo:.1f}"
+            sign = "+" if delta_val >= 0 else ""
+            delta_elo_str = f"{sign}{delta_val:.1f}"
 
         short_name = username[:20] if len(username) > 20 else username
-        line = f"{place_symbol}{place_last:2} {short_name:<20} {games_last:3} {elo_last:6.1f} {delta_elo_str:>8}"
+        line = f"{place_symbol}{place_last:2} {short_name:<20} {games_last:3} {elo_display:6.0f} {delta_elo_str:>8}"
         message_lines.append(line)
 
     message_lines.append("```")
