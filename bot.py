@@ -1613,13 +1613,18 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Изменение ELO
         delta_elo_raw = row.get("Изменение ELO")
         if delta_elo_raw is not None and delta_elo_raw != "":
-            if isinstance(delta_elo_raw, str):
-                delta_elo_raw = delta_elo_raw.replace(',', '.')
             try:
+                if isinstance(delta_elo_raw, str):
+                    delta_elo_raw = delta_elo_raw.replace(',', '.')
                 delta_val = float(delta_elo_raw)
             except:
                 delta_val = None
+
             if delta_val is not None:
+                # Если значение является целым (нет дробной части) — это скорее всего сотые
+                if delta_val.is_integer():
+                    delta_val = delta_val / 100
+                # Дополнительная проверка: если абсолютное значение > 500, делим на 100
                 if abs(delta_val) > 500:
                     delta_val = delta_val / 100
                 delta_elo = round(delta_val, 1)
