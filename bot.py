@@ -1664,7 +1664,7 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Символ изменения места и строка для изменения позиции
         if delta_place is None:
-            place_symbol = "🆕"
+            place_symbol = "(+)"
             place_change_display = "   "
         elif delta_place > 0:
             place_symbol = "↑"
