@@ -1403,8 +1403,8 @@ def update_ranking(chat_id: int):
             # Удаляем все строки после первой
             ranking_sheet.delete_rows(2, len(all_cells) - 1)
         
-        # Обновляем заголовок на случай, если он изменился
-        ranking_sheet.update('A1:K1', [headers])
+        # Обновляем заголовок (исправленный синтаксис)
+        ranking_sheet.update(range_name='A1:K1', values=[headers])
         
     except gspread.WorksheetNotFound:
         # Создаём новый лист
@@ -1615,8 +1615,17 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return num / 100
         return num
 
+    # Функция для безопасного преобразования delta_place в int
+    def parse_delta_place(val):
+        if val is None or val == "":
+            return None
+        try:
+            return int(float(val))
+        except:
+            return None
+
     # Сортируем по текущему месту
-    records.sort(key=lambda x: x.get("Текущее место", 999))
+    records.sort(key=lambda x: int(x.get("Текущее место", 999)) if str(x.get("Текущее место", 999)).isdigit() else 999)
 
     message_lines = ["📊 ДИНАМИКА РЕЙТИНГА\n"]
     message_lines.append("```")
@@ -1626,6 +1635,12 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for row in records:
         username = row.get("Игрок", "")
         games_last = row.get("Игр на последнюю дату игр", 0)
+        
+        # Преобразуем games_last в число
+        try:
+            games_last = int(games_last) if games_last else 0
+        except:
+            games_last = 0
 
         # Текущий ELO
         elo_current_raw = row.get("Среднее ELO на текущий момент", 0)
@@ -1636,32 +1651,30 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elo_prev_raw = row.get("Среднее ELO на предпоследнюю дату игр", 0)
         elo_prev = parse_elo_value(elo_prev_raw)
 
-        place_last = row.get("Текущее место", 0)
-        delta_place = row.get("Изменение места")
+        # Текущее место
+        place_last_raw = row.get("Текущее место", 0)
+        try:
+            place_last = int(place_last_raw) if place_last_raw else 0
+        except:
+            place_last = 0
+        
+        # Изменение места
+        delta_place_raw = row.get("Изменение места")
+        delta_place = parse_delta_place(delta_place_raw)
 
         # Символ изменения места и строка для изменения позиции
         if delta_place is None:
             place_symbol = "🆕"
-            delta_place_str = "   "  # пусто для новых
+            place_change_display = "   "
         elif delta_place > 0:
             place_symbol = "↑"
-            delta_place_str = f"+{delta_place}"
+            place_change_display = f"(+{delta_place})"
         elif delta_place < 0:
             place_symbol = "↓"
-            delta_place_str = f"{delta_place}"
+            place_change_display = f"({delta_place})"
         else:
             place_symbol = " "
-            delta_place_str = "0"
-
-        # Скобки для изменения места
-        if delta_place is None:
-            place_change_display = "   "
-        elif delta_place == 0:
-            place_change_display = " (-)"
-        elif delta_place > 0:
-            place_change_display = f"(+{delta_place})"
-        else:
-            place_change_display = f"({delta_place})"
+            place_change_display = "(-)"
 
         # Вычисляем дельту ELO
         if elo_prev == 0 or elo_prev_raw is None or elo_prev_raw == "":
@@ -1677,12 +1690,19 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         short_name = username[:20] if len(username) > 20 else username
 
-        # Формируем строку: символ, место, скобка с изменением, имя, игры, ELO, дельта ELO
+        # Формируем строку
         line = f"{place_symbol}{place_last:2} {place_change_display:<5} {short_name:<20} {games_last:3} {elo_display:6.0f} {delta_elo_str:>8}"
         message_lines.append(line)
 
     message_lines.append("```")
-    await update.message.reply_text("\n".join(message_lines), parse_mode="Markdown")
+    
+    # Отправляем сообщение, разбивая на части если нужно
+    final_message = "\n".join(message_lines)
+    if len(final_message) > 4096:
+        for i in range(0, len(final_message), 4000):
+            await update.message.reply_text(final_message[i:i+4000], parse_mode="Markdown")
+    else:
+        await update.message.reply_text(final_message, parse_mode="Markdown")
 
 # -------------------- ЗАПУСК --------------------
 def main():
