@@ -1296,28 +1296,79 @@ def update_ranking(chat_id: int):
         print(f"Нет игр для чата {chat_id}, Ranking не создаётся")
         return
 
+    # Убираем дубликаты: для каждого игрока и даты оставляем только последнюю игру (по времени)
+    unique_games = {}
+    for row in chat_games:
+        username = row.get("Игрок")
+        if not username:
+            continue
+        
+        # Получаем полную дату со временем
+        full_datetime = row.get("Дата", "")
+        if not full_datetime:
+            continue
+        
+        # Разделяем дату и время
+        parts = full_datetime.split()
+        if len(parts) < 2:
+            continue
+        
+        date_str = parts[0]  # YYYY-MM-DD
+        time_str = parts[1] if len(parts) > 1 else "00:00:00"
+        
+        # Создаем ключ: игрок + дата
+        key = (username, date_str)
+        
+        # Если для этой даты уже есть запись, сравниваем время и оставляем более позднюю
+        if key in unique_games:
+            existing_time = unique_games[key].get("time_str", "00:00:00")
+            if time_str > existing_time:
+                unique_games[key] = row
+                unique_games[key]["time_str"] = time_str
+        else:
+            unique_games[key] = row
+            unique_games[key]["time_str"] = time_str
+    
+    # Преобразуем обратно в список
+    deduplicated_games = list(unique_games.values())
+    
     # Сортируем по дате (от старых к новым)
-    chat_games.sort(key=lambda x: x.get("Дата", ""))
-
+    deduplicated_games.sort(key=lambda x: x.get("Дата", ""))
+    
     # Получаем уникальные календарные даты (без времени)
-    unique_dates = sorted(set(row["Дата"].split()[0] for row in chat_games))
+    unique_dates = sorted(set(row["Дата"].split()[0] for row in deduplicated_games))
+    
     if len(unique_dates) < 2:
         print("Недостаточно дат для построения динамики (нужно хотя бы две разные даты)")
         return
+    
     last_date = unique_dates[-1]
     prev_date = unique_dates[-2]
+    
+    print(f"📊 Для рейтинга используем даты: {prev_date} и {last_date}")
+    print(f"📊 Всего уникальных записей в играх: {len(deduplicated_games)}")
 
     # Функция для получения накопленной статистики игрока на определённую дату (включительно)
     def get_stats_up_to(date_limit):
         stats = {}
-        for row in chat_games:
+        for row in deduplicated_games:
             row_date = row["Дата"].split()[0]
             if row_date > date_limit:
                 continue
             username = row.get("Игрок")
             if not username:
                 continue
+            
+            # Получаем ELO (если есть, иначе пропускаем)
             elo = row.get("ELO после игры", 0)
+            if elo == 0 or elo is None:
+                continue
+                
+            try:
+                elo = float(elo)
+            except:
+                continue
+                
             if username not in stats:
                 stats[username] = {"games": 0, "elo_sum": 0.0}
             stats[username]["games"] += 1
@@ -1326,6 +1377,9 @@ def update_ranking(chat_id: int):
 
     prev_stats = get_stats_up_to(prev_date)
     last_stats = get_stats_up_to(last_date)
+    
+    print(f"📊 Игроков на {prev_date}: {len(prev_stats)}")
+    print(f"📊 Игроков на {last_date}: {len(last_stats)}")
 
     # Определяем калиброванных игроков (>=10 игр на последнюю дату)
     calibrated_players = [u for u, data in last_stats.items() if data["games"] >= 10]
@@ -1333,27 +1387,34 @@ def update_ranking(chat_id: int):
         print("Нет игроков с 10+ играми на последнюю дату")
         return
 
-    prev_calibrated = [u for u, data in prev_stats.items() if data["games"] >= 10]
+    # Для предыдущей даты считаем места только среди калиброванных
+    prev_calibrated = [u for u in calibrated_players if u in prev_stats and prev_stats[u]["games"] >= 10]
     prev_calibrated.sort(key=lambda u: prev_stats[u]["elo_sum"] / prev_stats[u]["games"], reverse=True)
     prev_places = {u: i+1 for i, u in enumerate(prev_calibrated)}
 
+    # Для последней даты считаем места среди всех калиброванных
     last_calibrated = calibrated_players
     last_calibrated.sort(key=lambda u: last_stats[u]["elo_sum"] / last_stats[u]["games"], reverse=True)
     last_places = {u: i+1 for i, u in enumerate(last_calibrated)}
 
     ranking_rows = []
     for username in last_calibrated:
-        games_prev = prev_stats.get(username, {}).get("games", 0)
-        if games_prev >= 10:
+        # Данные за предыдущую дату
+        if username in prev_stats and prev_stats[username]["games"] >= 10:
+            games_prev = prev_stats[username]["games"]
             elo_prev_avg = prev_stats[username]["elo_sum"] / games_prev
+            place_prev = prev_places.get(username)
         else:
+            games_prev = None
             elo_prev_avg = None
+            place_prev = None
+        
+        # Данные за последнюю дату
         games_last = last_stats[username]["games"]
         elo_last_avg = last_stats[username]["elo_sum"] / games_last
-
-        place_prev = prev_places.get(username) if games_prev >= 10 else None
         place_last = last_places[username]
 
+        # Вычисляем изменения
         if place_prev is None:
             delta_place = None
             delta_elo = None
@@ -1363,19 +1424,20 @@ def update_ranking(chat_id: int):
 
         ranking_rows.append([
             username,
-            prev_date,
-            games_prev if games_prev >= 10 else None,
-            round(elo_prev_avg, 2) if elo_prev_avg is not None else None,
-            place_prev,
+            prev_date if place_prev is not None else "",
+            games_prev if games_prev is not None else "",
+            round(elo_prev_avg, 2) if elo_prev_avg is not None else "",
+            place_prev if place_prev is not None else "",
             last_date,
             games_last,
             round(elo_last_avg, 2),
             place_last,
-            round(delta_elo, 2) if delta_elo is not None else None,
-            delta_place
+            round(delta_elo, 2) if delta_elo is not None else "",
+            delta_place if delta_place is not None else ""
         ])
 
-    ranking_rows.sort(key=lambda x: x[8])  # сортируем по текущему месту
+    # Сортируем по текущему месту
+    ranking_rows.sort(key=lambda x: x[8] if isinstance(x[8], (int, float)) else 999)
 
     ranking_sheet_name = f"Ranking_{chat_id}"
     
@@ -1403,7 +1465,7 @@ def update_ranking(chat_id: int):
             # Удаляем все строки после первой
             ranking_sheet.delete_rows(2, len(all_cells) - 1)
         
-        # Обновляем заголовок (исправленный синтаксис)
+        # Обновляем заголовок
         ranking_sheet.update(range_name='A1:K1', values=[headers])
         
     except gspread.WorksheetNotFound:
@@ -1413,14 +1475,15 @@ def update_ranking(chat_id: int):
     
     # Добавляем новые данные (если есть)
     if ranking_rows:
-        # Преобразуем None в пустые строки для корректной записи
-        rows_to_append = []
-        for row in ranking_rows:
-            cleaned_row = ["" if cell is None else cell for cell in row]
-            rows_to_append.append(cleaned_row)
-        ranking_sheet.append_rows(rows_to_append, value_input_option='USER_ENTERED')
+        ranking_sheet.append_rows(ranking_rows, value_input_option='USER_ENTERED')
     
     print(f"✅ Лист {ranking_sheet_name} обновлён для чата {chat_id} (записано {len(ranking_rows)} игроков)")
+    
+    # Выводим первых несколько игроков для проверки
+    if ranking_rows:
+        print("📊 Первые 5 игроков в рейтинге:")
+        for i, row in enumerate(ranking_rows[:5], 1):
+            print(f"  {i}. {row[0]} - место: {row[8]}, ELO: {row[7]}, игр: {row[6]}")
 
 # -------------------- Команда /refresh (принудительный пересчёт Players для группы) --------------------
 async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
