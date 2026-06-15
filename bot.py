@@ -1375,17 +1375,10 @@ def update_ranking(chat_id: int):
             delta_place
         ])
 
-    ranking_rows.sort(key=lambda x: x[8])
+    ranking_rows.sort(key=lambda x: x[8])  # сортируем по текущему месту
 
     ranking_sheet_name = f"Ranking_{chat_id}"
-    try:
-        ranking_sheet = sheet.worksheet(ranking_sheet_name)
-        all_cells = ranking_sheet.get_all_values()
-        if len(all_cells) > 1:
-            ranking_sheet.delete_rows(2, len(all_cells) - 1)
-    except gspread.WorksheetNotFound:
-        ranking_sheet = sheet.add_worksheet(title=ranking_sheet_name, rows=1, cols=20)
-
+    
     headers = [
         "Игрок",
         "Предпоследняя дата игр",
@@ -1399,10 +1392,35 @@ def update_ranking(chat_id: int):
         "Изменение ELO",
         "Изменение места"
     ]
-    ranking_sheet.append_row(headers)
+    
+    try:
+        # Пытаемся получить существующий лист
+        ranking_sheet = sheet.worksheet(ranking_sheet_name)
+        
+        # Очищаем ВСЕ строки, кроме первой (оставляем заголовок)
+        all_cells = ranking_sheet.get_all_values()
+        if len(all_cells) > 1:
+            # Удаляем все строки после первой
+            ranking_sheet.delete_rows(2, len(all_cells) - 1)
+        
+        # Обновляем заголовок на случай, если он изменился
+        ranking_sheet.update('A1:K1', [headers])
+        
+    except gspread.WorksheetNotFound:
+        # Создаём новый лист
+        ranking_sheet = sheet.add_worksheet(title=ranking_sheet_name, rows=1, cols=20)
+        ranking_sheet.append_row(headers)
+    
+    # Добавляем новые данные (если есть)
     if ranking_rows:
-        ranking_sheet.append_rows(ranking_rows)
-    print(f"✅ Лист {ranking_sheet_name} обновлён для чата {chat_id}")
+        # Преобразуем None в пустые строки для корректной записи
+        rows_to_append = []
+        for row in ranking_rows:
+            cleaned_row = ["" if cell is None else cell for cell in row]
+            rows_to_append.append(cleaned_row)
+        ranking_sheet.append_rows(rows_to_append, value_input_option='USER_ENTERED')
+    
+    print(f"✅ Лист {ranking_sheet_name} обновлён для чата {chat_id} (записано {len(ranking_rows)} игроков)")
 
 # -------------------- Команда /refresh (принудительный пересчёт Players для группы) --------------------
 async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
