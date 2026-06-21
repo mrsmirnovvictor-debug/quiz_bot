@@ -1,0 +1,117 @@
+{
+  "title": "🎸 Угадай группу по фото: 16 вопросов",
+  "questions": [
+    {
+      "text": "Какая группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/1.jpeg",
+      "options": ["The Beatles", "The Rolling Stones", "The Who", "Led Zeppelin"],
+      "correct": 0,
+      "comment": "Легендарная ливерпульская четвёрка — The Beatles."
+    },
+    {
+      "text": "Какая группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/2.jpeg",
+      "options": ["Scorpions", "Queen", "Deep Purple", "AC/DC"],
+      "correct": 1,
+      "comment": "Британская рок-группа Queen с легендарным фронтменом Фредди Меркьюри."
+    },
+    {
+      "text": "Какая группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/3.jpeg",
+      "options": ["A-ha", "Boney M", "ABBA", "Eurythmics"],
+      "correct": 2,
+      "comment": "Шведская поп-группа ABBA — одна из самых успешных групп в истории."
+    },
+    {
+      "text": "Какая группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/4.jpeg",
+      "options": ["Pearl Jam", "Alice in Chains", "Soundgarden", "Nirvana"],
+      "correct": 3,
+      "comment": "Гранж-группа Nirvana с Куртом Кобейном."
+    },
+    {
+      "text": "Какая группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/5.jpg",
+      "options": ["Metallica", "Slayer", "Megadeth", "Anthrax"],
+      "correct": 0,
+      "comment": "Одна из «большой четвёрки» трэш-метала — Metallica."
+    },
+    {
+      "text": "Какая группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/6.jpg",
+      "options": ["The Animals", "Pink Floyd", "The Kinks", "The Doors"],
+      "correct": 1,
+      "comment": "Британская прогрессив-рок группа Pink Floyd."
+    },
+    {
+      "text": "Какая группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/7.jpeg",
+      "options": ["Judas Priest", "Black Sabbath", "AC/DC", "Iron Maiden"],
+      "correct": 2,
+      "comment": "Австралийская хард-рок группа AC/DC с Ангусом Янгом."
+    },
+    {
+      "text": "Какая группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/8.jpg",
+      "options": ["Coldplay", "Muse", "The Smashing Pumpkins", "Radiohead"],
+      "correct": 3,
+      "comment": "Британская альтернативная группа Radiohead."
+    },
+    {
+      "text": "Какая российская группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/9.jpeg",
+      "options": ["Кино", "Алиса", "ДДТ", "Наутилус Помпилиус"],
+      "correct": 0,
+      "comment": "Группа «Кино» с Виктором Цоем."
+    },
+    {
+      "text": "Какая российская группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/10.jpg",
+      "options": ["Аквариум", "ДДТ", "Чайф", "Гражданская оборона"],
+      "correct": 1,
+      "comment": "Группа «ДДТ» с Юрием Шевчуком."
+    },
+    {
+      "text": "Какая российская группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/11.jpg",
+      "options": ["Сектор Газа", "Наив", "Король и Шут", "Тараканы!"],
+      "correct": 2,
+      "comment": "Панк-группа «Король и Шут» с Михаилом Горшенёвым."
+    },
+    {
+      "text": "Какая российская группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/12.jpeg",
+      "options": ["Мастер", "Чёрный кофе", "Кипелов", "Ария"],
+      "correct": 3,
+      "comment": "Хэви-метал группа «Ария»."
+    },
+    {
+      "text": "Какая группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/13.jpg",
+      "options": ["Rammstein", "Eisbrecher", "Oomph!", "Megaherz"],
+      "correct": 0,
+      "comment": "Немецкая индастриал-метал группа Rammstein."
+    },
+    {
+      "text": "Какая группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/14.jpeg",
+      "options": ["The Edge", "U2", "Simple Minds", "The Cure"],
+      "correct": 1,
+      "comment": "Ирландская рок-группа U2 с Боно."
+    },
+    {
+      "text": "Какая российская группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/15.jpg",
+      "options": ["Зоопарк", "Телевизор", "Аквариум", "Кино"],
+      "correct": 2,
+      "comment": "Группа «Аквариум» с Борисом Гребенщиковым."
+    },
+    {
+      "text": "Какая группа изображена на этом фото?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/bands/16.jpeg",
+      "options": ["Mötley Crüe", "Bon Jovi", "Poison", "Guns N' Roses"],
+      "correct": 3,
+      "comment": "Американская хард-рок группа Guns N' Roses с Экслом Роузом."
+    }
+  ]
+}
