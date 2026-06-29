@@ -1,0 +1,118 @@
+{
+  "title": "🍽️ Угадай блюдо по картинке",
+  "questions": [
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Sushi_platter.jpg",
+      "options": ["Суши", "Сашими", "Рамен", "Поке"],
+      "correct": 0,
+      "comment": "Суши — традиционное японское блюдо из риса с рыбой, морепродуктами или другими начинками."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Paella_de_marisco_01.jpg",
+      "options": ["Ризотто", "Паэлья", "Плов", "Джамбалайя"],
+      "correct": 1,
+      "comment": "Паэлья — знаменитое испанское блюдо из риса с морепродуктами, мясом или овощами."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Poutine.JPG",
+      "options": ["Картофель фри", "Чили фрайс", "Путин", "Картофель по-деревенски"],
+      "correct": 2,
+      "comment": "Путин — канадское блюдо из картофеля фри, сырных зерен и мясной подливы."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Spaghetti_alle_vongole.jpg",
+      "options": ["Карбонара", "Болоньезе", "Паста Примавера", "Спагетти алле вонголе"],
+      "correct": 3,
+      "comment": "Спагетти алле вонголе готовятся с моллюсками и являются классикой неаполитанской кухни."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Khachapuri_Adjarian.jpg",
+      "options": ["Хачапури по-аджарски", "Осетинский пирог", "Ламаджо", "Пиде"],
+      "correct": 0,
+      "comment": "Хачапури по-аджарски отличается лодочкой из теста с сыром, яйцом и сливочным маслом."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Dim_sum.jpg",
+      "options": ["Гёдза", "Димсам", "Баоцзы", "Манты"],
+      "correct": 1,
+      "comment": "Димсам — общее название китайских небольших закусок, подаваемых к чаю."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Falafel.jpg",
+      "options": ["Хумус", "Крокеты", "Фалафель", "Киббе"],
+      "correct": 2,
+      "comment": "Фалафель — жареные шарики из нута или бобов."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Ramen_by_Taizo.jpg",
+      "options": ["Удон", "Фо Бо", "Соба", "Рамен"],
+      "correct": 3,
+      "comment": "Рамен — японский суп с лапшой, мясом и разнообразными добавками."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Moussaka.jpg",
+      "options": ["Мусака", "Лазанья", "Запеканка", "Пастицио"],
+      "correct": 0,
+      "comment": "Мусака — традиционная греческая запеканка с баклажанами и мясом."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Bibimbap.jpg",
+      "options": ["Поке", "Пибимпап", "Жареный рис", "Чахан"],
+      "correct": 1,
+      "comment": "Пибимпап — популярное корейское блюдо из риса, овощей, мяса и яйца."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Ceviche.jpg",
+      "options": ["Тартар", "Севиче", "Севиче", "Севиче"],
+      "options": ["Тартар", "Поке", "Севиче", "Карпаччо"],
+      "correct": 2,
+      "comment": "Севиче — блюдо из сырой рыбы, маринованной в соке лайма или лимона."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Shakshouka.jpg",
+      "options": ["Омлет", "Яичница", "Менемен", "Шакшука"],
+      "correct": 3,
+      "comment": "Шакшука — блюдо из яиц, приготовленных в томатном соусе со специями."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Okonomiyaki.jpg",
+      "options": ["Окономияки", "Такояки", "Панкейк", "Тамагояки"],
+      "correct": 0,
+      "comment": "Окономияки называют японской 'пиццей' или 'капустным блином'."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Biryani.jpg",
+      "options": ["Плов", "Бирьяни", "Кускус", "Джамбалайя"],
+      "correct": 1,
+      "comment": "Бирьяни — ароматное индийское блюдо из риса, мяса и специй."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Goulash.jpg",
+      "options": ["Бёф бургиньон", "Чили кон карне", "Гуляш", "Рагу"],
+      "correct": 2,
+      "comment": "Гуляш — традиционное венгерское блюдо из мяса с паприкой."
+    },
+    {
+      "text": "Как называется это блюдо?",
+      "image": "https://commons.wikimedia.org/wiki/Special:FilePath/Beef_Wellington.jpg",
+      "options": ["Ростбиф", "Бифштекс", "Турнедо Россини", "Говядина Веллингтон"],
+      "correct": 3,
+      "comment": "Говядина Веллингтон готовится из говяжьей вырезки, запечённой в слоёном тесте."
+    }
+  ]
+}
