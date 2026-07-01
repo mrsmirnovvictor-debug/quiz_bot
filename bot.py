@@ -55,15 +55,18 @@ def ensure_sheets_exist(sheet, chat_id: int):
             games_sheet = sheet.worksheet("Games")
         except gspread.WorksheetNotFound:
             games_sheet = sheet.add_worksheet(title="Games", rows=1, cols=100)
+            # Основные столбцы (без "Очки рейтинга")
             headers = ["Дата", "Chat ID", "Название квиза", "Игрок", "Место", "Общий счёт",
                        "Количество вопросов", "Правильные ответы", "Неправильные ответы", "Без ответа",
                        "Общее время ответов", "Общее время правильных ответов",
-                       "Среднее время ответа", "Среднее время (правильные)", "ELO после игры", "% правильных ответов",
-                       "Очки рейтинга"]  # Добавлен столбец для очков рейтинга
+                       "Среднее время ответа", "Среднее время (правильные)", "ELO после игры", "% правильных ответов"]
+            # Для каждого вопроса добавляем 3 столбца: ответ, баллы, время
             for i in range(1, 17):
                 headers.append(f"Вопрос {i} ответ")
                 headers.append(f"Вопрос {i} баллы")
                 headers.append(f"Вопрос {i} время")
+            # В самом конце добавляем столбец "Очки рейтинга" (BM)
+            headers.append("Очки рейтинга")
             games_sheet.append_row(headers)
             print("✅ Лист Games создан")
         
@@ -170,15 +173,16 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             avg_time_all_hundredths = int(round(avg_time_all * 100))
             avg_time_correct_hundredths = int(round(avg_time_correct * 100))
             
+            # Формируем строку: сначала основные поля до % правильных ответов
             row = [date_str, str(chat_id), game.pack["title"], username, place, score,
                    total_questions, correct_count, incorrect_count, no_answer,
                    total_time_all_hundredths,
                    total_time_correct_hundredths,
                    avg_time_all_hundredths,
                    avg_time_correct_hundredths,
-                   elo, round(correct_percent, 2),
-                   rating_points]  # Добавлены очки рейтинга
+                   elo, round(correct_percent, 2)]
             
+            # Добавляем данные по каждому вопросу (ответ, баллы, время)
             answers_detail = player_answers_detail.get(user_id, [])
             for q_idx in range(total_questions):
                 if q_idx < len(answers_detail):
@@ -190,6 +194,9 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
                     row.append("-")
                     row.append(0)
                     row.append(0)
+            
+            # В самом конце добавляем очки рейтинга
+            row.append(rating_points)
             
             games_sheet.append_row(row)
     
@@ -207,7 +214,7 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
                 if not username:
                     continue
                 
-                # Получаем очки рейтинга
+                # Получаем очки рейтинга (последний столбец)
                 points_raw = row.get("Очки рейтинга", 0)
                 try:
                     points = int(float(points_raw)) if points_raw else 0
@@ -421,7 +428,7 @@ class Game:
         self.user_total_answered = {}
         self.current_question_image = ""
         self.user_answers_detail = defaultdict(list)
-        self.delete_messages = False  # Флаг удаления сообщений во время игры
+        self.delete_messages = False
 
     def add_player(self, user_id, username):
         if user_id not in self.registered:
@@ -713,7 +720,7 @@ async def close_registration_and_start(context: ContextTypes.DEFAULT_TYPE, chat_
         game.reg_timer_job = None
     
     game.status = "active"
-    game.delete_messages = True   # Включаем удаление сообщений
+    game.delete_messages = True
     users_list = "\n".join(f"• {p['username']}" for p in game.registered.values())
     start_line = format_datetime_msk_multiline(game.scheduled_start_utc)
     await context.bot.edit_message_text(
@@ -924,7 +931,7 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE):
     if not game:
         return
     
-    game.delete_messages = False   # Отключаем удаление сообщений
+    game.delete_messages = False
     players_ranking = game.calculate_final_ranking()
     avg_times_all, avg_times_correct = game.get_player_avg_times()
     
@@ -1102,7 +1109,7 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for job in context.job_queue.jobs():
         if job.chat_id == chat_id:
             job.schedule_removal()
-    game.delete_messages = False   # Отключаем удаление сообщений
+    game.delete_messages = False
     games.pop(chat_id, None)
     send_kwargs = {"chat_id": chat_id, "text": "Квиз остановлен. Необходимо запустить заново."}
     if game.message_thread_id:
@@ -1123,7 +1130,6 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         games_sheet = sheet.worksheet("Games")
         all_games = games_sheet.get_all_records()
 
-        # Фильтруем только игры текущего чата
         chat_games = [row for row in all_games if str(row.get("Chat ID", "")) == str(chat_id)]
 
         if not chat_games:
@@ -1170,7 +1176,6 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             total_time_all_raw = to_float(row.get("Общее время ответов", 0))
             total_time_correct_raw = to_float(row.get("Общее время правильных ответов", 0))
 
-            # Автоопределение формата
             if total_time_all_raw > 1000 or (total_time_all_raw == int(total_time_all_raw) and total_time_all_raw > 100):
                 total_time_all = total_time_all_raw / 100
             else:
@@ -1190,21 +1195,18 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             stats["games_count"] += 1
             stats["elo_sum"] += elo_game
 
-        # Фильтруем игроков с количеством игр >= 10 (калибровка)
         calibrated = {u: s for u, s in player_stats.items() if s["games_count"] >= 10}
 
         if not calibrated:
             await update.message.reply_text("❌ Пока нет игроков, сыгравших 10 и более квизов (калибровка).")
             return
 
-        # Сортируем по среднему ELO (убывание)
         sorted_players = sorted(
             calibrated.items(),
             key=lambda x: (x[1]["elo_sum"] / x[1]["games_count"]) if x[1]["games_count"] > 0 else 0,
             reverse=True
         )
 
-        # Формируем таблицу
         lines = ["🏆 ТОП ИГРОКОВ (>=10 игр, по ELO)\n"]
         lines.append("```")
         lines.append(f"{'Игрок':<20} {'Игры':>4} {'Очки':>6} {'%ПО':>6} {'ASA':>5} {'ELO':>4}")
@@ -1228,7 +1230,6 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
 # -------------------- Команда /games (список всех доступных квизов) --------------------
 async def games_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Проверяем, что команда вызвана в личном чате
     if update.effective_chat.type != "private":
         await update.message.reply_text(
             "📩 Список доступных квизов я могу отправить только в личные сообщения.\n"
@@ -1236,7 +1237,6 @@ async def games_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Получаем список файлов в папке packs
     packs_dir = "packs"
     if not os.path.exists(packs_dir):
         await update.message.reply_text("❌ Папка с квизами не найдена.")
@@ -1247,19 +1247,17 @@ async def games_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет доступных квизов.")
         return
 
-    # Сортируем по имени файла
     files.sort()
 
     message_lines = ["📚 Список доступных квизов:\n"]
     for file in files:
-        pack_id = file[:-5]  # удаляем .json
+        pack_id = file[:-5]
         if len(pack_id) != 4 or not pack_id.isdigit():
-            continue  # пропускаем файлы с неправильным именем
+            continue
         try:
             with open(os.path.join(packs_dir, file), "r", encoding="utf-8") as f:
                 data = json.load(f)
                 title = data.get("title", "Без названия")
-                # Обрезаем слишком длинные названия
                 if len(title) > 50:
                     title = title[:47] + "..."
                 message_lines.append(f"`{pack_id}` — {title}")
@@ -1271,10 +1269,8 @@ async def games_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет корректных файлов квизов.")
         return
 
-    # Отправляем сообщение частями, если оно длинное
     final_message = "\n".join(message_lines)
     if len(final_message) > 4096:
-        # Разбиваем на части
         for i in range(0, len(final_message), 4000):
             await update.message.reply_text(final_message[i:i+4000])
     else:
@@ -1345,7 +1341,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # -------------------- Команда /rating (рейтинг по очкам) --------------------
 async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает рейтинговую таблицу по очкам для текущей группы"""
+    """Показывает рейтинговую таблицу по очкам для текущей группы (все участники)"""
     chat_id = update.effective_chat.id
     
     if update.effective_chat.type == "private":
@@ -1379,12 +1375,12 @@ async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_lines.append(f"{'#':>2} {'Игрок':<20} {'Игр':>3} {'Очки':>5}")
     message_lines.append("-" * 35)
     
-    for i, row in enumerate(records[:20], 1):
+    # Выводим всех участников (без ограничения)
+    for i, row in enumerate(records, 1):
         username = row.get("Игрок", "")
         games = row.get("Количество игр", 0)
         points = row.get("Всего очков рейтинга", 0)
         
-        # Преобразуем значения
         try:
             games = int(games) if games else 0
         except:
@@ -1397,7 +1393,6 @@ async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         short_name = username[:20] if len(username) > 20 else username
         
-        # Добавляем эмодзи для топ-3
         medal = ""
         if i == 1:
             medal = "🥇 "
@@ -1410,16 +1405,6 @@ async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     message_lines.append("```")
     
-    # Добавляем информацию о системе начисления очков
-    message_lines.append("\n📋 Система начисления очков рейтинга:")
-    message_lines.append("🥇 1 место — 10 очков")
-    message_lines.append("🥈 2 место — 5 очков")
-    message_lines.append("🥉 3 место — 3 очка")
-    message_lines.append("4 место — 2 очка")
-    message_lines.append("5 место — 1 очко")
-    message_lines.append("❌ За места с 6-го и ниже очки не начисляются")
-    message_lines.append("⚠️ Если пропущено более 8 вопросов — очки не начисляются")
-    
     final_message = "\n".join(message_lines)
     if len(final_message) > 4096:
         for i in range(0, len(final_message), 4000):
@@ -1429,15 +1414,12 @@ async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # -------------------- Удаление сообщений во время активной игры --------------------
 async def delete_chat_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Удаляет сообщения пользователей только в той ветке (топике), где идёт квиз."""
     chat_id = update.effective_chat.id
     message = update.effective_message
     
-    # Не удаляем сообщения самого бота
     if message.from_user and message.from_user.id == context.bot.id:
         return
     
-    # Не удаляем команды для управления
     if message.text and message.text.startswith('/'):
         return
     
@@ -1445,10 +1427,7 @@ async def delete_chat_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     if not game or not game.delete_messages:
         return
     
-    # Получаем ID ветки, в которой находится сообщение
     message_thread_id = message.message_thread_id
-    
-    # Если квиз идёт в определённой ветке, а сообщение — в другой — пропускаем
     if game.message_thread_id is not None and message_thread_id != game.message_thread_id:
         return
     
@@ -1459,7 +1438,6 @@ async def delete_chat_messages(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # -------------------- Обновление листа Ranking --------------------
 def update_ranking(chat_id: int):
-    """Создаёт/обновляет лист Ranking_{chat_id} с динамикой среднего ELO по последним двум датам квизов."""
     sheet = init_google_sheets()
     if not sheet:
         print("❌ Нет доступа к Google Sheets для обновления Ranking")
@@ -1472,16 +1450,13 @@ def update_ranking(chat_id: int):
         print(f"Ошибка чтения Games для Ranking: {e}")
         return
 
-    # Фильтруем игры только этого чата
     chat_games = [row for row in all_games if str(row.get("Chat ID", "")) == str(chat_id)]
     if not chat_games:
         print(f"Нет игр для чата {chat_id}, Ranking не создаётся")
         return
 
-    # Сортируем по дате
     chat_games.sort(key=lambda x: x.get("Дата", ""))
 
-    # Получаем уникальные календарные даты (без времени)
     unique_dates = sorted(set(row["Дата"].split()[0] for row in chat_games))
     if len(unique_dates) < 2:
         print("Недостаточно дат для построения динамики (нужно хотя бы две разные даты)")
@@ -1493,7 +1468,6 @@ def update_ranking(chat_id: int):
     print(f"📊 Уникальные даты: {unique_dates}")
     print(f"📊 Используем даты: {prev_date} и {last_date}")
 
-    # Функция для получения статистики игрока на определённую дату (только игры до этой даты включительно)
     def get_stats_up_to(date_limit):
         stats = {}
         for row in chat_games:
@@ -1504,7 +1478,6 @@ def update_ranking(chat_id: int):
             if not username:
                 continue
             
-            # Получаем ELO
             elo = row.get("ELO после игры", 0)
             if elo is None or elo == "":
                 continue
@@ -1519,14 +1492,12 @@ def update_ranking(chat_id: int):
             stats[username]["elo_sum"] += elo
         return stats
 
-    # Получаем статистику на обе даты
     prev_stats = get_stats_up_to(prev_date)
     last_stats = get_stats_up_to(last_date)
     
     print(f"📊 Игроков на {prev_date}: {len(prev_stats)}")
     print(f"📊 Игроков на {last_date}: {len(last_stats)}")
 
-    # Находим игроков, у которых есть 10+ игр на ПОСЛЕДНЮЮ дату
     calibrated_on_last = [u for u, data in last_stats.items() if data["games"] >= 10]
     
     if not calibrated_on_last:
@@ -1535,15 +1506,12 @@ def update_ranking(chat_id: int):
     
     print(f"📊 Калиброванных игроков на последнюю дату: {len(calibrated_on_last)}")
     
-    # Для каждого калиброванного игрока проверяем, есть ли у него 10+ игр на ПРЕДЫДУЩУЮ дату
     ranking_rows = []
     
     for username in calibrated_on_last:
-        # Данные за последнюю дату
         games_last = last_stats[username]["games"]
         elo_last_avg = last_stats[username]["elo_sum"] / games_last
         
-        # Данные за предыдущую дату
         if username in prev_stats and prev_stats[username]["games"] >= 10:
             games_prev = prev_stats[username]["games"]
             elo_prev_avg = prev_stats[username]["elo_sum"] / games_prev
@@ -1562,21 +1530,16 @@ def update_ranking(chat_id: int):
             "has_prev_data": has_prev_data
         })
     
-    # Сортируем по среднему ELO на последнюю дату
     ranking_rows.sort(key=lambda x: x["elo_last_avg"], reverse=True)
     
-    # Назначаем места
     for idx, row in enumerate(ranking_rows, 1):
         row["place_last"] = idx
     
-    # Для тех, у кого есть данные за предыдущую дату, считаем их места на тот момент
-    # Для этого нужно пересчитать места только среди тех, у кого есть prev_data
     prev_players = [row for row in ranking_rows if row["has_prev_data"]]
     prev_players.sort(key=lambda x: x["elo_prev_avg"], reverse=True)
     for idx, row in enumerate(prev_players, 1):
         row["place_prev"] = idx
     
-    # Формируем итоговые строки для Google Sheets
     final_rows = []
     for row in ranking_rows:
         if row["has_prev_data"]:
@@ -1606,7 +1569,6 @@ def update_ranking(chat_id: int):
             delta_place if delta_place is not None else ""
         ])
     
-    # Сортируем по текущему месту
     final_rows.sort(key=lambda x: x[8])
     
     ranking_sheet_name = f"Ranking_{chat_id}"
@@ -1626,17 +1588,14 @@ def update_ranking(chat_id: int):
     ]
     
     try:
-        # Получаем существующий лист или создаём новый
         try:
             ranking_sheet = sheet.worksheet(ranking_sheet_name)
             ranking_sheet.clear()
         except gspread.WorksheetNotFound:
             ranking_sheet = sheet.add_worksheet(title=ranking_sheet_name, rows=1, cols=20)
         
-        # Записываем заголовок и данные
         ranking_sheet.append_row(headers)
         if final_rows:
-            # Преобразуем все значения в строки
             rows_to_append = []
             for row in final_rows:
                 cleaned_row = [str(cell) if cell is not None and cell != "" else "" for cell in row]
@@ -1645,7 +1604,6 @@ def update_ranking(chat_id: int):
         
         print(f"✅ Лист {ranking_sheet_name} обновлён для чата {chat_id} (записано {len(final_rows)} игроков)")
         
-        # Выводим для контроля
         if final_rows:
             print("📊 Первые 5 строк рейтинга:")
             for i in range(min(5, len(final_rows))):
@@ -1657,7 +1615,6 @@ def update_ranking(chat_id: int):
 
 # -------------------- Команда /refresh (принудительный пересчёт Players для группы) --------------------
 async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Проверяем, что команду выполняет администратор
     user = update.effective_user
     chat_id = update.effective_chat.id
     
@@ -1832,7 +1789,6 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет данных для отображения рейтинга.")
         return
 
-    # Функция для нормализации ELO
     def parse_elo_value(val):
         if val is None or val == "":
             return 0.0
@@ -1848,7 +1804,6 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return num / 100
         return num
 
-    # Функция для безопасного преобразования delta_place в int
     def parse_delta_place(val):
         if val is None or val == "":
             return None
@@ -1857,7 +1812,6 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             return None
 
-    # Сортируем по текущему месту
     records.sort(key=lambda x: int(x.get("Текущее место", 999)) if str(x.get("Текущее место", 999)).isdigit() else 999)
 
     message_lines = ["📊 ДИНАМИКА РЕЙТИНГА\n"]
@@ -1869,33 +1823,27 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username = row.get("Игрок", "")
         games_last = row.get("Игр на последнюю дату игр", 0)
         
-        # Преобразуем games_last в число
         try:
             games_last = int(games_last) if games_last else 0
         except:
             games_last = 0
 
-        # Текущий ELO
         elo_current_raw = row.get("Среднее ELO на текущий момент", 0)
         elo_current = parse_elo_value(elo_current_raw)
         elo_display = round(elo_current, 0)
 
-        # Предыдущий ELO
         elo_prev_raw = row.get("Среднее ELO на предпоследнюю дату игр", 0)
         elo_prev = parse_elo_value(elo_prev_raw)
 
-        # Текущее место
         place_last_raw = row.get("Текущее место", 0)
         try:
             place_last = int(place_last_raw) if place_last_raw else 0
         except:
             place_last = 0
         
-        # Изменение места
         delta_place_raw = row.get("Изменение места")
         delta_place = parse_delta_place(delta_place_raw)
 
-        # Символ изменения места и строка для изменения позиции
         if delta_place is None:
             place_symbol = "+"
             place_change_display = "   "
@@ -1909,7 +1857,6 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             place_symbol = " "
             place_change_display = "(-)"
 
-        # Вычисляем дельту ELO
         if elo_prev == 0 or elo_prev_raw is None or elo_prev_raw == "":
             delta_elo = None
         else:
@@ -1923,13 +1870,11 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         short_name = username[:20] if len(username) > 20 else username
 
-        # Формируем строку
         line = f"{place_symbol}{place_last:2} {place_change_display:<5} {short_name:<20} {games_last:3} {elo_display:6.0f} {delta_elo_str:>8}"
         message_lines.append(line)
 
     message_lines.append("```")
     
-    # Отправляем сообщение, разбивая на части если нужно
     final_message = "\n".join(message_lines)
     if len(final_message) > 4096:
         for i in range(0, len(final_message), 4000):
@@ -1958,7 +1903,6 @@ def main():
     app.add_handler(CallbackQueryHandler(start_early_callback, pattern="start_early"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
     
-    # Обработчик удаления сообщений
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, delete_chat_messages), group=1)
 
     print("🚀 Бот запущен в режиме polling")
