@@ -1565,7 +1565,7 @@ async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif i == 3:
             medal = "🥉 "
         
-        message_lines.append(f"{i:2} {medal}{short_name:<18} {games:3} {points:5}")
+        message_lines.append(f"{i:2} {short_name:<18} {games:3} {points:5}")
     
     message_lines.append("```")
     
