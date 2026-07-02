@@ -68,10 +68,9 @@ def ensure_sheets_exist(sheet, chat_id: int):
             games_sheet.append_row(headers)
             print("✅ Лист Games создан")
         else:
-            # Проверяем наличие столбца "Очки рейтинга" в существующем листе
+            # Проверяем наличие столбца "Очки рейтинга"
             headers = games_sheet.row_values(1)
             if "Очки рейтинга" not in headers:
-                # Добавляем один столбец справа
                 games_sheet.add_cols(1)
                 new_col = len(headers) + 1
                 games_sheet.update_cell(1, new_col, "Очки рейтинга")
@@ -113,7 +112,6 @@ def calculate_elo(score: int, max_score: int, avg_time_correct: float, total_pla
     return max(20, min(300, elo))
 
 def calculate_rating_points(place: int) -> int:
-    """Расчёт очков рейтинга в зависимости от места"""
     if place == 1:
         return 10
     elif place == 2:
@@ -142,7 +140,6 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
     max_possible_score = len(game.pack["questions"]) * 15
     total_questions = len(game.pack["questions"])
     
-    # Определяем, сколько вопросов пропустил каждый игрок
     players_missed = {}
     for player_data in players_ranking:
         for player in player_data["players"]:
@@ -151,7 +148,7 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             missed = total_questions - len(answers)
             players_missed[user_id] = missed
     
-    # ---------- 1. Добавляем строки в лист Games (в сотых) ----------
+    # ---------- 1. Добавляем строки в лист Games ----------
     for place_info in players_ranking:
         place = place_info["place"]
         for player in place_info["players"]:
@@ -167,20 +164,17 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
             correct_percent = (correct_count / total_questions) * 100 if total_questions > 0 else 0
             elo = calculate_elo(score, max_possible_score, avg_time_correct, len(game.registered), place)
             
-            # Проверяем, пропустил ли игрок более 8 вопросов
             missed = players_missed.get(user_id, 0)
             if missed > 8:
                 rating_points = 0
             else:
                 rating_points = calculate_rating_points(place)
             
-            # Время сохраняем в сотых (целые числа)
             total_time_all_hundredths = int(round(avg_time_all * total_answered * 100))
             total_time_correct_hundredths = int(round(avg_time_correct * correct_count * 100))
             avg_time_all_hundredths = int(round(avg_time_all * 100))
             avg_time_correct_hundredths = int(round(avg_time_correct * 100))
             
-            # Формируем строку: основные поля
             row = [date_str, str(chat_id), game.pack["title"], username, place, score,
                    total_questions, correct_count, incorrect_count, no_answer,
                    total_time_all_hundredths,
@@ -189,7 +183,6 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
                    avg_time_correct_hundredths,
                    elo, round(correct_percent, 2)]
             
-            # Добавляем данные по каждому вопросу (ответ, баллы, время)
             answers_detail = player_answers_detail.get(user_id, [])
             for q_idx in range(total_questions):
                 if q_idx < len(answers_detail):
@@ -202,52 +195,13 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
                     row.append(0)
                     row.append(0)
             
-            # В самом конце добавляем очки рейтинга
             row.append(rating_points)
-            
             games_sheet.append_row(row)
     
-    # ---------- 2. Обновляем Rating_{chat_id} ----------
-    try:
-        all_games = games_sheet.get_all_records()
-        chat_games = [row for row in all_games if str(row.get("Chat ID", "")) == str(chat_id)]
-        
-        if chat_games:
-            rating_stats = {}
-            for row in chat_games:
-                username = row.get("Игрок")
-                if not username:
-                    continue
-                
-                # Получаем очки рейтинга
-                points_raw = row.get("Очки рейтинга", 0)
-                try:
-                    points = int(float(points_raw)) if points_raw else 0
-                except:
-                    points = 0
-                
-                if username not in rating_stats:
-                    rating_stats[username] = {"games_count": 0, "total_points": 0}
-                
-                rating_stats[username]["games_count"] += 1
-                rating_stats[username]["total_points"] += points
-            
-            new_rating_rows = []
-            for username, stats in rating_stats.items():
-                new_rating_rows.append([username, stats["games_count"], stats["total_points"]])
-            
-            new_rating_rows.sort(key=lambda x: x[2], reverse=True)
-            
-            all_cells = rating_sheet.get_all_values()
-            if len(all_cells) > 1:
-                rating_sheet.delete_rows(2, len(all_cells) - 1)
-            if new_rating_rows:
-                rating_sheet.append_rows(new_rating_rows, value_input_option='USER_ENTERED')
-            print(f"✅ Рейтинг для чата {chat_id} обновлён для {len(new_rating_rows)} игроков")
-    except Exception as e:
-        print(f"Ошибка обновления Rating_{chat_id}: {e}")
+    # ---------- 2. Обновляем Rating ----------
+    update_rating(chat_id)
     
-    # ---------- 3. Полностью пересчитываем статистику для Players текущей группы ----------
+    # ---------- 3. Полностью пересчитываем Players ----------
     try:
         all_games = games_sheet.get_all_records()
     except Exception as e:
@@ -362,6 +316,231 @@ def save_game_results(game, players_ranking, avg_times_all, avg_times_correct, p
         print(f"Ошибка обновления Players_{chat_id}: {e}")
     
     print(f"✅ Результаты сохранены в Google Sheets")
+
+def update_rating(chat_id: int):
+    """Пересчитывает лист Rating_{chat_id} только по играм, где есть значение 'Очки рейтинга'."""
+    sheet = init_google_sheets()
+    if not sheet:
+        print("❌ Нет доступа к Google Sheets для обновления Rating")
+        return
+
+    try:
+        games_sheet = sheet.worksheet("Games")
+        all_games = games_sheet.get_all_records()
+    except Exception as e:
+        print(f"Ошибка чтения Games для Rating: {e}")
+        return
+
+    # Фильтруем строки: только нужный чат и поле "Очки рейтинга" не пустое
+    chat_games = []
+    for row in all_games:
+        if str(row.get("Chat ID", "")) != str(chat_id):
+            continue
+        rating_points = row.get("Очки рейтинга")
+        if rating_points is not None and rating_points != "":
+            chat_games.append(row)
+
+    if not chat_games:
+        print(f"Нет игр с заполненными очками рейтинга для чата {chat_id}, Rating не обновляется")
+        return
+
+    rating_stats = {}
+    for row in chat_games:
+        username = row.get("Игрок")
+        if not username:
+            continue
+        points_raw = row.get("Очки рейтинга", 0)
+        try:
+            points = int(float(points_raw)) if points_raw else 0
+        except:
+            points = 0
+        if username not in rating_stats:
+            rating_stats[username] = {"games_count": 0, "total_points": 0}
+        rating_stats[username]["games_count"] += 1
+        rating_stats[username]["total_points"] += points
+
+    new_rows = []
+    for username, stats in rating_stats.items():
+        new_rows.append([username, stats["games_count"], stats["total_points"]])
+
+    new_rows.sort(key=lambda x: x[2], reverse=True)
+
+    rating_sheet_name = f"Rating_{chat_id}"
+    try:
+        try:
+            rating_sheet = sheet.worksheet(rating_sheet_name)
+        except gspread.WorksheetNotFound:
+            rating_sheet = sheet.add_worksheet(title=rating_sheet_name, rows=1, cols=20)
+            rating_sheet.append_row(["Игрок", "Количество игр", "Всего очков рейтинга"])
+            print(f"✅ Создан лист {rating_sheet_name}")
+
+        all_cells = rating_sheet.get_all_values()
+        if len(all_cells) > 1:
+            rating_sheet.delete_rows(2, len(all_cells) - 1)
+        if new_rows:
+            rating_sheet.append_rows(new_rows, value_input_option='USER_ENTERED')
+        print(f"✅ Лист {rating_sheet_name} обновлён для чата {chat_id} (записано {len(new_rows)} игроков)")
+    except Exception as e:
+        print(f"❌ Ошибка обновления Rating_{chat_id}: {e}")
+
+def update_ranking(chat_id: int):
+    """Обновляет лист Ranking_{chat_id} только по играм с общим счётом > 0."""
+    sheet = init_google_sheets()
+    if not sheet:
+        print("❌ Нет доступа к Google Sheets для обновления Ranking")
+        return
+
+    try:
+        games_sheet = sheet.worksheet("Games")
+        all_games = games_sheet.get_all_records()
+    except Exception as e:
+        print(f"Ошибка чтения Games для Ranking: {e}")
+        return
+
+    chat_games = [
+        row for row in all_games
+        if str(row.get("Chat ID", "")) == str(chat_id)
+        and float(row.get("Общий счёт", 0)) > 0
+    ]
+    if not chat_games:
+        print(f"Нет игр с очками для чата {chat_id}, Ranking не создаётся")
+        return
+
+    chat_games.sort(key=lambda x: x.get("Дата", ""))
+
+    unique_dates = sorted(set(row["Дата"].split()[0] for row in chat_games if row.get("Дата")))
+    if len(unique_dates) < 2:
+        print("Недостаточно дат для построения динамики (нужно хотя бы две разные даты)")
+        return
+    last_date = unique_dates[-1]
+    prev_date = unique_dates[-2]
+
+    def get_stats_up_to(date_limit):
+        stats = {}
+        for row in chat_games:
+            row_date = row["Дата"].split()[0]
+            if row_date > date_limit:
+                continue
+            username = row.get("Игрок")
+            if not username:
+                continue
+            elo = row.get("ELO после игры", 0)
+            if elo is None or elo == "":
+                continue
+            try:
+                elo = float(elo)
+            except (ValueError, TypeError):
+                continue
+            if username not in stats:
+                stats[username] = {"games": 0, "elo_sum": 0.0}
+            stats[username]["games"] += 1
+            stats[username]["elo_sum"] += elo
+        return stats
+
+    prev_stats = get_stats_up_to(prev_date)
+    last_stats = get_stats_up_to(last_date)
+
+    calibrated_on_last = [u for u, data in last_stats.items() if data["games"] >= 10]
+    if not calibrated_on_last:
+        print("Нет игроков с 10+ играми на последнюю дату")
+        return
+
+    ranking_rows = []
+    for username in calibrated_on_last:
+        games_last = last_stats[username]["games"]
+        elo_last_avg = last_stats[username]["elo_sum"] / games_last
+
+        if username in prev_stats and prev_stats[username]["games"] >= 10:
+            games_prev = prev_stats[username]["games"]
+            elo_prev_avg = prev_stats[username]["elo_sum"] / games_prev
+            has_prev_data = True
+        else:
+            games_prev = None
+            elo_prev_avg = None
+            has_prev_data = False
+
+        ranking_rows.append({
+            "username": username,
+            "games_last": games_last,
+            "elo_last_avg": elo_last_avg,
+            "games_prev": games_prev,
+            "elo_prev_avg": elo_prev_avg,
+            "has_prev_data": has_prev_data
+        })
+
+    ranking_rows.sort(key=lambda x: x["elo_last_avg"], reverse=True)
+    for idx, row in enumerate(ranking_rows, 1):
+        row["place_last"] = idx
+
+    prev_players = [row for row in ranking_rows if row["has_prev_data"]]
+    prev_players.sort(key=lambda x: x["elo_prev_avg"], reverse=True)
+    for idx, row in enumerate(prev_players, 1):
+        row["place_prev"] = idx
+
+    final_rows = []
+    for row in ranking_rows:
+        if row["has_prev_data"]:
+            delta_place = row["place_prev"] - row["place_last"]
+            delta_elo = row["elo_last_avg"] - row["elo_prev_avg"]
+            place_prev_display = row["place_prev"]
+            games_prev_display = row["games_prev"]
+            elo_prev_display = round(row["elo_prev_avg"], 2)
+        else:
+            delta_place = None
+            delta_elo = None
+            place_prev_display = ""
+            games_prev_display = ""
+            elo_prev_display = ""
+
+        final_rows.append([
+            row["username"],
+            prev_date if row["has_prev_data"] else "",
+            games_prev_display,
+            elo_prev_display,
+            place_prev_display,
+            last_date,
+            row["games_last"],
+            round(row["elo_last_avg"], 2),
+            row["place_last"],
+            round(delta_elo, 2) if delta_elo is not None else "",
+            delta_place if delta_place is not None else ""
+        ])
+
+    final_rows.sort(key=lambda x: x[8])
+
+    ranking_sheet_name = f"Ranking_{chat_id}"
+    headers = [
+        "Игрок",
+        "Предпоследняя дата игр",
+        "Игр на предпоследнюю дату игр",
+        "Среднее ELO на предпоследнюю дату игр",
+        "Место на предпоследнюю дату игр",
+        "Последняя дата игр",
+        "Игр на последнюю дату игр",
+        "Среднее ELO на текущий момент",
+        "Текущее место",
+        "Изменение ELO",
+        "Изменение места"
+    ]
+
+    try:
+        try:
+            ranking_sheet = sheet.worksheet(ranking_sheet_name)
+            ranking_sheet.clear()
+        except gspread.WorksheetNotFound:
+            ranking_sheet = sheet.add_worksheet(title=ranking_sheet_name, rows=1, cols=20)
+
+        ranking_sheet.append_row(headers)
+        if final_rows:
+            rows_to_append = []
+            for row in final_rows:
+                cleaned_row = [str(cell) if cell is not None and cell != "" else "" for cell in row]
+                rows_to_append.append(cleaned_row)
+            ranking_sheet.append_rows(rows_to_append, value_input_option='USER_ENTERED')
+
+        print(f"✅ Лист {ranking_sheet_name} обновлён для чата {chat_id} (записано {len(final_rows)} игроков)")
+    except Exception as e:
+        print(f"❌ Ошибка при обновлении Ranking: {e}")
 
 # -------------------- Блокировка повторного запуска --------------------
 PID_FILE = "/tmp/bot_pid.txt"
@@ -1102,7 +1281,7 @@ async def abort_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
         send_kwargs["message_thread_id"] = game.message_thread_id
     await context.bot.send_message(**send_kwargs)
 
-# -------------------- Команда /stats (общая статистика по группе) --------------------
+# -------------------- Команда /stats --------------------
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     await update.message.reply_text("🔄 Загружаю статистику по этой группе...")
@@ -1214,7 +1393,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"Ошибка получения статистики: {e}")
         await update.message.reply_text("❌ Ошибка загрузки статистики.")
         
-# -------------------- Команда /games (список всех доступных квизов) --------------------
+# -------------------- Команда /games --------------------
 async def games_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
         await update.message.reply_text(
@@ -1262,7 +1441,7 @@ async def games_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(final_message, parse_mode="Markdown")
 
-# -------------------- Команда /history (только в личку, по всем группам) --------------------
+# -------------------- Команда /history --------------------
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
         await update.message.reply_text(
@@ -1325,7 +1504,7 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(f"Ошибка получения истории: {e}")
         await update.message.reply_text("❌ Ошибка загрузки истории.")
 
-# -------------------- Команда /rating (рейтинг по очкам) --------------------
+# -------------------- Команда /rating --------------------
 async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает рейтинговую таблицу по очкам для текущей группы (все участники)"""
     chat_id = update.effective_chat.id
@@ -1361,7 +1540,6 @@ async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_lines.append(f"{'#':>2} {'Игрок':<20} {'Игр':>3} {'Очки':>5}")
     message_lines.append("-" * 35)
     
-    # Выводим всех участников
     for i, row in enumerate(records, 1):
         username = row.get("Игрок", "")
         games = row.get("Количество игр", 0)
@@ -1398,7 +1576,7 @@ async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(final_message, parse_mode="Markdown")
 
-# -------------------- Удаление сообщений во время активной игры --------------------
+# -------------------- Удаление сообщений --------------------
 async def delete_chat_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     message = update.effective_message
@@ -1422,209 +1600,33 @@ async def delete_chat_messages(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as e:
         print(f"Не удалось удалить сообщение {message.message_id}: {e}")
 
-# -------------------- Обновление листа Ranking (для команды /rank) --------------------
-def update_ranking(chat_id: int):
-    sheet = init_google_sheets()
-    if not sheet:
-        print("❌ Нет доступа к Google Sheets для обновления Ranking")
-        return
-
-    try:
-        games_sheet = sheet.worksheet("Games")
-        all_games = games_sheet.get_all_records()
-    except Exception as e:
-        print(f"Ошибка чтения Games для Ranking: {e}")
-        return
-
-    chat_games = [row for row in all_games if str(row.get("Chat ID", "")) == str(chat_id)]
-    if not chat_games:
-        print(f"Нет игр для чата {chat_id}, Ranking не создаётся")
-        return
-
-    chat_games.sort(key=lambda x: x.get("Дата", ""))
-
-    unique_dates = sorted(set(row["Дата"].split()[0] for row in chat_games))
-    if len(unique_dates) < 2:
-        print("Недостаточно дат для построения динамики (нужно хотя бы две разные даты)")
-        return
-    last_date = unique_dates[-1]
-    prev_date = unique_dates[-2]
-    
-    print(f"📊 Всего записей: {len(chat_games)}")
-    print(f"📊 Уникальные даты: {unique_dates}")
-    print(f"📊 Используем даты: {prev_date} и {last_date}")
-
-    def get_stats_up_to(date_limit):
-        stats = {}
-        for row in chat_games:
-            row_date = row["Дата"].split()[0]
-            if row_date > date_limit:
-                continue
-            username = row.get("Игрок")
-            if not username:
-                continue
-            
-            elo = row.get("ELO после игры", 0)
-            if elo is None or elo == "":
-                continue
-            try:
-                elo = float(elo)
-            except (ValueError, TypeError):
-                continue
-                
-            if username not in stats:
-                stats[username] = {"games": 0, "elo_sum": 0.0}
-            stats[username]["games"] += 1
-            stats[username]["elo_sum"] += elo
-        return stats
-
-    prev_stats = get_stats_up_to(prev_date)
-    last_stats = get_stats_up_to(last_date)
-    
-    print(f"📊 Игроков на {prev_date}: {len(prev_stats)}")
-    print(f"📊 Игроков на {last_date}: {len(last_stats)}")
-
-    calibrated_on_last = [u for u, data in last_stats.items() if data["games"] >= 10]
-    
-    if not calibrated_on_last:
-        print("Нет игроков с 10+ играми на последнюю дату")
-        return
-    
-    print(f"📊 Калиброванных игроков на последнюю дату: {len(calibrated_on_last)}")
-    
-    ranking_rows = []
-    
-    for username in calibrated_on_last:
-        games_last = last_stats[username]["games"]
-        elo_last_avg = last_stats[username]["elo_sum"] / games_last
-        
-        if username in prev_stats and prev_stats[username]["games"] >= 10:
-            games_prev = prev_stats[username]["games"]
-            elo_prev_avg = prev_stats[username]["elo_sum"] / games_prev
-            has_prev_data = True
-        else:
-            games_prev = None
-            elo_prev_avg = None
-            has_prev_data = False
-        
-        ranking_rows.append({
-            "username": username,
-            "games_last": games_last,
-            "elo_last_avg": elo_last_avg,
-            "games_prev": games_prev,
-            "elo_prev_avg": elo_prev_avg,
-            "has_prev_data": has_prev_data
-        })
-    
-    ranking_rows.sort(key=lambda x: x["elo_last_avg"], reverse=True)
-    
-    for idx, row in enumerate(ranking_rows, 1):
-        row["place_last"] = idx
-    
-    prev_players = [row for row in ranking_rows if row["has_prev_data"]]
-    prev_players.sort(key=lambda x: x["elo_prev_avg"], reverse=True)
-    for idx, row in enumerate(prev_players, 1):
-        row["place_prev"] = idx
-    
-    final_rows = []
-    for row in ranking_rows:
-        if row["has_prev_data"]:
-            delta_place = row["place_prev"] - row["place_last"]
-            delta_elo = row["elo_last_avg"] - row["elo_prev_avg"]
-            place_prev_display = row["place_prev"]
-            games_prev_display = row["games_prev"]
-            elo_prev_display = round(row["elo_prev_avg"], 2)
-        else:
-            delta_place = None
-            delta_elo = None
-            place_prev_display = ""
-            games_prev_display = ""
-            elo_prev_display = ""
-        
-        final_rows.append([
-            row["username"],
-            prev_date if row["has_prev_data"] else "",
-            games_prev_display,
-            elo_prev_display,
-            place_prev_display,
-            last_date,
-            row["games_last"],
-            round(row["elo_last_avg"], 2),
-            row["place_last"],
-            round(delta_elo, 2) if delta_elo is not None else "",
-            delta_place if delta_place is not None else ""
-        ])
-    
-    final_rows.sort(key=lambda x: x[8])
-    
-    ranking_sheet_name = f"Ranking_{chat_id}"
-    
-    headers = [
-        "Игрок",
-        "Предпоследняя дата игр",
-        "Игр на предпоследнюю дату игр",
-        "Среднее ELO на предпоследнюю дату игр",
-        "Место на предпоследнюю дату игр",
-        "Последняя дата игр",
-        "Игр на последнюю дату игр",
-        "Среднее ELO на текущий момент",
-        "Текущее место",
-        "Изменение ELO",
-        "Изменение места"
-    ]
-    
-    try:
-        try:
-            ranking_sheet = sheet.worksheet(ranking_sheet_name)
-            ranking_sheet.clear()
-        except gspread.WorksheetNotFound:
-            ranking_sheet = sheet.add_worksheet(title=ranking_sheet_name, rows=1, cols=20)
-        
-        ranking_sheet.append_row(headers)
-        if final_rows:
-            rows_to_append = []
-            for row in final_rows:
-                cleaned_row = [str(cell) if cell is not None and cell != "" else "" for cell in row]
-                rows_to_append.append(cleaned_row)
-            ranking_sheet.append_rows(rows_to_append, value_input_option='USER_ENTERED')
-        
-        print(f"✅ Лист {ranking_sheet_name} обновлён для чата {chat_id} (записано {len(final_rows)} игроков)")
-        
-        if final_rows:
-            print("📊 Первые 5 строк рейтинга:")
-            for i in range(min(5, len(final_rows))):
-                row = final_rows[i]
-                print(f"  {i+1}. {row[0]} - место: {row[8]}, ELO: {row[7]}, игр: {row[6]}, есть prev: {bool(row[1])}")
-                
-    except Exception as e:
-        print(f"❌ Ошибка при обновлении Ranking: {e}")
-
-# -------------------- Команда /refresh (принудительный пересчёт Players для группы) --------------------
+# -------------------- Команда /refresh --------------------
 async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = update.effective_chat.id
-    
+
     try:
         member = await context.bot.get_chat_member(chat_id, user.id)
         is_admin = member.status in ("creator", "administrator")
     except:
         is_admin = False
-    
+
     if not is_admin:
         await update.message.reply_text("❌ Только администраторы группы могут использовать эту команду.")
         return
-    
-    await update.message.reply_text("🔄 Пересчитываю статистику Players для этой группы...")
-    
+
+    await update.message.reply_text("🔄 Пересчитываю статистику Players, Ranking и Rating для этой группы...")
+
     sheet = init_google_sheets()
     if not sheet:
         await update.message.reply_text("❌ Нет доступа к Google Sheets.")
         return
-    
+
     try:
+        # 1. Обновляем Players
         games_sheet = sheet.worksheet("Games")
         players_sheet_name = f"Players_{chat_id}"
-        
+
         try:
             players_sheet = sheet.worksheet(players_sheet_name)
         except gspread.WorksheetNotFound:
@@ -1633,20 +1635,20 @@ async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_
                                       "Среднее время ответа", "Среднее время (правильные)",
                                       "% правильных ответов", "ELO"])
             await update.message.reply_text(f"📄 Создан новый лист {players_sheet_name}")
-        
+
         all_games = games_sheet.get_all_records()
         chat_games = [row for row in all_games if str(row.get("Chat ID", "")) == str(chat_id)]
-        
+
         if not chat_games:
             await update.message.reply_text("❌ В этой группе пока нет сыгранных квизов.")
             return
-        
+
         player_stats = {}
         for row in chat_games:
             username = row.get("Игрок")
             if not username:
                 continue
-            
+
             def to_float(v):
                 if isinstance(v, str):
                     v = v.replace(',', '.')
@@ -1654,7 +1656,7 @@ async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_
                     return float(v)
                 except:
                     return 0.0
-            
+
             def to_int(v):
                 if isinstance(v, str):
                     v = v.replace(',', '.')
@@ -1662,27 +1664,27 @@ async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_
                     return int(float(v))
                 except:
                     return 0
-            
+
             score = to_float(row.get("Общий счёт", 0))
             total_questions = to_int(row.get("Количество вопросов", 0))
             correct = to_int(row.get("Правильные ответы", 0))
             incorrect = to_int(row.get("Неправильные ответы", 0))
-            
+
             total_time_all_raw = to_float(row.get("Общее время ответов", 0))
             total_time_correct_raw = to_float(row.get("Общее время правильных ответов", 0))
-            
+
             if total_time_all_raw > 1000 or (total_time_all_raw == int(total_time_all_raw) and total_time_all_raw > 100):
                 total_time_all = total_time_all_raw / 100
             else:
                 total_time_all = total_time_all_raw
-            
+
             if total_time_correct_raw > 1000 or (total_time_correct_raw == int(total_time_correct_raw) and total_time_correct_raw > 100):
                 total_time_correct = total_time_correct_raw / 100
             else:
                 total_time_correct = total_time_correct_raw
-            
+
             elo = to_float(row.get("ELO после игры", 0))
-            
+
             if username not in player_stats:
                 player_stats[username] = {
                     "games_count": 0,
@@ -1703,25 +1705,25 @@ async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_
             stats["total_time_all"] += total_time_all
             stats["total_time_correct"] += total_time_correct
             stats["elos"].append(elo)
-        
+
         new_rows = []
         for username, stats in player_stats.items():
             games_count = stats["games_count"]
             total_score = stats["total_score"]
             avg_score = total_score / games_count if games_count > 0 else 0
-            
+
             total_correct = stats["total_correct"]
             total_incorrect = stats["total_incorrect"]
             total_answered = total_correct + total_incorrect
-            
+
             avg_time_all = stats["total_time_all"] / total_answered if total_answered > 0 else 0
             avg_time_correct = stats["total_time_correct"] / total_correct if total_correct > 0 else 0
-            
+
             total_questions = stats["total_questions"]
             percent_correct = (total_correct / total_questions) * 100 if total_questions > 0 else 0
-            
+
             avg_elo = int(round(sum(stats["elos"]) / len(stats["elos"]))) if stats["elos"] else 0
-            
+
             new_rows.append([
                 username,
                 games_count,
@@ -1732,26 +1734,34 @@ async def refresh_players_command(update: Update, context: ContextTypes.DEFAULT_
                 round(percent_correct, 1),
                 avg_elo
             ])
-        
+
         if not new_rows:
             await update.message.reply_text("❌ Нет данных для записи в Players.")
             return
-        
+
         all_cells = players_sheet.get_all_values()
         if len(all_cells) > 1:
             players_sheet.delete_rows(2, len(all_cells) - 1)
-        
+
         players_sheet.append_rows(new_rows, value_input_option='USER_ENTERED')
-        
+
+        # 2. Обновляем Ranking
         update_ranking(chat_id)
-        
-        await update.message.reply_text(f"✅ Статистика Players для этой группы обновлена!\n\n📊 Обработано игроков: {len(new_rows)}\n📊 Всего игр в группе: {len(chat_games)}")
-        
+
+        # 3. Обновляем Rating
+        update_rating(chat_id)
+
+        await update.message.reply_text(
+            f"✅ Статистика Players, Ranking и Rating для этой группы обновлена!\n\n"
+            f"📊 Обработано игроков в Players: {len(new_rows)}\n"
+            f"📊 Всего игр в группе: {len(chat_games)}"
+        )
+
     except Exception as e:
-        print(f"Ошибка при пересчёте Players: {e}")
+        print(f"Ошибка при пересчёте: {e}")
         await update.message.reply_text(f"❌ Ошибка при пересчёте: {e}")
 
-# -------------------- Команда /rank (вывод рейтинговой таблицы ELO) --------------------
+# -------------------- Команда /rank --------------------
 async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     if update.effective_chat.type == "private":
@@ -1884,7 +1894,7 @@ def main():
     app.add_handler(CommandHandler("refresh", refresh_players_command))
     app.add_handler(CommandHandler("games", games_command))
     app.add_handler(CommandHandler("rank", rank_command))
-    app.add_handler(CommandHandler("rating", rating_command))  # Команда рейтинга по очкам
+    app.add_handler(CommandHandler("rating", rating_command))
     app.add_handler(CallbackQueryHandler(register_callback, pattern="register"))
     app.add_handler(CallbackQueryHandler(start_early_callback, pattern="start_early"))
     app.add_handler(CallbackQueryHandler(answer_callback, pattern=r"ans_\d+"))
@@ -1895,4 +1905,4 @@ def main():
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
-    main()
+        main()
