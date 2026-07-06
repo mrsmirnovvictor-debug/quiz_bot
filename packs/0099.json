@@ -31,7 +31,7 @@
     },
     {
       "text": "Что это за покемон?",
-      "image": "Dhttps://pub-ea6a4494c019470aa38328eec255511d.r2.dev/pokemon/5.jpeg",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/pokemon/5.jpeg",
       "options": ["Даркрай", "Ивелтал", "Зороарк", "Гиратина"],
       "correct": 0,
       "comment": "Даркрай способен вызывать кошмары у окружающих."
