@@ -1,0 +1,157 @@
+{
+  "title": "Премия Грэмми: сложный квиз",
+  "questions": [
+    {
+      "text": "В каком году впервые состоялась церемония вручения премии «Грэмми»?",
+      "image": "",
+      "options": ["1955", "1959", "1965", "1971"],
+      "correct": 1,
+      "comment": "Первая церемония Grammy Awards состоялась 4 мая 1959 года."
+    },
+    {
+      "text": "Кто первым получил премию Grammy в категории «Лучший новый исполнитель»?",
+      "image": "",
+      "options": ["The Beatles", "Боб Дилан", "Карпентеры", "The Swingle Singers"],
+      "correct": 3,
+      "comment": "The Swingle Singers стали первыми победителями категории Best New Artist в 1961 году."
+    },
+    {
+      "text": "Какой альбом получил первую премию Grammy в категории «Альбом года»?",
+      "image": "",
+      "options": [
+        "Come Dance with Me! — Фрэнк Синатра",
+        "The Music from Peter Gunn — Генри Манчини",
+        "Gigi — саундтрек",
+        "Mingus Ah Um — Чарльз Мингус"
+      ],
+      "correct": 1,
+      "comment": "The Music from Peter Gunn Генри Манчини получил первую награду Album of the Year в истории Grammy."
+    },
+    {
+      "text": "Кто является самым титулованным исполнителем по количеству побед на премии «Грэмми»?",
+      "image": "",
+      "options": ["Куинси Джонс", "Георг Шолти", "Бейонсе", "Эллисон Краусс"],
+      "correct": 2,
+      "comment": "Бейонсе является рекордсменом по количеству побед среди исполнителей с более чем 30 наградами Grammy."
+    },
+    {
+      "text": "Какая хип-хоп-группа первой получила премию Grammy за «Альбом года»?",
+      "image": "",
+      "options": ["OutKast", "Fugees", "Public Enemy", "Run-D.M.C."],
+      "correct": 0,
+      "comment": "OutKast получили Grammy за Album of the Year в 2004 году за Speakerboxxx/The Love Below."
+    },
+    {
+      "text": "Какой артист получил пять премий Grammy за альбом Blackstar после смерти?",
+      "image": "",
+      "options": ["Принс", "Том Петти", "Дэвид Боуи", "Леонард Коэн"],
+      "correct": 2,
+      "comment": "Дэвид Боуи получил пять Grammy в 2017 году за альбом Blackstar."
+    },
+    {
+      "text": "Кто стал самым молодым победителем в категории «Альбом года»?",
+      "image": "",
+      "options": ["Тейлор Свифт", "Билли Айлиш", "Лорд", "Оливия Родриго"],
+      "correct": 1,
+      "comment": "Билли Айлиш выиграла Album of the Year в 2020 году в возрасте 18 лет."
+    },
+    {
+      "text": "Какая песня стала первой в истории победительницей в категории «Песня года»?",
+      "image": "",
+      "options": [
+        "Mack the Knife — Бобби Дарин",
+        "The Battle of New Orleans — Джонни Хортон",
+        "Moon River — Генри Манчини",
+        "Nel blu dipinto di blu (Volare) — Доменико Модуньо"
+      ],
+      "correct": 3,
+      "comment": "Nel blu dipinto di blu (Volare) получила первую награду Song of the Year в 1959 году."
+    },
+    {
+      "text": "Какие два исполнителя делят рекорд по количеству побед Grammy за одну церемонию?",
+      "image": "",
+      "options": [
+        "Майкл Джексон и Карлос Сантана",
+        "Бейонсе и Адель",
+        "Стиви Уандер и Принс",
+        "Куинси Джонс и Джордж Майкл"
+      ],
+      "correct": 0,
+      "comment": "Майкл Джексон в 1984 году и Карлос Сантана в 2000 году получили по 8 наград за одну церемонию."
+    },
+    {
+      "text": "Какой альбом Тейлор Свифт первым получил премию Grammy за «Альбом года»?",
+      "image": "",
+      "options": ["Red", "Folklore", "Fearless", "1989"],
+      "correct": 2,
+      "comment": "Fearless получил Album of the Year в 2010 году."
+    },
+    {
+      "text": "Кто первым получил Grammy в категории Best Female Rock Vocal Performance?",
+      "image": "",
+      "options": ["Тина Тёрнер", "Мелисса Этеридж", "Стиви Никс", "Пэт Бенатар"],
+      "correct": 3,
+      "comment": "Пэт Бенатар выиграла первую награду в этой категории в 1981 году."
+    },
+    {
+      "text": "Какая категория Grammy награждает именно авторов песни, а не исполнителей записи?",
+      "image": "",
+      "options": [
+        "Record of the Year",
+        "Song of the Year",
+        "Album of the Year",
+        "Best New Artist"
+      ],
+      "correct": 1,
+      "comment": "Song of the Year присуждается авторам композиции."
+    },
+    {
+      "text": "Какой альбом Аланис Мориссетт получил премию Grammy за «Альбом года»?",
+      "image": "",
+      "options": [
+        "Under the Rug Swept",
+        "Jagged Little Pill",
+        "Supposed Former Infatuation Junkie",
+        "Flavors of Entanglement"
+      ],
+      "correct": 1,
+      "comment": "Jagged Little Pill получил Grammy за Album of the Year в 1996 году."
+    },
+    {
+      "text": "Кто является рекордсменом по количеству побед Grammy среди дирижёров?",
+      "image": "",
+      "options": [
+        "Леонард Бернстайн",
+        "Герберт фон Караян",
+        "Георг Шолти",
+        "Даниэль Баренбойм"
+      ],
+      "correct": 2,
+      "comment": "Георг Шолти выиграл 31 премию Grammy — больше всех среди дирижёров."
+    },
+    {
+      "text": "Какая группа первой получила Grammy за «Альбом года» среди рок-исполнителей?",
+      "image": "",
+      "options": [
+        "The Beatles",
+        "Fleetwood Mac",
+        "Simon & Garfunkel",
+        "Eagles"
+      ],
+      "correct": 2,
+      "comment": "Simon & Garfunkel получили Album of the Year за Bridge over Troubled Water в 1971 году."
+    },
+    {
+      "text": "Какой исполнитель первым выиграл Grammy за «Запись года» два года подряд?",
+      "image": "",
+      "options": [
+        "Роберта Флэк",
+        "Фрэнк Синатра",
+        "Элла Фицджеральд",
+        "Стиви Уандер"
+      ],
+      "correct": 3,
+      "comment": "Стиви Уандер выиграл Record of the Year два года подряд в 1974 и 1975 годах."
+    }
+  ]
+}
