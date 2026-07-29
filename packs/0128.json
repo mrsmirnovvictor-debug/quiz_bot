@@ -1,0 +1,118 @@
+{
+  "title": "Угадай фит",
+  "description": "По исполнителю и названию песни определите, кто записал этот хит вместе с ним.",
+  "questions": [
+    {
+      "question": "Элджей — «Розовое вино». Кто записал эту песню вместе с Элджеем?",
+      "image": "",
+      "options": ["OG Buda", "LSP", "Miyagi", "Feduk"],
+      "correct": 3,
+      "comment": "Хит 2017 года записан Элджеем и Feduk."
+    },
+    {
+      "question": "Artik & Asti — «Грустный дэнс». Кто второй исполнитель?",
+      "image": "",
+      "options": ["JONY", "Артём Качер", "MOT", "NILETTO"],
+      "correct": 1,
+      "comment": "Совместная работа Artik & Asti и Артёма Качера."
+    },
+    {
+      "question": "Morgenshtern — «Cadillac». Кто записал песню вместе с ним?",
+      "image": "",
+      "options": ["Егор Крид", "Тимати", "Slava Marlow", "Элджей"],
+      "correct": 0,
+      "comment": "Хит 2020 года записан с Егором Кридом."
+    },
+    {
+      "question": "Timati — «Lollipop». Кто второй исполнитель?",
+      "image": "",
+      "options": ["Баста", "Мот", "Джиган", "Snoop Dogg"],
+      "correct": 3,
+      "comment": "Совместный трек Тимати и Snoop Dogg."
+    },
+    {
+      "question": "Doni — «Ты такой». Кто записал песню вместе с Doni?",
+      "image": "",
+      "options": ["Ёлка", "Нюша", "Натали", "Zivert"],
+      "correct": 0,
+      "comment": "Хит Doni и Натали."
+    },
+    {
+      "question": "Баста — «Сансара». Кто исполнил песню вместе с Бастой?",
+      "image": "",
+      "options": ["Полина Гагарина", "Диана Арбенина", "Zivert", "Ёлка"],
+      "correct": 1,
+      "comment": "Главный вокал вместе с Бастой исполнила Диана Арбенина."
+    },
+    {
+      "question": "EMIN — «Камин». Кто второй исполнитель?",
+      "image": "",
+      "options": ["Мот", "Bahh Tee", "JONY", "MACAN"],
+      "correct": 2,
+      "comment": "Совместная песня EMIN и JONY."
+    },
+    {
+      "question": "Баста — «Поколение». Кто записал трек вместе с Бастой?",
+      "image": "",
+      "options": ["Noize MC", "MOT", "Miyagi", "Смоки Мо"],
+      "correct": 3,
+      "comment": "Песня записана совместно со Смоки Мо."
+    },
+    {
+      "question": "Егор Крид — «Если ты меня не любишь». Кто второй исполнитель?",
+      "image": "",
+      "options": ["Molly", "Клава Кока", "Zivert", "Нюша"],
+      "correct": 0,
+      "comment": "Хит Егора Крида и MOLLY."
+    },
+    {
+      "question": "JONY — «Лилии». Кто записал песню вместе с ним?",
+      "image": "",
+      "options": ["EMIN", "MOT", "MACAN", "Andro"],
+      "correct": 1,
+      "comment": "Совместная работа JONY и MOT."
+    },
+    {
+      "question": "NILETTO — «Краш». Кто вторая исполнительница?",
+      "image": "",
+      "options": ["Клава Кока", "Zivert", "Asti", "Mia Boyka"],
+      "correct": 0,
+      "comment": "Песня исполнена NILETTO и Клавой Кокой."
+    },
+    {
+      "question": "HammAli & Navai — «Птичка». Кто исполнил песню вместе с дуэтом?",
+      "image": "",
+      "options": ["ANNA ASTI", "Mona", "Mia Boyka", "Мари Краймбрери"],
+      "correct": 2,
+      "comment": "Совместный трек HammAli & Navai и Mia Boyka."
+    },
+    {
+      "question": "Баста — «Ты была права». Кто записал песню вместе с Бастой?",
+      "image": "",
+      "options": ["Zivert", "Полина Гагарина", "Ёлка", "IOWA"],
+      "correct": 0,
+      "comment": "Совместная работа Басты и Zivert."
+    },
+    {
+      "question": "Filatov & Karas — «Amore Море, Goodbye». Кто второй исполнитель?",
+      "image": "",
+      "options": ["JONY", "Burito", "MOT", "Gayazovs Brothers"],
+      "correct": 3,
+      "comment": "Хит записан совместно с Gayazovs Brothers."
+    },
+    {
+      "question": "DJ Smash — «Моя любовь». Кто записал песню вместе с ним?",
+      "image": "",
+      "options": ["Полина Гагарина", "Винтаж", "LOBODA", "Zivert"],
+      "correct": 0,
+      "comment": "Совместная песня DJ Smash и Полины Гагариной."
+    },
+    {
+      "question": "Макс Барских — «Лей, не жалей». Кто второй исполнитель в ремиксе-хите?",
+      "image": "",
+      "options": ["Dabro", "Zivert", "RASA", "DAVA"],
+      "correct": 1,
+      "comment": "Популярный ремикс был записан вместе с Zivert."
+    }
+  ]
+}
