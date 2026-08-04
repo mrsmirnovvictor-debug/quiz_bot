@@ -3,6 +3,7 @@ import sys
 import re
 import json
 import asyncio
+import random  # <-- ДОБАВЛЕНО
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, List, Tuple
 from collections import defaultdict
@@ -595,6 +596,10 @@ class Game:
         self.user_answers_detail = defaultdict(list)
         self.delete_messages = False
 
+        # --- RANDOM ORDER: поля для хранения перемешанных опций текущего вопроса ---
+        self.current_shuffled_options = None
+        self.current_shuffled_correct = None
+
     def add_player(self, user_id, username):
         if user_id not in self.registered:
             self.registered[user_id] = {"username": username, "score": 0}
@@ -609,9 +614,11 @@ class Game:
             return
         
         q = self.pack["questions"][self.current_question]
-        is_correct = (option_idx == q["correct"])
+        # --- RANDOM ORDER: проверяем правильность по перемешанному индексу ---
+        is_correct = (option_idx == self.current_shuffled_correct)
         delta = (answer_time - self.question_start_time).total_seconds()
-        answer_text = q["options"][option_idx]
+        # --- RANDOM ORDER: текст ответа берём из перемешанного списка ---
+        answer_text = self.current_shuffled_options[option_idx]
         
         points = 0
         if is_correct:
@@ -948,7 +955,17 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE):
         base_kwargs["message_thread_id"] = game.message_thread_id
     
     q = game.pack["questions"][game.current_question]
-    buttons = [InlineKeyboardButton(opt, callback_data=f"ans_{i}") for i, opt in enumerate(q["options"])]
+
+    # --- RANDOM ORDER: перемешиваем варианты ---
+    options = q["options"]
+    indices = list(range(len(options)))
+    random.shuffle(indices)
+    shuffled_options = [options[i] for i in indices]
+    shuffled_correct = indices.index(q["correct"])   # индекс правильного ответа в перемешанном списке
+    game.current_shuffled_options = shuffled_options
+    game.current_shuffled_correct = shuffled_correct
+
+    buttons = [InlineKeyboardButton(opt, callback_data=f"ans_{i}") for i, opt in enumerate(shuffled_options)]
     keyboard = InlineKeyboardMarkup([[btn] for btn in buttons])
     
     question_text = (
@@ -1004,9 +1021,12 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
         return
     
     q = game.pack["questions"][game.current_question]
+    # --- RANDOM ORDER: используем перемешанные опции ---
+    shuffled_options = game.current_shuffled_options
+    shuffled_correct = game.current_shuffled_correct
     
     total_answers = len(game.answers)
-    counts = [0] * len(q["options"])
+    counts = [0] * len(shuffled_options)
     for uid, (opt_idx, _, is_correct, _) in game.answers.items():
         if 0 <= opt_idx < len(counts):
             counts[opt_idx] += 1
@@ -1017,8 +1037,8 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE):
         percents.append(perc)
     
     stats_lines = []
-    for idx, (opt, perc) in enumerate(zip(q["options"], percents)):
-        marker = " ✅" if idx == q["correct"] else ""
+    for idx, (opt, perc) in enumerate(zip(shuffled_options, percents)):
+        marker = " ✅" if idx == shuffled_correct else ""
         stats_lines.append(f"{opt}: {perc:.1f}%{marker}")
     stats_text = "📊 Статистика ответов:\n" + "\n".join(stats_lines)
     
@@ -1905,4 +1925,4 @@ def main():
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
-        main()
+    main()
