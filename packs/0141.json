@@ -1,0 +1,117 @@
+{
+  "title": "🇬🇧 Английский язык: тест на уровень Upper-Intermediate. 16 вопросов по 20 секунд",
+  "questions": [
+    {
+      "text": "Как правильно: «К тому моменту фильм уже начался»?",
+      "image": "",
+      "options": ["already started", "has already started", "had already started", "was already starting"],
+      "correct": 2,
+      "comment": "Действие, завершившееся до другого момента в прошлом, передаётся через Past Perfect: had started."
+    },
+    {
+      "text": "Какое слово значит «скрытный относительно своей личной жизни»?",
+      "image": "",
+      "options": ["protective", "private", "reluctant", "cautious"],
+      "correct": 1,
+      "comment": "'Private about' — «скрытный, не раскрывающий подробности». 'Protective about' означает скорее «оберегающий», а не «скрытный»."
+    },
+    {
+      "text": "«Отчёт будет закончен к утру» — какая форма?",
+      "image": "",
+      "options": ["will finish", "will be finished", "is finishing", "has finished"],
+      "correct": 1,
+      "comment": "Future Passive образуется по формуле 'will be + Past Participle'."
+    },
+    {
+      "text": "«Если бы я знал о пробках...» — какое слово должно стоять после If?",
+      "image": "",
+      "options": ["have", "had", "would have", "did"],
+      "correct": 1,
+      "comment": "Third Conditional: 'If + Past Perfect, would have + Past Participle'."
+    },
+    {
+      "text": "Что означает идиома 'to bite the bullet'?",
+      "image": "",
+      "options": ["Избежать проблемы", "Стойко принять трудность", "Проиграть спор", "Просить помощи"],
+      "correct": 1,
+      "comment": "'To bite the bullet' — «стиснуть зубы и сделать что-то неприятное, но необходимое»."
+    },
+    {
+      "text": "«Жаль, что у меня нет больше времени» — какое слово?",
+      "image": "",
+      "options": ["have", "had", "would have", "having"],
+      "correct": 1,
+      "comment": "После 'I wish' для сожаления о настоящем используется Past Simple: 'I wish I had more time'."
+    },
+    {
+      "text": "Каким фразовым глаголом переводится «отложить встречу»?",
+      "image": "",
+      "options": ["put off", "put up", "put in", "put down"],
+      "correct": 0,
+      "comment": "'Put off' означает «отложить, перенести на другое время»."
+    },
+    {
+      "text": "«Мужчина, чья машина была угнана» — какое слово?",
+      "image": "",
+      "options": ["who", "whose", "which", "that"],
+      "correct": 1,
+      "comment": "'Whose' используется для выражения принадлежности («чья машина»)."
+    },
+    {
+      "text": "Что означает 'to be on the fence' о вопросе?",
+      "image": "",
+      "options": ["Быть уверенным", "Не определиться", "Быть разозлённым", "Быть осведомлённым"],
+      "correct": 1,
+      "comment": "'On the fence' — «сомневаться, не определиться с решением»."
+    },
+    {
+      "text": "«Должно быть, она спит» — какой модальный глагол?",
+      "image": "",
+      "options": ["can", "must", "should", "would"],
+      "correct": 1,
+      "comment": "'Must' используется для выражения уверенного предположения."
+    },
+    {
+      "text": "Косвенная речь: «I am tired», сказала она",
+      "image": "",
+      "options": ["she is tired", "she was tired", "she has been tired", "she be tired"],
+      "correct": 1,
+      "comment": "При согласовании времён Present Simple меняется на Past Simple."
+    },
+    {
+      "text": "«Его аргумент был совершенно бессвязным» — какое слово?",
+      "image": "",
+      "options": ["coherent", "incoherent", "consistent", "credible"],
+      "correct": 1,
+      "comment": "'Incoherent' означает «бессвязный, нелогичный»."
+    },
+    {
+      "text": "«Никогда я не видел такого хаоса» — инверсия?",
+      "image": "",
+      "options": ["Never I have seen", "Never have I seen", "Never did I saw", "Never I did see"],
+      "correct": 1,
+      "comment": "После отрицательных наречий в начале предложения используется инверсия."
+    },
+    {
+      "text": "Что означает 'a blessing in disguise'?",
+      "image": "",
+      "options": ["Скрытая опасность", "Нет худа без добра", "Тайный подарок", "Явное преимущество"],
+      "correct": 1,
+      "comment": "То, что казалось неудачей, обернулось благом."
+    },
+    {
+      "text": "«Он отрицал, что украл деньги» — форма глагола?",
+      "image": "",
+      "options": ["to steal", "stealing", "steal", "stolen"],
+      "correct": 1,
+      "comment": "Глагол 'deny' требует после себя герундия: 'deny stealing'."
+    },
+    {
+      "text": "«Взаимные недопонимания» — лучший перевод?",
+      "image": "",
+      "options": ["mutual", "reciprocal", "concurrent", "collaborative"],
+      "correct": 0,
+      "comment": "'Mutual misunderstandings' — распространённая коллокация в формальном английском."
+    }
+  ]
+}
