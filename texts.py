@@ -61,8 +61,21 @@ def question_result(idx: int, total: int, text: str, stats_lines: list[str],
     return f"❓ Вопрос {idx + 1}/{total}\n{text}\n\n{stats}\n\n{tail}"
 
 
-def leaderboard(rows: list[tuple[str, int]]) -> str:
-    lines = [f"{i}. {name} — {score} очк." for i, (name, score) in enumerate(rows, 1)]
+def plain_name(username: str) -> str:
+    """Убирает @, чтобы строка рейтинга не превращалась в упоминание.
+
+    Telegram шлёт уведомление на каждое @имя в тексте. После каждого вопроса
+    это означало бы 16 пингов за игру каждому участнику.
+    """
+    return username[1:] if username.startswith("@") else username
+
+
+def leaderboard(rows: list[tuple[str, int]], limit: int = 10) -> str:
+    shown = rows[:limit]
+    lines = [f"{i}. {plain_name(name)} — {score} очк."
+             for i, (name, score) in enumerate(shown, 1)]
+    if len(rows) > limit:
+        lines.append(f"…и ещё {len(rows) - limit} участников")
     return "🏆 Текущий рейтинг:\n" + "\n".join(lines)
 
 

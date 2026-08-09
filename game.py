@@ -20,6 +20,7 @@ class Answer:
     is_correct: bool
     points: int
     elapsed: float
+    changed: bool = False        # игрок уже воспользовался правом замены
 
 
 @dataclass
@@ -90,42 +91,64 @@ class Game:
         self.question_started_at = datetime.now(timezone.utc)
         return q.text, self.shuffled_options, q.image
 
+    def _score_answer(self, option_idx: int, elapsed: float) -> tuple[bool, int]:
+        is_correct = option_idx == self.shuffled_correct
+        if not is_correct:
+            return False, 0
+        points = RULES.base_points
+        for threshold, bonus in RULES.speed_bonus:
+            if elapsed <= threshold:
+                points += bonus
+                break
+        return True, points
+
     def record_answer(self, user_id: int, q_idx: int, option_idx: int,
-                      at: datetime) -> Answer | None:
-        """Регистрирует ответ. None — если ответ не принят.
+                      at: datetime) -> tuple[Answer | None, str]:
+        """Регистрирует или заменяет ответ.
+
+        Возвращает (ответ, статус). Статусы:
+          accepted   — ответ принят впервые
+          changed    — ответ заменён, право замены израсходовано
+          same       — нажат тот же вариант, ничего не изменилось
+          used_up    — замена уже использовалась
+          rejected   — ответ не принят (не тот вопрос, не игрок, не время)
 
         Проверка q_idx == current_question закрывает гонку, при которой нажатие,
         отправленное за миг до конца вопроса, засчитывалось следующему вопросу
         с чужим правильным вариантом.
         """
         if self.status != "active" or user_id not in self.players:
-            return None
+            return None, "rejected"
         if q_idx != self.current_question:
-            return None
-        if (user_id, q_idx) in self.answers:
-            return None
+            return None, "rejected"
         if self.question_started_at is None:
-            return None
+            return None, "rejected"
         if not (0 <= option_idx < len(self.shuffled_options)):
-            return None
+            return None, "rejected"
+
+        previous = self.answers.get((user_id, q_idx))
+        if previous is not None:
+            if previous.option_idx == option_idx:
+                return previous, "same"
+            if previous.changed:
+                return previous, "used_up"
+            # Откатываем вклад прежнего ответа целиком.
+            if previous.is_correct:
+                self.scores[user_id] -= previous.points
+                self.speed_sum[user_id] -= previous.elapsed
 
         elapsed = (at - self.question_started_at).total_seconds()
-        is_correct = option_idx == self.shuffled_correct
-
-        points = 0
+        # Очки считаем по времени финального ответа: иначе можно было бы
+        # застолбить скоростной бонус наугад и потом спокойно подумать.
+        is_correct, points = self._score_answer(option_idx, elapsed)
         if is_correct:
-            points = RULES.base_points
-            for threshold, bonus in RULES.speed_bonus:
-                if elapsed <= threshold:
-                    points += bonus
-                    break
             self.scores[user_id] += points
             self.speed_sum[user_id] += elapsed
 
         answer = Answer(q_idx, option_idx, self.shuffled_options[option_idx],
-                        is_correct, points, elapsed)
+                        is_correct, points, elapsed, changed=previous is not None)
         self.answers[(user_id, q_idx)] = answer
-        return answer
+        return answer, "changed" if previous is not None else "accepted"
 
     def current_question_answers(self) -> list[Answer]:
         return [a for (_, q), a in self.answers.items() if q == self.current_question]

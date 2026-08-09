@@ -59,7 +59,16 @@ CREATE TABLE IF NOT EXISTS answers (
     is_correct  INTEGER NOT NULL DEFAULT 0,
     points      INTEGER NOT NULL DEFAULT 0,
     elapsed     REAL    NOT NULL DEFAULT 0,   -- СЕКУНДЫ, не сотые
+    changed     INTEGER NOT NULL DEFAULT 0,   -- игрок воспользовался заменой
     PRIMARY KEY (game_id, user_id, q_idx)
+);
+
+-- Повторная загрузка одного и того же mp3 на каждой игре тратит секунды
+-- и трафик. Telegram отдаёт file_id, который можно переиспользовать вечно.
+CREATE TABLE IF NOT EXISTS media_cache (
+    path       TEXT PRIMARY KEY,
+    file_id    TEXT NOT NULL,
+    created_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS results (
@@ -121,8 +130,21 @@ def init() -> None:
         _conn.execute("PRAGMA synchronous=NORMAL")
         _conn.execute("PRAGMA foreign_keys=ON")
         _conn.executescript(SCHEMA)
+        _migrate(_conn)
         _conn.commit()
     log.info("SQLite готов: %s", DB_PATH)
+
+
+def _migrate(c: sqlite3.Connection) -> None:
+    """Догоняет схему на уже существующей базе.
+
+    CREATE TABLE IF NOT EXISTS не добавляет колонки в созданную таблицу,
+    поэтому новые поля приходится доливать через ALTER.
+    """
+    existing = {r["name"] for r in c.execute("PRAGMA table_info(answers)")}
+    if "changed" not in existing:
+        c.execute("ALTER TABLE answers ADD COLUMN changed INTEGER NOT NULL DEFAULT 0")
+        log.info("Миграция: добавлена колонка answers.changed")
 
 
 @contextmanager
@@ -228,15 +250,40 @@ def participants(game_id: int) -> list[sqlite3.Row]:
 
 
 def save_answer(game_id: int, user_id: int, q_idx: int, option_idx: int,
-                answer_text: str, is_correct: bool, points: int, elapsed: float) -> None:
+                answer_text: str, is_correct: bool, points: int, elapsed: float,
+                changed: bool = False) -> None:
+    """REPLACE, а не IGNORE: игрок может один раз поменять ответ."""
     with tx() as c:
         c.execute(
-            """INSERT OR IGNORE INTO answers
-               (game_id, user_id, q_idx, option_idx, answer_text, is_correct, points, elapsed)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT OR REPLACE INTO answers
+               (game_id, user_id, q_idx, option_idx, answer_text, is_correct,
+                points, elapsed, changed)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (game_id, user_id, q_idx, option_idx, answer_text,
-             int(is_correct), points, elapsed),
+             int(is_correct), points, elapsed, int(changed)),
         )
+
+
+# ==================== Кэш медиафайлов ====================
+
+def get_cached_file_id(path: str) -> str | None:
+    row = _row("SELECT file_id FROM media_cache WHERE path = ?", (path,))
+    return row["file_id"] if row else None
+
+
+def cache_file_id(path: str, file_id: str) -> None:
+    with tx() as c:
+        c.execute(
+            "INSERT OR REPLACE INTO media_cache (path, file_id, created_at) "
+            "VALUES (?, ?, ?)",
+            (path, file_id, _utcnow()),
+        )
+
+
+def drop_cached_file_id(path: str) -> None:
+    """Telegram изредка инвалидирует file_id — тогда кэш нужно сбросить."""
+    with tx() as c:
+        c.execute("DELETE FROM media_cache WHERE path = ?", (path,))
 
 
 def game_answers(game_id: int) -> list[sqlite3.Row]:

@@ -25,6 +25,12 @@ class Question:
     correct: int
     image: str = ""
     comment: str = ""
+    audio: str = ""          # URL или путь к mp3 относительно корня проекта
+    duration: int = 0        # 0 = взять значение по умолчанию
+
+    @property
+    def is_audio(self) -> bool:
+        return bool(self.audio)
 
 
 @dataclass
@@ -56,12 +62,23 @@ def _parse_question(raw: dict, n: int) -> Question:
     if not isinstance(correct, int) or not (0 <= correct < len(options)):
         raise PackError(f"вопрос {n}: неверный индекс правильного ответа ({correct!r})")
 
+    audio = str(raw.get("audio") or "").strip()
+    if audio and not audio.startswith(("http://", "https://")):
+        if not os.path.exists(audio):
+            raise PackError(f"вопрос {n}: аудиофайл не найден ({audio})")
+
+    duration = raw.get("duration") or 0
+    if not isinstance(duration, int) or duration < 0 or duration > 300:
+        raise PackError(f"вопрос {n}: неверное значение duration ({duration!r})")
+
     return Question(
         text=str(text).strip(),
         options=[str(o).strip() for o in options],
         correct=correct,
         image=str(raw.get("image") or "").strip(),
         comment=str(raw.get("comment") or "").strip(),
+        audio=audio,
+        duration=duration,
     )
 
 

@@ -15,7 +15,8 @@ from telegram.ext import ContextTypes
 import db
 import sheets
 import texts
-from config import MSK, RULES, SHEETS_ENABLED, TIMER_VIDEO_URL, TIMINGS
+from config import (AUDIO, MSK, RULES, SHEETS_ENABLED, TIMER_VIDEO_URL,
+                    TIMINGS)
 from game import Answer, Game, build_result_rows
 from packs import Pack, load_pack
 
@@ -54,6 +55,51 @@ async def say_photo(context: ContextTypes.DEFAULT_TYPE, game: Game, photo: str,
     except TelegramError:
         log.warning("Фото не отправилось, шлём текстом", exc_info=True)
         return await say(context, game, caption, **kwargs)
+
+
+async def say_audio(context: ContextTypes.DEFAULT_TYPE, game: Game, question,
+                    caption: str, **kwargs):
+    """Отправляет музыкальный вопрос.
+
+    Метаданные перезаписываются: иначе Telegram покажет в плеере название
+    трека и исполнителя, то есть готовый ответ.
+    """
+    path = question.audio
+    kw = dict(
+        chat_id=game.chat_id,
+        caption=caption,
+        performer=AUDIO.performer,
+        title=AUDIO.title_template.format(n=game.current_question + 1),
+        **kwargs,
+    )
+    if game.thread_id:
+        kw["message_thread_id"] = game.thread_id
+
+    if path.startswith(("http://", "https://")):
+        try:
+            return await context.bot.send_audio(audio=path, **kw)
+        except TelegramError:
+            log.exception("Аудио по ссылке не отправилось: %s", path)
+            return await say(context, game, caption, **kwargs)
+
+    cached = await to_db(db.get_cached_file_id, path)
+    if cached:
+        try:
+            return await context.bot.send_audio(audio=cached, **kw)
+        except TelegramError:
+            log.warning("file_id протух, перезаливаем %s", path)
+            await to_db(db.drop_cached_file_id, path)
+
+    try:
+        with open(path, "rb") as f:
+            msg = await context.bot.send_audio(audio=f, **kw)
+    except (TelegramError, OSError):
+        log.exception("Не удалось отправить аудио %s", path)
+        return await say(context, game, caption, **kwargs)
+
+    if msg and msg.audio:
+        await to_db(db.cache_file_id, path, msg.audio.file_id)
+    return msg
 
 
 async def quiet_delete(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
@@ -251,8 +297,15 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE, game: Game):
         for i, opt in enumerate(options)
     ])
     caption = texts.question(idx, game.total_questions, text)
+    question = game.pack.questions[idx]
 
-    if TIMER_VIDEO_URL:
+    # У аудиовопроса плеер сам служит таймером, видео только мешало бы.
+    if question.is_audio:
+        seconds = question.duration or AUDIO.question_seconds
+    else:
+        seconds = question.duration or TIMINGS.question
+
+    if TIMER_VIDEO_URL and not question.is_audio:
         try:
             video = await context.bot.send_video(
                 chat_id=game.chat_id, video=TIMER_VIDEO_URL, width=200, height=150,
@@ -264,7 +317,9 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE, game: Game):
             log.warning("Видео-таймер не отправился", exc_info=True)
         await asyncio.sleep(0.5)
 
-    if image:
+    if question.is_audio:
+        msg = await say_audio(context, game, question, caption, reply_markup=keyboard)
+    elif image:
         msg = await say_photo(context, game, image, caption, reply_markup=keyboard)
     else:
         msg = await say(context, game, caption, reply_markup=keyboard)
@@ -281,7 +336,7 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE, game: Game):
     game.question_started_at = datetime.now(timezone.utc)
     await to_db(db.update_game, game.game_id, current_question=idx)
 
-    _schedule(context, job_end_question, TIMINGS.question, game.chat_id,
+    _schedule(context, job_end_question, seconds, game.chat_id,
               f"end:{game.chat_id}")
 
 
@@ -306,21 +361,30 @@ async def answer_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Раньше такой игрок получал «Ответ принят ✅» и не попадал в итоги.
         await query.answer("Вы не зарегистрированы на этот квиз 🙁", show_alert=True)
         return
-    if (user.id, q_idx) in game.answers:
-        await query.answer("Вы уже ответили на этот вопрос!", show_alert=True)
-        return
     if q_idx != game.current_question:
         await query.answer("Вопрос уже закрыт")
         return
 
-    answer = game.record_answer(user.id, q_idx, option_idx, at)
-    if answer is None:
+    answer, status = game.record_answer(user.id, q_idx, option_idx, at)
+
+    if status == "same":
+        await query.answer("Этот вариант уже выбран")
+        return
+    if status == "used_up":
+        await query.answer("Поменять ответ можно только один раз 🙂", show_alert=True)
+        return
+    if answer is None or status == "rejected":
         await query.answer("Ответ не принят")
         return
 
-    await query.answer("Ответ принят ✅")
+    if status == "changed":
+        await query.answer("Ответ изменён 🔁 Замена израсходована", show_alert=True)
+    else:
+        await query.answer("Ответ принят ✅ Поменять можно один раз")
+
     await to_db(db.save_answer, game.game_id, user.id, q_idx, option_idx,
-                answer.text, answer.is_correct, answer.points, answer.elapsed)
+                answer.text, answer.is_correct, answer.points, answer.elapsed,
+                answer.changed)
 
 
 async def job_end_question(context: ContextTypes.DEFAULT_TYPE):
@@ -347,16 +411,31 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE, game: Game):
     await quiet_delete(context, game.chat_id, game.video_msg_id)
     game.question_msg_id = game.video_msg_id = None
 
-    if question.image:
-        await say_photo(context, game, question.image, result_text)
-    else:
-        await say(context, game, result_text)
-
-    # Промежуточный рейтинг не каждый вопрос: 4 сообщения × 16 вопросов
-    # упираются в лимит Telegram ~20 сообщений в минуту на группу.
     is_last = game.is_last_question
-    if not is_last and (idx + 1) % RULES.leaderboard_every == 0:
-        await say(context, game, texts.leaderboard(game.leaderboard()))
+    board = None
+    if not is_last and RULES.leaderboard_mode != "off":
+        if RULES.leaderboard_mode == "inline":
+            board = texts.leaderboard(game.leaderboard(), RULES.leaderboard_limit)
+        elif (idx + 1) % RULES.leaderboard_every == 0:
+            board = texts.leaderboard(game.leaderboard(), RULES.leaderboard_limit)
+
+    # Рейтинг клеится к разбору ответа: отдельным сообщением после каждого
+    # вопроса вышло бы 4 сообщения на вопрос, а лимит Telegram — около 20
+    # в минуту на группу. Подпись к фото ограничена 1024 символами, поэтому
+    # при переполнении рейтинг уходит отдельно.
+    inline_board = board if RULES.leaderboard_mode == "inline" else None
+    combined = f"{result_text}\n\n{inline_board}" if inline_board else result_text
+    caption_overflow = question.image and len(combined) > 1000
+
+    if question.image:
+        await say_photo(context, game, question.image,
+                        result_text if caption_overflow else combined)
+    else:
+        await say(context, game, combined)
+
+    leftover = board if (caption_overflow or inline_board is None) else None
+    if leftover:
+        await say(context, game, leftover)
 
     game.current_question += 1
     await to_db(db.update_game, game.game_id, current_question=game.current_question)

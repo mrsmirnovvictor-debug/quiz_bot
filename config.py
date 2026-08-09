@@ -49,6 +49,18 @@ class Timings:
 
 
 @dataclass(frozen=True)
+class Audio:
+    """Музыкальные вопросы."""
+
+    # Telegram не умеет автовоспроизведение: игрок тратит время на тап по play.
+    # Поэтому у аудиовопросов свой, более щедрый таймер.
+    question_seconds: int = _int_env("T_QUESTION_AUDIO", 30)
+    # Метаданные файла Telegram показывает в плеере — они не должны выдать ответ.
+    performer: str = os.environ.get("AUDIO_PERFORMER", "Квиз")
+    title_template: str = os.environ.get("AUDIO_TITLE", "Вопрос {n}")
+
+
+@dataclass(frozen=True)
 class Rules:
     """Правила начисления очков и рейтинга."""
 
@@ -61,12 +73,19 @@ class Rules:
     max_missed_for_rating: int = 8
     # Сколько игр нужно для попадания в /stats и /rank
     calibration_games: int = _int_env("CALIBRATION_GAMES", 10)
-    # Показывать промежуточный рейтинг раз в N вопросов (лимиты Telegram!)
+    # Как показывать промежуточный рейтинг:
+    #   inline   — приклеить к разбору ответа (не плодит сообщений)
+    #   separate — отдельным сообщением раз в leaderboard_every вопросов
+    #   off      — не показывать
+    leaderboard_mode: str = os.environ.get("LEADERBOARD_MODE", "inline")
     leaderboard_every: int = _int_env("LEADERBOARD_EVERY", 4)
+    # Сколько строк рейтинга показывать (в группе бывает 40+ игроков)
+    leaderboard_limit: int = _int_env("LEADERBOARD_LIMIT", 10)
 
 
 TIMINGS = Timings()
 RULES = Rules()
+AUDIO = Audio()
 
 
 def _parse_calibration_overrides() -> dict[int, int]:
