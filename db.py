@@ -355,6 +355,43 @@ def user_history_count(username: str) -> int:
     return row["n"] if row else 0
 
 
+def find_player(username: str) -> dict | None:
+    """Сводка по игроку для проверки перед переименованием."""
+    row = _row(
+        "SELECT COUNT(*) AS games, MIN(substr(played_at,1,10)) AS first_game, "
+        "MAX(substr(played_at,1,10)) AS last_game FROM results WHERE username = ?",
+        (username,),
+    )
+    if not row or not row["games"]:
+        return None
+    return dict(row)
+
+
+def rename_player(old: str, new: str) -> dict[str, int]:
+    """Меняет ник во всей истории.
+
+    Ник в Telegram глобальный, поэтому правим по всем группам сразу.
+    Если игрок уже играл под новым ником, строки просто сольются: первичный
+    ключ results — (game_id, user_id), конфликта не возникает, а агрегаты
+    по username объединятся сами.
+    """
+    with tx() as c:
+        results = c.execute(
+            "UPDATE results SET username = ? WHERE username = ?", (new, old)
+        ).rowcount
+        participants = c.execute(
+            "UPDATE participants SET username = ? WHERE username = ?", (new, old)
+        ).rowcount
+    return {"results": results, "participants": participants}
+
+
+def player_chats(username: str) -> list[int]:
+    rows = _rows(
+        "SELECT DISTINCT chat_id FROM results WHERE username = ?", (username,)
+    )
+    return [r["chat_id"] for r in rows]
+
+
 # ==================== Расписание ====================
 
 def add_schedule(chat_id: int, thread_id: int | None, days: str, time_msk: str,

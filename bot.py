@@ -68,6 +68,7 @@ def main() -> None:
     app.add_handler(CommandHandler("abort", admin.abort_quiz))
     app.add_handler(CommandHandler("schedule", admin.schedule_command))
     app.add_handler(CommandHandler("skip", admin.skip_command))
+    app.add_handler(CommandHandler("rename", admin.rename_command))
     app.add_handler(CommandHandler("export", admin.export_command))
     app.add_handler(CommandHandler("refresh", admin.export_command))   # старое имя
 

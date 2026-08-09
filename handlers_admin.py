@@ -260,6 +260,71 @@ async def skip_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🗓 В этой группе нет активных слотов.")
 
 
+# ==================== /rename ====================
+
+async def rename_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/rename @старый_ник @новый_ник
+
+    Игроки в статистике группируются по нику, поэтому смена ника в Telegram
+    без этой команды разделила бы человека на двух.
+    """
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("Команда работает только в группах.")
+        return
+    if not await is_admin(update, update.effective_user.id):
+        await update.message.reply_text("❌ Только администраторы группы.")
+        return
+
+    parts = _args(update.message.text, "/rename").split()
+    if len(parts) != 2:
+        await update.message.reply_text(
+            "❌ Формат: `/rename @старый_ник @новый_ник`",
+            parse_mode="Markdown",
+        )
+        return
+
+    old, new = (p if p.startswith(("@", "id")) else "@" + p for p in parts)
+    if old == new:
+        await update.message.reply_text("❌ Ники совпадают.")
+        return
+
+    info = await engine.to_db(db.find_player, old)
+    if not info:
+        await update.message.reply_text(
+            f"❌ Игрок {old} в истории не найден. Проверьте написание — "
+            f"ник вводится ровно так, как он отображается в таблице."
+        )
+        return
+
+    merged = await engine.to_db(db.find_player, new)
+    chats = await engine.to_db(db.player_chats, old)
+    counts = await engine.to_db(db.rename_player, old, new)
+
+    lines = [
+        f"✅ {old} → {new}",
+        f"Обновлено записей: {counts['results']} (игры с {info['first_game']} "
+        f"по {info['last_game']})",
+    ]
+    if merged:
+        lines.append(
+            f"⚠️ Под ником {new} уже было {merged['games']} игр — истории объединены."
+        )
+
+    if SHEETS_ENABLED:
+        for chat_id in chats:
+            try:
+                await engine.to_db(sheets.rebuild_chat, chat_id)
+            except Exception:
+                log.exception("Не удалось обновить витрину чата %s", chat_id)
+        lines.append("📊 Листы Players / Rating / Ranking пересобраны.")
+        lines.append(
+            "ℹ️ В листе Games старые строки сохранили прежний ник — "
+            "это журнал, он не переписывается."
+        )
+
+    await update.message.reply_text("\n".join(lines))
+
+
 # ==================== /export ====================
 
 async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
