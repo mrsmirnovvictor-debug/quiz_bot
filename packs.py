@@ -88,7 +88,13 @@ def load_pack(pack_id: str) -> Pack:
     if not isinstance(raw_questions, list) or not raw_questions:
         raise PackError(f"пакет {pack_id}: нет вопросов")
 
-    questions = [_parse_question(q, i + 1) for i, q in enumerate(raw_questions)]
+    questions = []
+    for i, item in enumerate(raw_questions):
+        try:
+            questions.append(_parse_question(item, i + 1))
+        except PackError as e:
+            # Без ID пакета такое предупреждение в логах бесполезно.
+            raise PackError(f"пакет {pack_id} ({path}): {e}") from None
     return Pack(pack_id=pack_id, title=title, questions=questions)
 
 
@@ -116,6 +122,21 @@ def pack_titles() -> dict[str, str]:
             log.warning("Пакет %s не прошёл валидацию: %s", pid, e)
             out[pid] = "[ошибка чтения]"
     return out
+
+
+def load_first_valid(candidates: list[str]) -> tuple[Pack, list[str]]:
+    """Первый читаемый пакет из списка + список пропущенных битых.
+
+    Нужен планировщику: один испорченный файл не должен срывать автозапуск.
+    """
+    skipped = []
+    for pid in candidates:
+        try:
+            return load_pack(pid), skipped
+        except PackError as e:
+            log.warning("Пропускаю пакет %s: %s", pid, e)
+            skipped.append(pid)
+    raise PackError("ни один пакет из пула не проходит валидацию")
 
 
 def validate_all() -> list[str]:

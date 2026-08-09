@@ -110,11 +110,13 @@ def pick_pack(chat_id: int, pack_source: str, pool: str) -> tuple[packs.Pack, bo
     played = db.played_pack_ids(chat_id)
     unplayed = [p for p in available if p not in played]
     if unplayed:
-        return packs.load_pack(unplayed[0]), False
+        pack, _ = packs.load_first_valid(unplayed)
+        return pack, False
 
     last = db.last_played_at(chat_id)
     available.sort(key=lambda p: last.get(p, ""))
-    return packs.load_pack(available[0]), True
+    pack, _ = packs.load_first_valid(available)
+    return pack, True
 
 
 # ==================== Тик ====================

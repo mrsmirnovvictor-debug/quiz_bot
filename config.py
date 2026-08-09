@@ -68,5 +68,33 @@ class Rules:
 TIMINGS = Timings()
 RULES = Rules()
 
+
+def _parse_calibration_overrides() -> dict[int, int]:
+    """CALIBRATION_BY_CHAT='-1003453018572:1,-1002440363847:10'
+
+    Порог калибровки нужен большим группам с длинной историей и мешает
+    молодым: при семи сыгранных квизах порог в 10 игр прячет всю группу.
+    """
+    raw = os.environ.get("CALIBRATION_BY_CHAT", "")
+    result: dict[int, int] = {}
+    for chunk in raw.split(","):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        try:
+            chat_id, value = chunk.split(":")
+            result[int(chat_id)] = max(1, int(value))
+        except ValueError:
+            continue
+    return result
+
+
+CALIBRATION_BY_CHAT = _parse_calibration_overrides()
+
+
+def calibration_for(chat_id: int) -> int:
+    """Сколько игр нужно игроку этой группы для попадания в /stats и /rank."""
+    return CALIBRATION_BY_CHAT.get(chat_id, RULES.calibration_games)
+
 # Максимум очков за вопрос — нужен для расчёта ELO
 MAX_POINTS_PER_QUESTION = RULES.base_points + (RULES.speed_bonus[0][1] if RULES.speed_bonus else 0)

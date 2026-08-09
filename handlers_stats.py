@@ -9,7 +9,7 @@ from telegram.ext import ContextTypes
 import db
 import engine
 import packs
-from config import MSK, RULES
+from config import MSK, calibration_for
 
 log = logging.getLogger(__name__)
 
@@ -36,14 +36,17 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📊 Команда /stats работает в группах.")
         return
 
-    rows = await engine.to_db(db.player_stats, chat_id, RULES.calibration_games)
+    min_games = calibration_for(chat_id)
+    rows = await engine.to_db(db.player_stats, chat_id, min_games)
     if not rows:
         await update.message.reply_text(
-            f"❌ Пока нет игроков, сыгравших {RULES.calibration_games}+ квизов."
+            f"❌ Пока нет игроков, сыгравших {min_games}+ квизов."
         )
         return
 
-    lines = [f"🏆 ТОП ИГРОКОВ (от {RULES.calibration_games} игр, по ELO)\n", "```"]
+    header = "🏆 ТОП ИГРОКОВ (по ELO)" if min_games <= 1 else \
+             f"🏆 ТОП ИГРОКОВ (от {min_games} игр, по ELO)"
+    lines = [header + "\n", "```"]
     lines.append(f"{'Игрок':<18} {'Игр':>3} {'Очки':>6} {'%ПО':>5} {'ASA':>5} {'ELO':>4}")
     lines.append("-" * 48)
 
@@ -104,7 +107,7 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     prev = ({} if len(dates) < 2
             else await engine.to_db(db.elo_snapshot, chat_id, dates[-2] + "T23:59:59+00:00"))
 
-    min_games = RULES.calibration_games
+    min_games = calibration_for(chat_id)
     current = sorted(((u, g, e) for u, (g, e) in last.items() if g >= min_games),
                      key=lambda x: -x[2])
     if not current:

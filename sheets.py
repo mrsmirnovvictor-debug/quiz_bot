@@ -16,7 +16,8 @@ import threading
 from datetime import datetime
 
 import db
-from config import GOOGLE_CREDENTIALS_JSON, GOOGLE_SHEET_ID, MSK, RULES, SHEETS_ENABLED
+from config import (GOOGLE_CREDENTIALS_JSON, GOOGLE_SHEET_ID, MSK,
+                    SHEETS_ENABLED, calibration_for)
 
 log = logging.getLogger(__name__)
 
@@ -219,7 +220,7 @@ def _rebuild_ranking(chat_id: int) -> None:
     last = db.elo_snapshot(chat_id, last_date + "T23:59:59+00:00")
     prev = db.elo_snapshot(chat_id, prev_date + "T23:59:59+00:00")
 
-    min_games = RULES.calibration_games
+    min_games = calibration_for(chat_id)
     current = sorted(
         ((u, g, e) for u, (g, e) in last.items() if g >= min_games),
         key=lambda x: -x[2],
