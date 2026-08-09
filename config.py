@@ -1,0 +1,72 @@
+"""Единая точка конфигурации. Всё, что раньше было хардкодом, живёт здесь."""
+
+import os
+from dataclasses import dataclass
+from zoneinfo import ZoneInfo
+
+MSK = ZoneInfo("Europe/Moscow")
+
+# -------------------- Обязательные переменные окружения --------------------
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+
+# -------------------- Хранилище --------------------
+# На Railway смонтируйте том на /data и оставьте путь по умолчанию.
+# Файлы вне тома НЕ переживают редеплой.
+DB_PATH = os.environ.get("DB_PATH", "/data/quiz.db")
+PACKS_DIR = os.environ.get("PACKS_DIR", "packs")
+
+# -------------------- Google Sheets (витрина, не первичное хранилище) ------
+GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS", "")
+GOOGLE_SHEET_ID = os.environ.get("GOOGLE_SHEET_ID", "")
+SHEETS_ENABLED = bool(GOOGLE_CREDENTIALS_JSON and GOOGLE_SHEET_ID)
+
+# -------------------- Медиа --------------------
+TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "")
+
+# -------------------- Логирование --------------------
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
+
+
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+@dataclass(frozen=True)
+class Timings:
+    """Тайминги квиза в секундах."""
+
+    question: int = _int_env("T_QUESTION", 20)          # время на ответ
+    between_questions: int = _int_env("T_BETWEEN", 5)    # пауза между вопросами
+    pre_start_warning: int = _int_env("T_WARNING", 30)   # предупреждение до старта
+    early_start_delay: int = _int_env("T_EARLY", 5)      # задержка при досрочном старте
+    finish_delay: int = _int_env("T_FINISH", 5)          # пауза перед итогами
+    reg_refresh: int = _int_env("T_REG_REFRESH", 15)     # обновление списка регистрации
+    podium_pause: int = _int_env("T_PODIUM", 3)          # пауза между объявлениями мест
+    scheduler_tick: int = _int_env("T_TICK", 60)         # период опроса расписания
+
+
+@dataclass(frozen=True)
+class Rules:
+    """Правила начисления очков и рейтинга."""
+
+    base_points: int = 10
+    # (порог в секундах, бонус). Проверяются по порядку.
+    speed_bonus: tuple = ((5, 5), (10, 4), (13, 3), (16, 2), (19, 1))
+    # Очки рейтинга за место: 1-е, 2-е, 3-е, 4-е, 5-е
+    rating_by_place: tuple = (10, 5, 3, 2, 1)
+    # Если пропущено больше вопросов — очки рейтинга обнуляются
+    max_missed_for_rating: int = 8
+    # Сколько игр нужно для попадания в /stats и /rank
+    calibration_games: int = _int_env("CALIBRATION_GAMES", 10)
+    # Показывать промежуточный рейтинг раз в N вопросов (лимиты Telegram!)
+    leaderboard_every: int = _int_env("LEADERBOARD_EVERY", 4)
+
+
+TIMINGS = Timings()
+RULES = Rules()
+
+# Максимум очков за вопрос — нужен для расчёта ELO
+MAX_POINTS_PER_QUESTION = RULES.base_points + (RULES.speed_bonus[0][1] if RULES.speed_bonus else 0)
