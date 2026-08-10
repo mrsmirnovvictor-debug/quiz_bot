@@ -16,6 +16,7 @@ import db
 import engine
 import handlers_admin as admin
 import handlers_stats as stats
+import handlers_themes as themes_h
 import packs
 import scheduler
 import sheets
@@ -71,6 +72,14 @@ def main() -> None:
     app.add_handler(CommandHandler("rename", admin.rename_command))
     app.add_handler(CommandHandler("export", admin.export_command))
     app.add_handler(CommandHandler("refresh", admin.export_command))   # старое имя
+
+    app.add_handler(CommandHandler("themes", themes_h.themes_command))
+    app.add_handler(CommandHandler("slots", themes_h.slots_command))
+    app.add_handler(CommandHandler("book", themes_h.book_command))
+    app.add_handler(CommandHandler("theme_add", themes_h.theme_add_command))
+    app.add_handler(CommandHandler("theme_pack", themes_h.theme_pack_command))
+    app.add_handler(CommandHandler("theme_del", themes_h.theme_del_command))
+    app.add_handler(CommandHandler("season", themes_h.season_command))
 
     app.add_handler(CommandHandler("stats", stats.stats_command))
     app.add_handler(CommandHandler("rating", stats.rating_command))

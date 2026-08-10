@@ -145,6 +145,58 @@ async def tick(context: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception:
             log.exception("Слот #%s: ошибка обработки", row["id"])
 
+    try:
+        await _run_theme_orders(context, now_utc)
+    except Exception:
+        log.exception("Ошибка обработки заказанных тем")
+
+
+async def _run_theme_orders(context, now_utc) -> None:
+    """Запускает квизы по заказанным темам, у которых привязан пакет.
+
+    Регистрация открывается заранее, поэтому окно смотрим вперёд на величину
+    THEME_REG_LEAD, а назад — на LATE_GRACE, чтобы подхватить пропущенное
+    после простоя.
+    """
+    from config import THEME_REG_LEAD_MINUTES
+
+    horizon = now_utc + timedelta(minutes=THEME_REG_LEAD_MINUTES)
+    floor = now_utc - LATE_GRACE
+    orders = await engine.to_db(db.due_theme_orders, floor.isoformat(),
+                                horizon.isoformat())
+
+    for order in orders:
+        chat_id = order["chat_id"]
+        if chat_id in engine.LIVE:
+            continue
+        if await engine.to_db(db.active_game_for_chat, chat_id):
+            continue
+
+        slot = datetime.fromisoformat(order["slot_utc"])
+        # Помечаем сразу: повторный тик не должен запустить игру второй раз.
+        await engine.to_db(db.update_theme_order, order["id"], status="played")
+
+        try:
+            pack = await engine.to_db(packs.load_pack, order["pack_id"])
+        except Exception as e:
+            log.exception("Заказ #%s: пакет не читается", order["id"])
+            await _notify(context, chat_id, None,
+                          f"⚠️ Тема «{order['theme']}» не запущена: {e}")
+            continue
+
+        start = slot if slot > now_utc else now_utc + LATE_LEAD
+        game = await engine.create_game(
+            context, chat_id=chat_id, thread_id=None, pack=pack,
+            creator_id=order["created_by"], start_utc=start, source="theme",
+        )
+        log.info("Заказ #%s запустил квиз %s (пакет %s)",
+                 order["id"], game.game_id, order["pack_id"])
+        await _notify(
+            context, chat_id, None,
+            f"🎯 Тема этого квиза заказана игроком {order['username']}: "
+            f"«{order['theme']}»"
+        )
+
 
 async def _maybe_run(context, row, now_utc, now_msk, today) -> None:
     if not days_match(row["days"], now_msk.weekday()):

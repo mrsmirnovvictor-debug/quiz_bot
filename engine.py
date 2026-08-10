@@ -509,10 +509,40 @@ async def finish_quiz(context: ContextTypes.DEFAULT_TYPE, game: Game,
         await asyncio.sleep(TIMINGS.podium_pause)
 
     await say(context, game, texts.final_table(ranking))
+    await _offer_theme(context, game, ranking)
 
     if SHEETS_ENABLED:
         # Выгрузка идёт фоном: медленный Google не должен держать бота.
         asyncio.create_task(_export_later(game.game_id))
+
+
+async def _offer_theme(context: ContextTypes.DEFAULT_TYPE, game: Game,
+                       ranking: list[dict]) -> None:
+    """Напоминает победителям о праве заказать тему."""
+    from config import themes_enabled
+    if not themes_enabled(game.chat_id):
+        return
+
+    winners = next((g["players"] for g in ranking if g["place"] == 1), [])
+    if not winners:
+        return
+
+    try:
+        import themes as themes_mod
+        season = await to_db(themes_mod.ensure_season, game.chat_id)
+        lines = []
+        for player in winners:
+            quota = await to_db(themes_mod.quota_for, game.chat_id, season,
+                                player["username"])
+            if quota.left > 0:
+                lines.append(
+                    f"🎯 {player['username']}, можно заказать тему! "
+                    f"Доступно заказов: {quota.left}. Свободные слоты — /slots"
+                )
+        if lines:
+            await say(context, game, "\n".join(lines))
+    except Exception:
+        log.exception("Не удалось посчитать квоту тем для чата %s", game.chat_id)
 
 
 async def _export_later(game_id: int):

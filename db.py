@@ -94,6 +94,36 @@ CREATE TABLE IF NOT EXISTS results (
 CREATE INDEX IF NOT EXISTS idx_results_chat ON results(chat_id, played_at);
 CREATE INDEX IF NOT EXISTS idx_results_user ON results(username);
 
+CREATE TABLE IF NOT EXISTS seasons (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id   INTEGER NOT NULL,
+    name      TEXT    NOT NULL,
+    starts_on TEXT    NOT NULL,      -- YYYY-MM-DD включительно
+    ends_on   TEXT    NOT NULL,      -- YYYY-MM-DD включительно
+    active    INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT   NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_seasons_chat ON seasons(chat_id, active);
+
+-- Заказ темы победителем. slot_utc пустой у исторических записей,
+-- которые админ вносит задним числом за уже отыгранные заказы.
+CREATE TABLE IF NOT EXISTS theme_orders (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id    INTEGER NOT NULL,
+    season_id  INTEGER NOT NULL,
+    username   TEXT    NOT NULL,
+    theme      TEXT    NOT NULL,
+    slot_utc   TEXT,
+    pack_id    TEXT,
+    status     TEXT    NOT NULL DEFAULT 'booked',  -- booked|played|cancelled|legacy
+    note       TEXT,
+    created_at TEXT    NOT NULL,
+    created_by INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_theme_season ON theme_orders(chat_id, season_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_theme_slot
+    ON theme_orders(chat_id, slot_utc) WHERE slot_utc IS NOT NULL AND status != 'cancelled';
+
 CREATE TABLE IF NOT EXISTS schedules (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id          INTEGER NOT NULL,
@@ -495,6 +525,121 @@ def set_skip_date(chat_id: int, skip_date: str) -> int:
         cur = c.execute("UPDATE schedules SET skip_date = ? WHERE chat_id = ? AND enabled = 1",
                         (skip_date, chat_id))
         return cur.rowcount
+
+
+# ==================== Сезоны ====================
+
+def active_season(chat_id: int) -> sqlite3.Row | None:
+    return _row(
+        "SELECT * FROM seasons WHERE chat_id = ? AND active = 1 "
+        "ORDER BY starts_on DESC LIMIT 1",
+        (chat_id,),
+    )
+
+
+def create_season(chat_id: int, name: str, starts_on: str, ends_on: str) -> int:
+    with tx() as c:
+        c.execute("UPDATE seasons SET active = 0 WHERE chat_id = ?", (chat_id,))
+        cur = c.execute(
+            "INSERT INTO seasons (chat_id, name, starts_on, ends_on, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (chat_id, name, starts_on, ends_on, _utcnow()),
+        )
+        return cur.lastrowid
+
+
+def count_wins(chat_id: int, username: str, starts_on: str, ends_on: str) -> int:
+    """Побед в сезоне. Делёж первого места засчитывается всем, кто его разделил."""
+    row = _row(
+        "SELECT COUNT(*) AS n FROM results "
+        "WHERE chat_id = ? AND username = ? AND place = 1 "
+        "AND substr(played_at, 1, 10) BETWEEN ? AND ?",
+        (chat_id, username, starts_on, ends_on),
+    )
+    return row["n"] if row else 0
+
+
+def winners_in_season(chat_id: int, starts_on: str, ends_on: str) -> list[sqlite3.Row]:
+    return _rows(
+        "SELECT username, COUNT(*) AS wins FROM results "
+        "WHERE chat_id = ? AND place = 1 AND substr(played_at, 1, 10) BETWEEN ? AND ? "
+        "GROUP BY username ORDER BY wins DESC, username",
+        (chat_id, starts_on, ends_on),
+    )
+
+
+# ==================== Заказы тем ====================
+
+ACTIVE_ORDER_STATUSES = ("booked", "played", "legacy")
+
+
+def add_theme_order(chat_id: int, season_id: int, username: str, theme: str,
+                    slot_utc: str | None, status: str, created_by: int | None,
+                    note: str | None = None) -> int:
+    with tx() as c:
+        cur = c.execute(
+            """INSERT INTO theme_orders
+               (chat_id, season_id, username, theme, slot_utc, status, note,
+                created_at, created_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (chat_id, season_id, username, theme, slot_utc, status, note,
+             _utcnow(), created_by),
+        )
+        return cur.lastrowid
+
+
+def theme_orders(chat_id: int, season_id: int,
+                 username: str | None = None) -> list[sqlite3.Row]:
+    sql = ("SELECT * FROM theme_orders WHERE chat_id = ? AND season_id = ? "
+           "AND status != 'cancelled'")
+    params: tuple = (chat_id, season_id)
+    if username:
+        sql += " AND username = ?"
+        params += (username,)
+    sql += " ORDER BY COALESCE(slot_utc, created_at)"
+    return _rows(sql, params)
+
+
+def count_theme_orders(chat_id: int, season_id: int, username: str) -> int:
+    row = _row(
+        "SELECT COUNT(*) AS n FROM theme_orders "
+        "WHERE chat_id = ? AND season_id = ? AND username = ? "
+        "AND status IN ('booked', 'played', 'legacy')",
+        (chat_id, season_id, username),
+    )
+    return row["n"] if row else 0
+
+
+def busy_slots(chat_id: int, season_id: int) -> set[str]:
+    rows = _rows(
+        "SELECT slot_utc FROM theme_orders WHERE chat_id = ? AND season_id = ? "
+        "AND slot_utc IS NOT NULL AND status != 'cancelled'",
+        (chat_id, season_id),
+    )
+    return {r["slot_utc"] for r in rows}
+
+
+def get_theme_order(order_id: int, chat_id: int) -> sqlite3.Row | None:
+    return _row("SELECT * FROM theme_orders WHERE id = ? AND chat_id = ?",
+                (order_id, chat_id))
+
+
+def update_theme_order(order_id: int, **fields) -> None:
+    if not fields:
+        return
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    with tx() as c:
+        c.execute(f"UPDATE theme_orders SET {cols} WHERE id = ?",
+                  (*fields.values(), order_id))
+
+
+def due_theme_orders(now_iso: str, horizon_iso: str) -> list[sqlite3.Row]:
+    """Заказы с привязанным пакетом, которым пора запускаться."""
+    return _rows(
+        "SELECT * FROM theme_orders WHERE status = 'booked' AND pack_id IS NOT NULL "
+        "AND slot_utc IS NOT NULL AND slot_utc BETWEEN ? AND ? ORDER BY slot_utc",
+        (now_iso, horizon_iso),
+    )
 
 
 # ==================== Экспорт ====================

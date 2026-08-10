@@ -14,15 +14,61 @@ from config import MSK, calibration_for
 
 log = logging.getLogger(__name__)
 
-TELEGRAM_LIMIT = 4000
+# Лимит Telegram — 4096 символов. Берём с запасом: при переносе незакрытого
+# блока кода в следующую часть добавляется пара служебных строк.
+TELEGRAM_LIMIT = 3800
+FENCE = "```"
+
+
+def split_message(text: str, limit: int = TELEGRAM_LIMIT) -> list[str]:
+    """Режет длинный текст по строкам, сохраняя разметку целой.
+
+    Резать по символам нельзя: разрыв посреди пары обратных кавычек или
+    внутри блока ``` даёт от Telegram «can't find end of the entity».
+    Если часть заканчивается внутри блока кода, блок закрывается здесь
+    и заново открывается в следующей части.
+    """
+    if len(text) <= limit:
+        return [text]
+
+    chunks: list[str] = []
+    current: list[str] = []
+    length = 0
+    in_fence = False
+
+    def flush():
+        nonlocal current, length, in_fence
+        if not current:
+            return
+        body = "\n".join(current)
+        if in_fence:
+            body += "\n" + FENCE
+        chunks.append(body)
+        current = [FENCE] if in_fence else []
+        length = len(FENCE) + 1 if in_fence else 0
+
+    for line in text.split("\n"):
+        # Одна строка длиннее лимита — режем принудительно, но вне блока кода.
+        while len(line) > limit:
+            flush()
+            chunks.append(line[:limit])
+            line = line[limit:]
+
+        if length + len(line) + 1 > limit:
+            flush()
+        current.append(line)
+        length += len(line) + 1
+        if line.strip() == FENCE:
+            in_fence = not in_fence
+
+    if current:
+        chunks.append("\n".join(current))
+    return [c for c in chunks if c.strip()]
 
 
 async def _reply_long(update: Update, text: str, **kwargs):
-    if len(text) <= TELEGRAM_LIMIT:
-        await update.message.reply_text(text, **kwargs)
-        return
-    for i in range(0, len(text), TELEGRAM_LIMIT):
-        await update.message.reply_text(text[i:i + TELEGRAM_LIMIT], **kwargs)
+    for chunk in split_message(text):
+        await update.message.reply_text(chunk, **kwargs)
 
 
 def username_of(user) -> str:
@@ -192,6 +238,8 @@ HELP = (
     "`/skip` — пропустить сегодняшний автозапуск\n"
     "`/pause` `/resume` `/abort` — управление ходом\n"
     "`/stats` `/rating` `/rank` — статистика\n"
+    "`/themes` — мои заказы тем, `/slots` — свободные слоты\n"
+    "`/book 53 | Тема` — заказать тему (для победителей)\n"
     "`/rename @старый @новый` — игрок сменил ник\n"
     "`/export` — обновить Google-таблицы\n\n"
     "*В личке:*\n"
