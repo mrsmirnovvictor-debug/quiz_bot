@@ -79,6 +79,63 @@ def leaderboard(rows: list[tuple[str, int]], limit: int = 10) -> str:
     return "🏆 Текущий рейтинг:\n" + "\n".join(lines)
 
 
+# ==================== Таблицы для мобильного экрана ====================
+#
+# Экран телефона вмещает примерно 30 моноширинных символов. Всё, что шире,
+# переносится и разваливает выравнивание.
+#
+# Эмодзи внутри выровненных колонок использовать нельзя: Python считает 🥇
+# за один символ, а Telegram рисует его в две позиции — колонки съезжают.
+# Поэтому медали ставятся в конец строки, после всех числовых колонок.
+
+TABLE_WIDTH = 28
+MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
+
+
+def clip(name: str, width: int) -> str:
+    name = plain_name(name)
+    return name if len(name) <= width else name[: width - 1] + "…"
+
+
+def rating_table(rows: list[tuple[str, int, int]]) -> str:
+    """rows: (ник, игр, очки)"""
+    out = ["🏆 РЕЙТИНГ ПО ОЧКАМ", "```"]
+    out.append(f"{'#':>2} {'Игрок':<15}{'Игр':>4}{'Очки':>5}")
+    out.append("─" * TABLE_WIDTH)
+    for i, (name, games, points) in enumerate(rows, 1):
+        line = f"{i:2} {clip(name, 15):<15}{games:4}{points:5}"
+        medal = MEDALS.get(i)
+        out.append(f"{line} {medal}" if medal else line)
+    out.append("```")
+    return "\n".join(out)
+
+
+def stats_entry(place: int, name: str, games: int, score: int,
+                percent: float, avg_time: float, elo: int) -> str:
+    """Двухстрочная карточка игрока: шесть колонок в ширину экрана не влезают."""
+    medal = MEDALS.get(place, "")
+    head = f"{place}. {plain_name(name)} {medal}".rstrip()
+    body = f"    {games} игр · {score} очк · {percent:.0f}% · {avg_time:.1f}с · ELO {elo}"
+    return f"{head}\n{body}"
+
+
+def rank_entry(place: int, name: str, games: int, elo: float,
+               delta_place: int | None, delta_elo: float | None) -> str:
+    if delta_place is None:
+        movement = "🆕"
+    elif delta_place > 0:
+        movement = f"▲{delta_place}"
+    elif delta_place < 0:
+        movement = f"▼{abs(delta_place)}"
+    else:
+        movement = "—"
+
+    head = f"{place}. {plain_name(name)} {movement}"
+    tail = "" if delta_elo is None else f" ({delta_elo:+.1f})"
+    body = f"    {games} игр · ELO {elo:.0f}{tail}"
+    return f"{head}\n{body}"
+
+
 def podium(place: int, names: list[str]) -> str:
     joined = " и ".join(names)
     many = len(names) > 1
@@ -117,6 +174,16 @@ QUIZ_HELP = (
     "❌ Неверный формат. Используйте:\n"
     "`/quiz 0007 | 2026-05-15 | 14:00`\n"
     "Дата и время — по Москве (UTC+3). Разделитель — вертикальная черта."
+)
+
+DELAYED_START = (
+    "⚙️ Бот перезапускался и пропустил момент старта. "
+    "Квиз начнётся через минуту — регистрация ещё открыта."
+)
+
+CANCELLED_AFTER_RESTART = (
+    "⚠️ Квиз отменён: бот был недоступен дольше допустимого, "
+    "и время старта прошло. Организатор может запустить его заново через /quiz."
 )
 
 INTERRUPTED = (

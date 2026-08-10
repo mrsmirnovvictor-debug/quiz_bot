@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes
 import db
 import engine
 import packs
+import texts
 from config import MSK, calibration_for
 
 log = logging.getLogger(__name__)
@@ -46,22 +47,19 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     header = "🏆 ТОП ИГРОКОВ (по ELO)" if min_games <= 1 else \
              f"🏆 ТОП ИГРОКОВ (от {min_games} игр, по ELO)"
-    lines = [header + "\n", "```"]
-    lines.append(f"{'Игрок':<18} {'Игр':>3} {'Очки':>6} {'%ПО':>5} {'ASA':>5} {'ELO':>4}")
-    lines.append("-" * 48)
+    lines = [header, ""]
 
-    for s in rows[:20]:
-        answered = (s["total_correct"] or 0) + (s["total_incorrect"] or 0)
-        avg_time = (s["total_time"] or 0) / answered if answered else 0
-        percent = (s["total_correct"] / s["total_questions"] * 100
-                   if s["total_questions"] else 0)
-        lines.append(
-            f"{s['username'][:18]:<18} {s['games_count']:3} "
-            f"{round(s['total_score'] or 0):6} {percent:5.1f} {avg_time:5.1f} "
-            f"{int(round(s['avg_elo'] or 0)):4}"
-        )
-    lines.append("```")
-    await _reply_long(update, "\n".join(lines), parse_mode="Markdown")
+    for place, row in enumerate(rows[:20], 1):
+        answered = (row["total_correct"] or 0) + (row["total_incorrect"] or 0)
+        avg_time = (row["total_time"] or 0) / answered if answered else 0
+        percent = (row["total_correct"] / row["total_questions"] * 100
+                   if row["total_questions"] else 0)
+        lines.append(texts.stats_entry(
+            place, row["username"], row["games_count"],
+            round(row["total_score"] or 0), percent, avg_time,
+            int(round(row["avg_elo"] or 0)),
+        ))
+    await _reply_long(update, "\n".join(lines))
 
 
 # ==================== /rating ====================
@@ -77,16 +75,10 @@ async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Рейтинг пока пуст — сыграйте первую игру.")
         return
 
-    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
-    lines = ["🏆 РЕЙТИНГ ПО ОЧКАМ\n", "```"]
-    lines.append(f"{'#':>2} {'Игрок':<18} {'Игр':>3} {'Очки':>5}")
-    lines.append("-" * 34)
-    for i, r in enumerate(rows, 1):
-        marker = medals.get(i, f"{i:2}")
-        lines.append(f"{marker:>2} {r['username'][:18]:<18} "
-                     f"{r['games_count']:3} {r['total_points'] or 0:5}")
-    lines.append("```")
-    await _reply_long(update, "\n".join(lines), parse_mode="Markdown")
+    table = texts.rating_table(
+        [(r["username"], r["games_count"], r["total_points"] or 0) for r in rows]
+    )
+    await _reply_long(update, table, parse_mode="Markdown")
 
 
 # ==================== /rank ====================
@@ -121,24 +113,17 @@ async def rank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                        if g >= min_games and u in places_now), key=lambda x: -x[2])
     places_prev = {u: i for i, (u, _, _) in enumerate(previous, 1)}
 
-    lines = ["📊 ДИНАМИКА РЕЙТИНГА\n", "```"]
-    lines.append(f"{'#':>3} {'Δм':>5} {'Игрок':<18} {'Игр':>3} {'ELO':>6} {'ΔELO':>7}")
-    lines.append("-" * 48)
-
+    lines = ["📊 ДИНАМИКА РЕЙТИНГА", ""]
     for username, games, elo in current:
         place = places_now[username]
         if username in places_prev:
             delta_place = places_prev[username] - place
             delta_elo = elo - prev[username][1]
-            symbol = "↑" if delta_place > 0 else ("↓" if delta_place < 0 else " ")
-            change = f"({delta_place:+})" if delta_place else "(-)"
-            delta_elo_str = f"{delta_elo:+.1f}"
         else:
-            symbol, change, delta_elo_str = "+", "   ", "NEW"
-        lines.append(f"{symbol}{place:2} {change:>5} {username[:18]:<18} "
-                     f"{games:3} {elo:6.0f} {delta_elo_str:>7}")
-    lines.append("```")
-    await _reply_long(update, "\n".join(lines), parse_mode="Markdown")
+            delta_place = delta_elo = None
+        lines.append(texts.rank_entry(place, username, games, elo,
+                                      delta_place, delta_elo))
+    await _reply_long(update, "\n".join(lines))
 
 
 # ==================== /history ====================

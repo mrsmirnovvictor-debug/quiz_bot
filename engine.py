@@ -6,7 +6,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import TelegramError
@@ -17,6 +17,11 @@ import sheets
 import texts
 from config import (AUDIO, MSK, RULES, SHEETS_ENABLED, TIMER_VIDEO_URL,
                     TIMINGS)
+
+# Насколько бот готов опоздать со стартом после возвращения из даунтайма.
+RECOVERY_GRACE = timedelta(minutes=15)
+# Задержка перед стартом восстановленного квиза: людям нужно вернуться в чат.
+RECOVERY_DELAY = 60
 from game import Answer, Game, build_result_rows
 from packs import Pack, load_pack
 
@@ -551,24 +556,39 @@ async def recover(context: ContextTypes.DEFAULT_TYPE):
 
         start_utc = datetime.fromisoformat(row["scheduled_start_utc"])
 
-        if row["status"] == "registration" and start_utc > now:
-            # Регистрация ещё актуальна — восстанавливаем и переставляем джобу.
-            game = Game(game_id=game_id, chat_id=chat_id, thread_id=row["thread_id"],
-                        pack=pack, creator_id=row["creator_id"],
-                        scheduled_start_utc=start_utc, source=row["source"])
+        if row["status"] == "registration":
+            late = now - start_utc
+
+            if late > RECOVERY_GRACE:
+                # Опоздали безнадёжно. Молча ронять игру нельзя: в чате висит
+                # закреплённое приглашение, и люди будут ждать зря.
+                game = _rebuild_game(row, pack)
+                await say(context, game, texts.CANCELLED_AFTER_RESTART)
+                await to_db(db.update_game, game_id, status="aborted")
+                log.info("Игра %s отменена: старт просрочен на %s", game_id, late)
+                continue
+
+            game = _rebuild_game(row, pack)
             game.reg_msg_id = row["reg_msg_id"]
             for p in await to_db(db.participants, game_id):
                 game.add_player(p["user_id"], p["username"])
             LIVE[chat_id] = game
 
-            _schedule(context, job_start_sequence,
-                      (start_utc - now).total_seconds(), chat_id, f"start:{chat_id}")
+            if start_utc > now:
+                delay = (start_utc - now).total_seconds()
+                log.info("Восстановлена регистрация игры %s", game_id)
+            else:
+                # Момент старта пришёлся на даунтайм — стартуем с задержкой.
+                delay = RECOVERY_DELAY
+                await say(context, game, texts.DELAYED_START)
+                log.info("Игра %s стартует с опозданием %s", game_id, late)
+
+            _schedule(context, job_start_sequence, delay, chat_id, f"start:{chat_id}")
             context.job_queue.run_repeating(
                 job_refresh_registration, interval=TIMINGS.reg_refresh,
                 first=TIMINGS.reg_refresh, chat_id=chat_id, data=chat_id,
                 name=f"reg:{chat_id}",
             )
-            log.info("Восстановлена регистрация игры %s", game_id)
             continue
 
         # Всё остальное закрываем: доигрывать вопрос с потерянным таймером
@@ -576,11 +596,15 @@ async def recover(context: ContextTypes.DEFAULT_TYPE):
         await _finalize_interrupted(context, row, pack)
 
 
-async def _finalize_interrupted(context, row, pack):
-    game = Game(game_id=row["id"], chat_id=row["chat_id"], thread_id=row["thread_id"],
+def _rebuild_game(row, pack) -> Game:
+    return Game(game_id=row["id"], chat_id=row["chat_id"], thread_id=row["thread_id"],
                 pack=pack, creator_id=row["creator_id"],
                 scheduled_start_utc=datetime.fromisoformat(row["scheduled_start_utc"]),
                 source=row["source"])
+
+
+async def _finalize_interrupted(context, row, pack):
+    game = _rebuild_game(row, pack)
     game.status = "active"
     game.current_question = row["current_question"]
 
@@ -596,6 +620,7 @@ async def _finalize_interrupted(context, row, pack):
             game.speed_sum[a["user_id"]] += a["elapsed"]
 
     if not game.answers:
+        await say(context, game, texts.CANCELLED_AFTER_RESTART)
         await to_db(db.update_game, row["id"], status="aborted")
         log.info("Игра %s прервана без ответов, помечена aborted", row["id"])
         return
