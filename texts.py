@@ -97,9 +97,9 @@ def clip(name: str, width: int) -> str:
     return name if len(name) <= width else name[: width - 1] + "…"
 
 
-def rating_table(rows: list[tuple[str, int, int]]) -> str:
+def rating_table(rows: list[tuple[str, int, int]], period: str = "") -> str:
     """rows: (ник, игр, очки)"""
-    out = ["🏆 РЕЙТИНГ ПО ОЧКАМ", "```"]
+    out = [f"🏆 РЕЙТИНГ ПО ОЧКАМ{period}", "```"]
     out.append(f"{'#':>2} {'Игрок':<15}{'Игр':>4}{'Очки':>5}")
     out.append("─" * TABLE_WIDTH)
     for i, (name, games, points) in enumerate(rows, 1):

@@ -55,6 +55,18 @@ def current_quarter(today: date) -> tuple[str, str, str]:
     return f"Q{quarter} {today.year}", starts.isoformat(), ends.isoformat()
 
 
+def season_bounds(chat_id: int) -> tuple[str, str, str] | None:
+    """(название, начало, конец) активного сезона или None.
+
+    В отличие от ensure_season ничего не создаёт: вызывается из выгрузки
+    в Sheets, где неожиданное появление сезона было бы сюрпризом.
+    """
+    season = db.active_season(chat_id)
+    if not season:
+        return None
+    return season["name"], season["starts_on"], season["ends_on"]
+
+
 def ensure_season(chat_id: int, today: date | None = None):
     """Возвращает активный сезон, при отсутствии заводит текущий квартал."""
     season = db.active_season(chat_id)

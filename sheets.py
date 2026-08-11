@@ -196,10 +196,27 @@ def _rebuild_players(chat_id: int) -> None:
 
 
 def _rebuild_rating(chat_id: int) -> None:
+    """Рейтинг по очкам за текущий сезон.
+
+    Если сезон для группы задан, считаем только игры внутри его границ:
+    зачёт квартальный, а не за всю историю. Без сезона поведение прежнее.
+    """
+    import themes
+
     headers = ["Игрок", "Количество игр", "Всего очков рейтинга"]
     ws = _worksheet(f"Rating_{chat_id}", headers)
-    rows = [[r["username"], r["games_count"], r["total_points"] or 0]
-            for r in db.rating_table(chat_id)]
+
+    bounds = themes.season_bounds(chat_id)
+    if bounds:
+        name, starts, ends = bounds
+        # Границы сезона — даты, played_at — метка времени UTC.
+        data = db.rating_table_period(chat_id, starts, ends + "T23:59:59+00:00")
+        log.info("Rating_%s: сезон %s (%s — %s)", chat_id, name, starts, ends)
+    else:
+        data = db.rating_table(chat_id)
+        log.info("Rating_%s: сезон не задан, считаем за всё время", chat_id)
+
+    rows = [[r["username"], r["games_count"], r["total_points"] or 0] for r in data]
     _replace_rows(ws, rows)
 
 

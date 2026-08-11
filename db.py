@@ -382,13 +382,13 @@ def rating_table(chat_id: int) -> list[sqlite3.Row]:
 
 
 def rating_table_period(chat_id: int, since: str, until: str) -> list[sqlite3.Row]:
-    """То же, но за период — для сезонных зачётов на лидербордах."""
+    """Рейтинг за период. Границы включительно, сравнение по дате игры."""
     return _rows(
         """SELECT username,
                   COUNT(*)            AS games_count,
                   SUM(rating_points)  AS total_points
            FROM results
-           WHERE chat_id = ? AND played_at >= ? AND played_at < ?
+           WHERE chat_id = ? AND played_at >= ? AND played_at <= ?
            GROUP BY username
            ORDER BY total_points DESC, games_count ASC""",
         (chat_id, since, until),

@@ -10,6 +10,7 @@ import db
 import engine
 import packs
 import texts
+import themes
 from config import MSK, calibration_for
 
 log = logging.getLogger(__name__)
@@ -116,13 +117,29 @@ async def rating_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📊 Команда /rating работает в группах.")
         return
 
-    rows = await engine.to_db(db.rating_table, chat_id)
+    # /rating all — за всю историю, без аргумента — за текущий сезон.
+    want_all = update.message.text.partition(" ")[2].strip().lower() in ("all", "все", "всё")
+    bounds = None if want_all else await engine.to_db(themes.season_bounds, chat_id)
+
+    if bounds:
+        name, starts, ends = bounds
+        rows = await engine.to_db(db.rating_table_period, chat_id, starts,
+                                  ends + "T23:59:59+00:00")
+        period = f" · сезон {name}"
+    else:
+        rows = await engine.to_db(db.rating_table, chat_id)
+        period = " · за всё время" if want_all else ""
+
     if not rows:
-        await update.message.reply_text("❌ Рейтинг пока пуст — сыграйте первую игру.")
+        await update.message.reply_text(
+            "❌ В этом сезоне игр ещё не было. Полный рейтинг — /rating all"
+            if bounds else "❌ Рейтинг пока пуст — сыграйте первую игру."
+        )
         return
 
     table = texts.rating_table(
-        [(r["username"], r["games_count"], r["total_points"] or 0) for r in rows]
+        [(r["username"], r["games_count"], r["total_points"] or 0) for r in rows],
+        period=period,
     )
     await _reply_long(update, table, parse_mode="Markdown")
 
