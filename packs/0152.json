@@ -1,213 +1,138 @@
 {
-  "title": "🎧 Летние хиты 2026: угадай исполнителя. 16 отрывков по 20 секунд",
+  "title": "🎧 Угадай русского исполнителя. 16 отрывков по 20 секунд",
   "questions": [
     {
       "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_01.mp3",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/1.mp3",
       "duration": 20,
-      "options": [
-        "Клава Кока",
-        "ANNA ASTI",
-        "MIA BOYKA",
-        "NILETTO"
-      ],
+      "options": ["Клава Кока", "ANNA ASTI", "MIA BOYKA", "Люся Чеботина"],
       "correct": 2,
       "comment": "«ЭКСПОНАТ» — MIA BOYKA. Вышел 15 мая 2026 года; певица говорила, что писала его для поднятия самооценки у девушек."
     },
     {
       "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_02.mp3",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/2.mp3",
       "duration": 20,
-      "options": [
-        "Jony и Andro",
-        "By Индия, Xcho, MOT",
-        "Miyagi & Endshpil",
-        "HammAli & Navai"
-      ],
+      "options": ["Jony и Andro", "By Индия, Xcho, MOT", "Miyagi & Endshpil", "HammAli & Navai"],
       "correct": 1,
       "comment": "«Шадэ» — By Индия, Xcho и MOT. Вышел 8 мая, возглавил чарты стримингов и попал в мировой Shazam."
     },
     {
       "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_03.mp3",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/3.mp3",
       "duration": 20,
-      "options": [
-        "SAYAN",
-        "Xcho",
-        "Ramil'",
-        "ELMAN"
-      ],
+      "options": ["SAYAN", "Xcho", "Ramil'", "ELMAN"],
       "correct": 0,
       "comment": "«Мальборо» — SAYAN, релиз 10 апреля. Армянский колорит, лёгкая бравада и припев, который цепляется намертво."
     },
     {
       "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_04.mp3",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/4.mp3",
       "duration": 20,
-      "options": [
-        "Дора",
-        "Инстасамка",
-        "Три дня дождя",
-        "BEARWOLF"
-      ],
+      "options": ["Три дня дождя", "Мукка", "Пошлая Молли", "BEARWOLF"],
       "correct": 3,
-      "comment": "«Феникс» — BEARWOLF. Трек вышел ещё 20 февраля, но держится в чартах всё лето за счёт коротких видео."
+      "comment": "«Феникс» — BEARWOLF. Яндекс Музыка назвала её фрешменом 2024 года, а трек держится в чартах за счёт коротких видео."
     },
     {
       "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_05.mp3",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/5.mp3",
       "duration": 20,
-      "options": [
-        "Полина Гагарина",
-        "Zivert",
-        "Клава Кока",
-        "Ёлка"
-      ],
+      "options": ["Полина Гагарина", "Zivert", "Клава Кока", "Ёлка"],
       "correct": 1,
       "comment": "«GAZ» — Zivert, 24 апреля. Первая за год сольная работа певицы: о драйве и жизни в постоянном движении."
     },
     {
       "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_06.mp3",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/6.mp3",
       "duration": 20,
-      "options": [
-        "Тима Белорусских",
-        "ЛСП",
-        "HOLLYFLAME",
-        "Макс Корж"
-      ],
+      "options": ["Тима Белорусских", "ЛСП", "HOLLYFLAME", "Макс Корж"],
       "correct": 2,
       "comment": "«Тону» — HOLLYFLAME, белорусский исполнитель. Релиз 6 февраля, в топ вывели миллионы роликов в соцсетях."
     },
     {
       "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_07.mp3",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/7.mp3",
       "duration": 20,
-      "options": [
-        "Ваня Дмитриенко",
-        "Rauf & Faik",
-        "ANNA ASTI",
-        "Егор Крид"
-      ],
+      "options": ["Ваня Дмитриенко", "Rauf & Faik", "Егор Крид", "Niletto"],
       "correct": 0,
-      "comment": "«Ртуть» — Ваня Дмитриенко, 20 марта. Песня о колебаниях в самом начале отношений."
+      "comment": "«Ртуть» — Ваня Дмитриенко, 20 марта. В декабре 2025 года Яндекс Музыка назвала его артистом года."
     },
     {
       "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_08.mp3",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/8.mp3",
       "duration": 20,
-      "options": [
-        "Мари Краймбрери",
-        "Artik & Asti",
-        "Люся Чеботина",
-        "Jakone, Kiliana, Успенская"
-      ],
-      "correct": 3,
-      "comment": "«Плакала надежда» — Jakone, Kiliana и Любовь Успенская. Вышла 13 марта и разошлась по радио и телепремиям."
+      "options": ["Комната культуры", "Свидание", "Дайте танк (!)", "Три дня дождя"],
+      "correct": 0,
+      "comment": "«Поезда» — «Комната культуры» Жени Трофимова. Трек года по версии Яндекс Музыки за 2024-й."
     },
     {
       "text": "Кто исполняет?",
       "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_09.mp3",
       "duration": 20,
       "options": [
-        "Dua Lipa",
-        "PinkPantheress и Zara Larsson",
-        "Charli XCX",
-        "Tate McRae"
+        "MACAN",
+        "Wallem",
+        "Miyagi",
+        "Big Baby Tape"
       ],
       "correct": 1,
-      "comment": "«Stateside» — PinkPantheress и Zara Larsson. Ремикс с семплом «Freak Like Me» и басом в духе UK garage."
+      "comment": "«Харизма» — Wallem. Казахстанский артист за месяц вырос с 28 тысяч до 5 миллионов слушателей, а трек стал самым прослушиваемым в Яндекс Музыке за 2024 год."
     },
     {
       "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_10.mp3",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/10.mp3",
       "duration": 20,
-      "options": [
-        "Gracie Abrams",
-        "Billie Eilish",
-        "Olivia Rodrigo",
-        "Sabrina Carpenter"
-      ],
-      "correct": 2,
-      "comment": "«drop dead» — Olivia Rodrigo, ведущий сингл третьего альбома. Синтезаторный бас, струнные и подростковая эйфория."
-    },
-    {
-      "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_11.mp3",
-      "duration": 20,
-      "options": [
-        "Charli XCX",
-        "Kim Petras",
-        "Doja Cat",
-        "Slayyyter"
-      ],
-      "correct": 3,
-      "comment": "«CRANK» — Slayyyter, сингл с альбома WOR$T GIRL IN AMERICA. Индустриальный бит и главный клубный трек лета."
-    },
-    {
-      "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_12.mp3",
-      "duration": 20,
-      "options": [
-        "Vince Staples",
-        "Tyler, The Creator",
-        "Kendrick Lamar",
-        "Anderson .Paak"
-      ],
-      "correct": 0,
-      "comment": "«Cotton» — Vince Staples. Слэп-бас и лёгкий флоу маскируют жёсткое высказывание о коммерциализации чёрной музыки."
-    },
-    {
-      "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_13.mp3",
-      "duration": 20,
-      "options": [
-        "Blur",
-        "Gorillaz",
-        "Tame Impala",
-        "Arctic Monkeys"
-      ],
+      "options": ["Icegergert", "Скриптонит", "Kizaru", "OG Buda"],
       "correct": 1,
-      "comment": "«Orange County» — Gorillaz с альбома The Mountain, вдохновлённого Индией. Свист, ситар Анушки Шанкар и вокал Кары Джексон."
+      "comment": "«Не расслабляйся» — Скриптонит. Вышел в конце 2024-го, а разошёлся в 2025-м, добравшись даже до западного тиктока."
     },
     {
       "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_14.mp3",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/11.mp3",
       "duration": 20,
-      "options": [
-        "Confidence Man",
-        "Jungle",
-        "Fcukers",
-        "Romy"
-      ],
+      "options": ["ANNA ASTI", "MONA", "Мари Краймбрери", "Инстасамка"],
+      "correct": 1,
+      "comment": "«Иордан» — MONA. Дарья Кустовская два года подряд становилась артисткой года по версии Яндекс Музыки."
+    },
+    {
+      "text": "Кто исполняет?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/12.mp3",
+      "duration": 20,
+      "options": ["Аффинаж", "Хадн дадн", "Бонд с кнопкой", "Свидание"],
       "correct": 2,
-      "comment": "«LUCKY» — Fcukers, нью-йоркский дуэт на волне возрождения электроклэша. Бесстрастный вокал поверх бодрого дип-хауса."
+      "comment": "«Кухни» — «Бонд с кнопкой», инди-коллектив из Нефтекамска. Трек продержался на вершине чарта Яндекс Музыки 85 дней."
     },
     {
       "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_15.mp3",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/13.mp3",
       "duration": 20,
-      "options": [
-        "Madonna и Sabrina Carpenter",
-        "Kylie Minogue",
-        "Lady Gaga",
-        "Dua Lipa"
-      ],
-      "correct": 0,
-      "comment": "«Bring Your Love» — Madonna и Sabrina Carpenter. Продюсер Стюарт Прайс и семпл «Good Life» группы Inner City."
+      "options": ["Платина", "Джон Гарик", "Icegergert", "Kizaru"],
+      "correct": 1,
+      "comment": "«Сиять» — Джон Гарик, 2025 год. Один из главных рэп-хитов года, построенный на семпле из «Empty»."
     },
     {
       "text": "Кто исполняет?",
-      "audio": "https://storage.yandexcloud.net/ваш-бакет/summer2026_16.mp3",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/14.mp3",
       "duration": 20,
-      "options": [
-        "Bladee",
-        "Yung Lean",
-        "Ecco2k",
-        "Thaiboy Digital"
-      ],
+      "options": ["25/17", "Каспийский груз", "Хаски", "Триагрутрика"],
+      "correct": 2,
+      "comment": "«Ветром снегом зноем» — Хаски, 2025 год. Неожиданно светлая песня о любви от автора самых мрачных текстов в русском рэпе."
+    },
+    {
+      "text": "Кто исполняет?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/15.mp3",
+      "duration": 20,
+      "options": ["Sqwoz Bab", "Wallem", "OG Buda", "Bushido Zho"],
       "correct": 3,
-      "comment": "«Destiny» — Thaiboy Digital и продюсерское трио swedm®. Самый танцевальный трек участника Drain Gang."
+      "comment": "«Далеко (большой бушизм)» — Bushido Zho, 2024. Бразильский фонк, возглавивший «Суперлонч» Яндекс Музыки."
+    },
+    {
+      "text": "Кто исполняет?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/audioquiz/16.mp3",
+      "duration": 20,
+      "options": ["Morgenshtern", "Madk1d", "Платина", "Friendly Thug 52 NGG"],
+      "correct": 2,
+      "comment": "«Бро» — Платина, 2025 год. После мрачного предыдущего альбома — один из самых светлых трэп-треков на русском."
     }
   ]
 }
