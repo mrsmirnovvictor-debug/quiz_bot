@@ -633,6 +633,45 @@ def update_theme_order(order_id: int, **fields) -> None:
                   (*fields.values(), order_id))
 
 
+def reserved_pack_ids(chat_id: int) -> set[str]:
+    """Пакеты, привязанные к незаигранным заказам этой группы.
+
+    Автовыбор расписания не должен их трогать: тема заказана на конкретный
+    слот, и выдать её обычным слотом — значит сжечь чужой заказ.
+    """
+    rows = _rows(
+        "SELECT DISTINCT pack_id FROM theme_orders "
+        "WHERE chat_id = ? AND pack_id IS NOT NULL AND status = 'booked'",
+        (chat_id,),
+    )
+    return {r["pack_id"] for r in rows}
+
+
+def forget_chat(chat_id: int) -> dict[str, int]:
+    """Полностью удаляет группу из статистики. Необратимо."""
+    with tx() as c:
+        games = [r["id"] for r in c.execute(
+            "SELECT id FROM games WHERE chat_id = ?", (chat_id,))]
+        counts = {}
+        if games:
+            marks = ",".join("?" * len(games))
+            counts["ответов"] = c.execute(
+                f"DELETE FROM answers WHERE game_id IN ({marks})", games).rowcount
+            counts["участников"] = c.execute(
+                f"DELETE FROM participants WHERE game_id IN ({marks})", games).rowcount
+        counts["результатов"] = c.execute(
+            "DELETE FROM results WHERE chat_id = ?", (chat_id,)).rowcount
+        counts["игр"] = c.execute(
+            "DELETE FROM games WHERE chat_id = ?", (chat_id,)).rowcount
+        counts["расписаний"] = c.execute(
+            "DELETE FROM schedules WHERE chat_id = ?", (chat_id,)).rowcount
+        counts["заказов"] = c.execute(
+            "DELETE FROM theme_orders WHERE chat_id = ?", (chat_id,)).rowcount
+        counts["сезонов"] = c.execute(
+            "DELETE FROM seasons WHERE chat_id = ?", (chat_id,)).rowcount
+        return counts
+
+
 def due_theme_orders(now_iso: str, horizon_iso: str) -> list[sqlite3.Row]:
     """Заказы с привязанным пакетом, которым пора запускаться."""
     return _rows(

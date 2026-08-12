@@ -107,7 +107,9 @@ def pick_pack(chat_id: int, pack_source: str, pool: str) -> tuple[packs.Pack, bo
     if not available:
         raise ScheduleError(f"в пуле «{pool or 'все'}» нет ни одного пакета")
 
-    played = db.played_pack_ids(chat_id)
+    # Пакеты под заказанные темы держим отдельно: их запустит механизм тем
+    # в свой слот, а не общий автовыбор.
+    played = db.played_pack_ids(chat_id) | db.reserved_pack_ids(chat_id)
     unplayed = [p for p in available if p not in played]
     if unplayed:
         pack, _ = packs.load_first_valid(unplayed)
