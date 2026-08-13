@@ -672,6 +672,15 @@ def forget_chat(chat_id: int) -> dict[str, int]:
         return counts
 
 
+def booked_order_at(chat_id: int, slot_utc: str):
+    """Бронь ровно на этот момент, если она есть."""
+    return _row(
+        "SELECT * FROM theme_orders WHERE chat_id = ? AND slot_utc = ? "
+        "AND status = 'booked' LIMIT 1",
+        (chat_id, slot_utc),
+    )
+
+
 def due_theme_orders(now_iso: str, horizon_iso: str) -> list[sqlite3.Row]:
     """Заказы с привязанным пакетом, которым пора запускаться."""
     return _rows(

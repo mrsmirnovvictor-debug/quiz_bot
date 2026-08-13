@@ -141,16 +141,18 @@ async def tick(context: ContextTypes.DEFAULT_TYPE) -> None:
         log.exception("Не удалось прочитать расписание")
         return
 
+    # Заказанные темы имеют приоритет: игрок выиграл право на конкретный слот,
+    # и обычное расписание не должно занять его первым.
+    try:
+        await _run_theme_orders(context, now_utc)
+    except Exception:
+        log.exception("Ошибка обработки заказанных тем")
+
     for row in rows:
         try:
             await _maybe_run(context, row, now_utc, now_msk, today)
         except Exception:
             log.exception("Слот #%s: ошибка обработки", row["id"])
-
-    try:
-        await _run_theme_orders(context, now_utc)
-    except Exception:
-        log.exception("Ошибка обработки заказанных тем")
 
 
 async def _run_theme_orders(context, now_utc) -> None:
@@ -217,6 +219,15 @@ async def _maybe_run(context, row, now_utc, now_msk, today) -> None:
         return                       # слот безнадёжно проспан, ждём следующего дня
 
     chat_id = row["chat_id"]
+
+    # Если на это же время есть заказанная тема — расписание молча уступает.
+    booked = await engine.to_db(db.booked_order_at, chat_id, start_utc.isoformat())
+    if booked:
+        log.info("Слот #%s уступает заказу #%s (%s)",
+                 row["id"], booked["id"], booked["theme"])
+        await engine.to_db(db.claim_schedule_run, row["id"], today)
+        return
+
     if chat_id in engine.LIVE:
         log.info("Слот #%s пропущен: в чате уже идёт квиз", row["id"])
         return
