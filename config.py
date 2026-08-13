@@ -104,13 +104,6 @@ def _parse_chat_list(name: str) -> set[int]:
 THEMES_CHATS = _parse_chat_list("THEMES_CHATS")
 # Максимум заказов на игрока за сезон, сколько бы побед он ни набрал.
 THEME_LIMIT = _int_env("THEME_LIMIT", 3)
-# За сколько часов до слота бронь закрывается: админу нужно успеть собрать пакет.
-THEME_LEAD_HOURS = _int_env("THEME_LEAD_HOURS", 24)
-# За сколько минут до заказанного слота открывать регистрацию.
-THEME_REG_LEAD_MINUTES = _int_env("THEME_REG_LEAD_MINUTES", 45)
-# Сетка игровых слотов: дни недели (пн=0) и часы по Москве.
-THEME_WEEKDAYS = tuple(int(x) for x in os.environ.get("THEME_WEEKDAYS", "0,3").split(","))
-THEME_HOURS = tuple(int(x) for x in os.environ.get("THEME_HOURS", "19,20,21,22").split(","))
 
 
 def themes_enabled(chat_id: int) -> bool:

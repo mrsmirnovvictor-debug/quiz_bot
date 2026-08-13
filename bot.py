@@ -74,11 +74,8 @@ def main() -> None:
     app.add_handler(CommandHandler("refresh", admin.export_command))   # старое имя
 
     app.add_handler(CommandHandler("themes", themes_h.themes_command))
-    app.add_handler(CommandHandler("slots", themes_h.slots_command))
-    app.add_handler(CommandHandler("book", themes_h.book_command))
-    app.add_handler(CommandHandler("theme_add", themes_h.theme_add_command))
-    app.add_handler(CommandHandler("theme_pack", themes_h.theme_pack_command))
-    app.add_handler(CommandHandler("theme_del", themes_h.theme_del_command))
+    app.add_handler(CommandHandler("order", themes_h.order_command))
+    app.add_handler(CommandHandler("order_del", themes_h.order_del_command))
     app.add_handler(CommandHandler("season", themes_h.season_command))
 
     app.add_handler(CommandHandler("stats", stats.stats_command))
