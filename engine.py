@@ -66,44 +66,55 @@ async def say_audio(context: ContextTypes.DEFAULT_TYPE, game: Game, question,
                     caption: str, **kwargs):
     """Отправляет музыкальный вопрос.
 
-    Метаданные перезаписываются: иначе Telegram покажет в плеере название
-    трека и исполнителя, то есть готовый ответ.
+    По умолчанию — голосовым сообщением: Telegram не собирает их в плейлист,
+    поэтому короткий отрывок не тянет за собой соседние аудио из ленты.
+    Заодно в голосовом не видно тегов файла, которые выдали бы ответ.
     """
     path = question.audio
-    kw = dict(
-        chat_id=game.chat_id,
-        caption=caption,
-        performer=AUDIO.performer,
-        title=AUDIO.title_template.format(n=game.current_question + 1),
-        **kwargs,
-    )
+    mode = question.audio_mode or AUDIO.mode
+    is_voice = mode == "voice"
+
+    kw = dict(chat_id=game.chat_id, caption=caption, **kwargs)
     if game.thread_id:
         kw["message_thread_id"] = game.thread_id
+    if not is_voice:
+        kw["performer"] = AUDIO.performer
+        kw["title"] = AUDIO.title_template.format(n=game.current_question + 1)
 
+    send = context.bot.send_voice if is_voice else context.bot.send_audio
+    field = "voice" if is_voice else "audio"
+
+    def file_id_of(msg):
+        media = msg.voice if is_voice else msg.audio
+        return media.file_id if media else None
+
+    # Ссылку Telegram скачивает сам, кэшировать нечего.
     if path.startswith(("http://", "https://")):
         try:
-            return await context.bot.send_audio(audio=path, **kw)
+            return await send(**{field: path}, **kw)
         except TelegramError:
             log.exception("Аудио по ссылке не отправилось: %s", path)
             return await say(context, game, caption, **kwargs)
 
-    cached = await to_db(db.get_cached_file_id, path)
+    cache_key = f"{mode}:{path}"
+    cached = await to_db(db.get_cached_file_id, cache_key)
     if cached:
         try:
-            return await context.bot.send_audio(audio=cached, **kw)
+            return await send(**{field: cached}, **kw)
         except TelegramError:
             log.warning("file_id протух, перезаливаем %s", path)
-            await to_db(db.drop_cached_file_id, path)
+            await to_db(db.drop_cached_file_id, cache_key)
 
     try:
         with open(path, "rb") as f:
-            msg = await context.bot.send_audio(audio=f, **kw)
+            msg = await send(**{field: f}, **kw)
     except (TelegramError, OSError):
         log.exception("Не удалось отправить аудио %s", path)
         return await say(context, game, caption, **kwargs)
 
-    if msg and msg.audio:
-        await to_db(db.cache_file_id, path, msg.audio.file_id)
+    file_id = file_id_of(msg) if msg else None
+    if file_id:
+        await to_db(db.cache_file_id, cache_key, file_id)
     return msg
 
 

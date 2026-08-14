@@ -27,6 +27,7 @@ class Question:
     comment: str = ""
     audio: str = ""          # URL или путь к mp3 относительно корня проекта
     duration: int = 0        # 0 = взять значение по умолчанию
+    audio_mode: str = ""     # voice|audio, пусто = из настроек
 
     @property
     def is_audio(self) -> bool:
@@ -71,6 +72,12 @@ def _parse_question(raw: dict, n: int) -> Question:
     if not isinstance(duration, int) or duration < 0 or duration > 300:
         raise PackError(f"вопрос {n}: неверное значение duration ({duration!r})")
 
+    audio_mode = str(raw.get("audio_mode") or "").strip().lower()
+    if audio_mode and audio_mode not in ("voice", "audio"):
+        raise PackError(
+            f"вопрос {n}: audio_mode может быть voice или audio, а не {audio_mode!r}"
+        )
+
     return Question(
         text=str(text).strip(),
         options=[str(o).strip() for o in options],
@@ -79,6 +86,7 @@ def _parse_question(raw: dict, n: int) -> Question:
         comment=str(raw.get("comment") or "").strip(),
         audio=audio,
         duration=duration,
+        audio_mode=audio_mode,
     )
 
 
