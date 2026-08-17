@@ -148,6 +148,67 @@ async def tick(context: ContextTypes.DEFAULT_TYPE) -> None:
             log.exception("Слот #%s: ошибка обработки", row["id"])
 
 
+async def _maybe_run(context, row, now_utc, now_msk, today) -> None:
+    """Проверяет один слот и при совпадении запускает квиз."""
+    if not days_match(row["days"], now_msk.weekday()):
+        return
+    if row["last_run_date"] == today or row["skip_date"] == today:
+        return
+
+    hour, minute = (int(x) for x in row["time_msk"].split(":"))
+    start_msk = now_msk.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    start_utc = start_msk.astimezone(timezone.utc)
+    open_at = start_utc - timedelta(minutes=row["reg_lead_minutes"])
+
+    if now_utc < open_at:
+        return                       # ещё рано
+    if now_utc > start_utc + LATE_GRACE:
+        return                       # слот проспан, ждём следующего дня
+
+    chat_id = row["chat_id"]
+    if chat_id in engine.LIVE:
+        # Логируем один раз за слот, а не каждую минуту: строка повторялась
+        # весь квиз и засоряла лог.
+        if row["id"] not in _reported_busy:
+            _reported_busy.add(row["id"])
+            log.info("Слот #%s ждёт: в чате идёт квиз", row["id"])
+        return
+    existing = await engine.to_db(db.active_game_for_chat, chat_id)
+    if existing:
+        if row["id"] not in _reported_busy:
+            _reported_busy.add(row["id"])
+            log.info("Слот #%s ждёт: незакрытая игра %s", row["id"], existing["id"])
+        return
+    _reported_busy.discard(row["id"])
+
+    # Атомарная заявка. Если параллельный тик успел раньше — выходим.
+    if not await engine.to_db(db.claim_schedule_run, row["id"], today):
+        return
+
+    try:
+        pack, repeat = await engine.to_db(pick_pack, chat_id, row["pack_source"],
+                                          row["pack_pool"])
+    except Exception as e:
+        log.exception("Слот #%s: не удалось выбрать пакет", row["id"])
+        await _notify(context, chat_id, row["thread_id"],
+                      f"⚠️ Автозапуск квиза отменён: {e}")
+        return
+
+    # Опоздали к слоту — даём людям хотя бы несколько минут на регистрацию.
+    actual_start = start_utc if start_utc > now_utc else now_utc + LATE_LEAD
+
+    game = await engine.create_game(
+        context, chat_id=chat_id, thread_id=row["thread_id"], pack=pack,
+        creator_id=row["created_by"], start_utc=actual_start, source="schedule",
+    )
+    log.info("Слот #%s запустил квиз %s (пакет %s)", row["id"], game.game_id, pack.pack_id)
+
+    if repeat:
+        await _notify(context, chat_id, row["thread_id"],
+                      "ℹ️ Все пакеты из пула уже сыграны в этой группе — "
+                      "берём самый давний. Пора добавить новые вопросы.")
+
+
 async def _notify(context, chat_id: int, thread_id, text: str) -> None:
     kwargs = {"chat_id": chat_id, "text": text}
     if thread_id:
