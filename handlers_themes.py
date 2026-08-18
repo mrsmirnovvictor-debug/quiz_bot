@@ -27,8 +27,15 @@ def username_of(user) -> str:
     return f"@{user.username}" if user.username else f"id{user.id}"
 
 
-def _args(text: str, command: str) -> str:
-    return text[len(command) + 1:].strip()
+def _args(text: str, command: str = "") -> str:
+    """Аргументы команды.
+
+    В группах Telegram часто присылает команду с упоминанием бота
+    (/themes@QuizBot all), поэтому отрезаем первое слово целиком,
+    а не фиксированную длину.
+    """
+    parts = (text or "").strip().split(maxsplit=1)
+    return parts[1].strip() if len(parts) > 1 else ""
 
 
 async def _admin_chats(context, user_id: int) -> list[int]:
@@ -167,24 +174,21 @@ async def _overview(update: Update, context: ContextTypes.DEFAULT_TYPE,
     done = [r for r in rows if r["left"] == 0 and r["used"]]
 
     if compact:
-        # В группе — только суть: кто ещё может заказать и что заказано недавно.
+        # В группе — кто сколько ещё может заказать.
+        # Формат строки: ник — остаток (заказано) побед 🏆
         lines = [f"🎯 Заказ тем · сезон {season['name']}", ""]
         if available:
             lines.append("Доступно заказов:")
             for r in available:
-                lines.append(f"  {themes.plain(r['username'])} — {r['left']}")
+                lines.append(f"  {themes.plain(r['username'])} — {r['left']} "
+                             f"({r['used']}) {r['wins']} 🏆")
         else:
             lines.append("Свободных заказов нет.")
-        if orders:
+        if done:
             lines.append("")
-            recent = orders[-5:]
-            head = "Последние темы:" if len(orders) > 5 else "Заказанные темы:"
-            lines.append(head)
-            for order in recent:
-                lines.append(f"  {themes.plain(order['username'])} — "
-                             f"{order['theme'][:40]}")
-            if len(orders) > 5:
-                lines.append(f"  …всего {len(orders)}, полный список — /themes all в личке")
+            lines.append("Квота исчерпана:")
+            for r in done:
+                lines.append(f"  {themes.plain(r['username'])} — {r['used']}")
         await update.message.reply_text("\n".join(lines))
         return
 
