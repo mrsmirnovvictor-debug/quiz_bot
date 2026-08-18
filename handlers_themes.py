@@ -16,7 +16,7 @@ from datetime import date
 import db
 import engine
 import themes
-from config import THEME_LIMIT, THEMES_CHATS
+from config import THEME_LIMIT, THEMES_CHATS, themes_enabled
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -31,17 +31,38 @@ def _args(text: str, command: str) -> str:
     return text[len(command) + 1:].strip()
 
 
-async def _admin_chat(context, user_id: int) -> int | None:
-    """Первая группа, где человек админ. В личке прав проверить негде,
-    поэтому опрашиваем группы с включённым учётом тем."""
-    for chat_id in sorted(THEMES_CHATS):
+async def _admin_chats(context, user_id: int) -> list[int]:
+    """Все группы с учётом тем, где человек админ."""
+    out = []
+    for chat_id in THEMES_CHATS:
         try:
             member = await context.bot.get_chat_member(chat_id, user_id)
             if member.status in ("creator", "administrator"):
-                return chat_id
+                out.append(chat_id)
         except Exception:
             continue
-    return None
+    return out
+
+
+async def _admin_chat(context, user_id: int) -> int | None:
+    """Одна группа для админских команд в личке.
+
+    Раньше бралась первая по сортировке, из-за чего сводка всегда
+    показывала тестовую группу вместо основной. Теперь предпочитаем
+    ту, где больше сыгранных игр — почти всегда это и есть боевая.
+    """
+    chats = await _admin_chats(context, user_id)
+    if not chats:
+        return None
+    if len(chats) == 1:
+        return chats[0]
+    counts = await engine.to_db(_games_per_chat)
+    return max(chats, key=lambda c: counts.get(c, 0))
+
+
+def _games_per_chat() -> dict[int, int]:
+    return {r["chat_id"]: r["n"] for r in db._rows(
+        "SELECT chat_id, COUNT(DISTINCT game_id) n FROM results GROUP BY chat_id")}
 
 
 async def _chat_title(context, chat_id: int) -> str:
@@ -59,17 +80,24 @@ def _private_only(update: Update) -> bool:
 # ==================== /themes ====================
 
 async def themes_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not _private_only(update):
-        await update.message.reply_text(
-            "📩 Напишите мне /themes в личку — покажу победы и заказы."
-        )
-        return
-
     user = update.effective_user
     username = username_of(user)
-    admin_chat = await _admin_chat(context, user.id)
+    wants_all = _args(update.message.text, "/themes").lower() in ("all", "все")
 
-    if admin_chat and _args(update.message.text, "/themes").lower() in ("all", "все"):
+    # В группе сводка берётся по этой же группе — гадать не нужно.
+    if not _private_only(update):
+        chat_id = update.effective_chat.id
+        if not themes_enabled(chat_id):
+            await update.message.reply_text("🎯 В этой группе учёт тем не включён.")
+            return
+        if wants_all:
+            await _overview(update, context, chat_id, compact=True)
+        else:
+            await _personal_in_group(update, context, chat_id, username)
+        return
+
+    admin_chat = await _admin_chat(context, user.id)
+    if admin_chat and wants_all:
         await _overview(update, context, admin_chat)
         return
 
@@ -109,16 +137,60 @@ async def themes_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines))
 
 
-async def _overview(update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+async def _personal_in_group(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                             chat_id: int, username: str):
+    """Короткий ответ игроку прямо в группе — три строки, не больше."""
+    season = await engine.to_db(themes.ensure_season, chat_id)
+    quota = await engine.to_db(themes.quota_for, chat_id, season, username)
+
+    if quota.wins == 0:
+        await update.message.reply_text(
+            f"{themes.plain(username)}: побед в сезоне пока нет. "
+            f"Победитель квиза получает право заказать тему."
+        )
+        return
+
+    tail = " — можно заказывать" if quota.left else " — квота исчерпана"
+    await update.message.reply_text(
+        f"🎯 {themes.plain(username)} · сезон {season['name']}\n"
+        f"побед {quota.wins} · заказано {quota.used} · осталось {quota.left}{tail}"
+    )
+
+
+async def _overview(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                    chat_id: int, compact: bool = False):
     season = await engine.to_db(themes.ensure_season, chat_id)
     rows = await engine.to_db(themes.season_overview, chat_id, season)
-    title = await _chat_title(context, chat_id)
-
-    lines = [f"🎯 {title} · сезон {season['name']}",
-             f"{season['starts_on']} — {season['ends_on']}", ""]
+    orders = await engine.to_db(db.theme_orders, chat_id, season["id"])
 
     available = [r for r in rows if r["left"] > 0]
     done = [r for r in rows if r["left"] == 0 and r["used"]]
+
+    if compact:
+        # В группе — только суть: кто ещё может заказать и что заказано недавно.
+        lines = [f"🎯 Заказ тем · сезон {season['name']}", ""]
+        if available:
+            lines.append("Доступно заказов:")
+            for r in available:
+                lines.append(f"  {themes.plain(r['username'])} — {r['left']}")
+        else:
+            lines.append("Свободных заказов нет.")
+        if orders:
+            lines.append("")
+            recent = orders[-5:]
+            head = "Последние темы:" if len(orders) > 5 else "Заказанные темы:"
+            lines.append(head)
+            for order in recent:
+                lines.append(f"  {themes.plain(order['username'])} — "
+                             f"{order['theme'][:40]}")
+            if len(orders) > 5:
+                lines.append(f"  …всего {len(orders)}, полный список — /themes all в личке")
+        await update.message.reply_text("\n".join(lines))
+        return
+
+    title = await _chat_title(context, chat_id)
+    lines = [f"🎯 {title} · сезон {season['name']}",
+             f"{season['starts_on']} — {season['ends_on']}", ""]
 
     if available:
         lines.append("Могут заказать:")
@@ -131,7 +203,6 @@ async def _overview(update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id:
         for r in done:
             lines.append(f"  {themes.plain(r['username'])} — {r['used']}")
 
-    orders = await engine.to_db(db.theme_orders, chat_id, season["id"])
     if orders:
         lines.append("")
         lines.append(f"Заказы сезона ({len(orders)}):")
