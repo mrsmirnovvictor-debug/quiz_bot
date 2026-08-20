@@ -1,0 +1,89 @@
+{
+"title": "🎤 Музыкальные группы: назови группу по вокалисту",
+"questions": [
+{
+"text": "Фронтменом и вокалистом какой легендарной рок-группы являлся Фредди Меркьюри?",
+"image": "",
+"options": ["Queen", "Led Zeppelin", "The Who", "Deep Purple"],
+"correct": 0,
+"comment": "Фредди Меркьюри был бессменным лидером и вокалистом группы Queen с момента её основания в 1970 году."
+},
+{
+"text": "Вокалистом какой группы является Мик Джаггер?",
+"image": "",
+"options": ["The Kinks", "The Rolling Stones", "The Doors", "The Animals"],
+"correct": 1,
+"comment": "Мик Джаггер — бессменный фронтмен и один из основателей британской рок-группы The Rolling Stones."
+},
+{
+"text": "В какой группе вокалистом и ритм-гитаристом выступает Джеймс Хэтфилд?",
+"image": "",
+"options": ["Megadeth", "Slayer", "Metallica", "Anthrax"],
+"correct": 2,
+"comment": "Джеймс Хэтфилд — бессменный фронтмен и сооснователь группы Metallica."
+},
+{
+"text": "Лидером и вокалистом какой гранж-группы был Курт Кобейн?",
+"image": "",
+"options": ["Pearl Jam", "Soundgarden", "Alice in Chains", "Nirvana"],
+"correct": 3,
+"comment": "Курт Кобейн был вокалистом, гитаристом и автором большинства песен культовой группы Nirvana."
+},
+{
+"text": "Вокалистом какой культовой группы является Тилль Линдеманн?",
+"image": "",
+"options": ["Rammstein", "Oomph!", "Scorpions", "Accept"],
+"correct": 0,
+"comment": "Тилль Линдеманн — фронтмен и автор текстов немецкой индастриал-метал группы Rammstein."
+},
+{
+"text": "Фронтменом какой группы является Том Йорк?",
+"image": "",
+"options": ["Coldplay", "Radiohead", "Oasis", "Muse"],
+"correct": 1,
+"comment": "Том Йорк — вокалист, мультиинструменталист и главный автор музыки британской группы Radiohead."
+},
+{
+"text": "В какой группе основным вокалистом выступал Честер Беннингтон?",
+"image": "",
+"options": ["Limp Bizkit", "Papa Roach", "Linkin Park", "Evanescence"],
+"correct": 2,
+"comment": "Честер Беннингтон был ведущим вокалистом группы Linkin Park вплоть до своей смерти в 2017 году."
+},
+{
+"text": "Лидером и голосом какой альтернативной группы является Дэймон Албарн?",
+"image": "",
+"options": ["The Verve", "Pulp", "Suede", "Blur"],
+"correct": 3,
+"comment": "Дэймон Албарн известен как вокалист брит-поп группы Blur, а также как создатель виртуального проекта Gorillaz."
+},
+{
+"text": "Фронтменом какой группы является Мэттью Беллами?",
+"image": "",
+"options": ["Muse", "Placebo", "Arctic Monkeys", "Franz Ferdinand"],
+"correct": 0,
+"comment": "Мэттью Беллами — бессменный лидер, вокалист, гитарист и клавишник рок-группы Muse."
+},
+{
+"text": "Вокалистом какой классической хард-рок группы был Роберт Плант?",
+"image": "",
+"options": ["Black Sabbath", "Led Zeppelin", "Aerosmith", "AC/DC"],
+"correct": 1,
+"comment": "Роберт Плант прославился своим мощным вокалом в качестве фронтмена Led Zeppelin."
+},
+{
+"text": "В какой группе вокалистом является Энтони Кидис?",
+"image": "",
+"options": ["Foo Fighters", "Green Day", "Red Hot Chili Peppers", "The Smashing Pumpkins"],
+"correct": 2,
+"comment": "Энтони Кидис — сооснователь и бессменный вокалист фанк-рок группы Red Hot Chili Peppers."
+},
+{
+"text": "Голосом какой синти-поп группы является Дэйв Гаан?",
+"image": "",
+"options": ["Pet Shop Boys", "New Order", "A-ha", "Depeche Mode"],
+"correct": 3,
+"comment": "Дэйв Гаан — фронтмен и ведущий вокалист британской группы Depeche Mode."
+}
+]
+}
