@@ -1,0 +1,197 @@
+{
+  "title": "🇬🇧 Английский уровня C1: проверь себя. 16 вопросов по 20 секунд",
+  "questions": [
+    {
+      "text": "Not only ___ the deadline, but he also ignored every reminder.",
+      "image": "",
+      "options": [
+        "he missed",
+        "missed he",
+        "he did miss",
+        "did he miss"
+      ],
+      "correct": 3,
+      "comment": "После отрицательных наречных оборотов в начале предложения (not only, never, rarely, little) идёт инверсия со вспомогательным глаголом — как в вопросе."
+    },
+    {
+      "text": "If she had accepted that offer in Berlin, she ___ in Germany now.",
+      "image": "",
+      "options": [
+        "will live",
+        "lived",
+        "would be living",
+        "would have lived"
+      ],
+      "correct": 2,
+      "comment": "Смешанное условное: условие относится к прошлому, а следствие — к настоящему. Поэтому в главной части would + инфинитив, а не would have + причастие."
+    },
+    {
+      "text": "The committee demanded that the report ___ before the audit.",
+      "image": "",
+      "options": [
+        "will be submitted",
+        "was submitted",
+        "is submitted",
+        "be submitted"
+      ],
+      "correct": 3,
+      "comment": "После глаголов demand, insist, suggest, require используется сослагательное наклонение: глагол стоит в форме инфинитива без изменений по лицам."
+    },
+    {
+      "text": "No sooner ___ the door than the alarm went off.",
+      "image": "",
+      "options": [
+        "did he open",
+        "had he opened",
+        "he opened",
+        "he had opened"
+      ],
+      "correct": 1,
+      "comment": "Конструкция no sooner… than требует инверсии и past perfect. Соседняя по смыслу конструкция hardly… when строится так же."
+    },
+    {
+      "text": "I wish I ___ his advice back then — everything would be simpler now.",
+      "image": "",
+      "options": [
+        "would take",
+        "had taken",
+        "have taken",
+        "took"
+      ],
+      "correct": 1,
+      "comment": "Сожаление о прошлом выражается через wish + past perfect. Для сожаления о настоящем использовалось бы простое прошедшее время."
+    },
+    {
+      "text": "I'd rather you ___ anything to her about the decision.",
+      "image": "",
+      "options": [
+        "won't say",
+        "don't say",
+        "not saying",
+        "didn't say"
+      ],
+      "correct": 3,
+      "comment": "После would rather с другим подлежащим ставится прошедшее время, хотя речь идёт о настоящем или будущем. Это одна из форм сослагательного наклонения."
+    },
+    {
+      "text": "I'm still not used to ___ up at five every morning.",
+      "image": "",
+      "options": [
+        "getting",
+        "got",
+        "have got",
+        "get"
+      ],
+      "correct": 0,
+      "comment": "Be used to означает «привыкнуть» и требует герундия. Не путать с used to + инфинитив — это регулярное действие в прошлом."
+    },
+    {
+      "text": "Что означает фразовый глагол «to put up with»?",
+      "image": "",
+      "options": [
+        "Accommodate",
+        "Tolerate",
+        "Renovate",
+        "Postpone"
+      ],
+      "correct": 1,
+      "comment": "Означает мириться с чем-то неприятным. Похожий по форме put up без with значит «приютить» или «разместить на ночь»."
+    },
+    {
+      "text": "Что означает «to come across something»?",
+      "image": "",
+      "options": [
+        "Encounter by chance",
+        "Explain clearly",
+        "Cross over",
+        "Give up"
+      ],
+      "correct": 0,
+      "comment": "Наткнуться на что-то случайно. У этого же глагола есть второе значение — производить впечатление: he comes across as arrogant."
+    },
+    {
+      "text": "Что значит идиома «to bite the bullet»?",
+      "image": "",
+      "options": [
+        "Endure something unpleasant",
+        "Stay completely silent",
+        "Lose all hope",
+        "Act recklessly"
+      ],
+      "correct": 0,
+      "comment": "Решиться на неприятное и стерпеть его. Выражение восходит к практике давать раненым закусить пулю до появления анестезии."
+    },
+    {
+      "text": "Что означает «a blessing in disguise»?",
+      "image": "",
+      "options": [
+        "An empty promise",
+        "A hidden benefit",
+        "A lucky guess",
+        "A false friend"
+      ],
+      "correct": 1,
+      "comment": "Неприятность, которая обернулась к лучшему. Русский аналог — «не было бы счастья, да несчастье помогло»."
+    },
+    {
+      "text": "Какой глагол сочетается со словом «research»?",
+      "image": "",
+      "options": [
+        "Do",
+        "Take",
+        "Make",
+        "Have"
+      ],
+      "correct": 0,
+      "comment": "Do research — устойчивое сочетание. Make используется с decision, mistake и progress, а take — с risk, break и decision в значении «принять»."
+    },
+    {
+      "text": "The new regulations will ___ every department in the company.",
+      "image": "",
+      "options": [
+        "afflict",
+        "effectuate",
+        "effect",
+        "affect"
+      ],
+      "correct": 3,
+      "comment": "Affect — глагол «влиять», effect — существительное «результат». Effect как глагол существует, но означает «осуществить» и встречается редко."
+    },
+    {
+      "text": "Что означает слово «ubiquitous»?",
+      "image": "",
+      "options": [
+        "Highly unusual",
+        "Extremely rare",
+        "Found everywhere",
+        "Strictly forbidden"
+      ],
+      "correct": 2,
+      "comment": "Повсеместный, встречающийся везде. Слово происходит от латинского ubique — «всюду»."
+    },
+    {
+      "text": "Что означает «notwithstanding»?",
+      "image": "",
+      "options": [
+        "In addition",
+        "Because of",
+        "Despite",
+        "As long as"
+      ],
+      "correct": 2,
+      "comment": "Формальный синоним despite и in spite of. Может стоять и перед существительным, и после него: notwithstanding the delay или the delay notwithstanding."
+    },
+    {
+      "text": "Какой из синонимов слова «start» самый формальный?",
+      "image": "",
+      "options": [
+        "Get going",
+        "Kick off",
+        "Commence",
+        "Set off"
+      ],
+      "correct": 2,
+      "comment": "Commence используется в официальных документах и объявлениях. Kick off и get going — разговорные, set off чаще означает «отправиться в путь»."
+    }
+  ]
+}
