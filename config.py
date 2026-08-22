@@ -45,7 +45,11 @@ class Timings:
     finish_delay: int = _int_env("T_FINISH", 5)          # пауза перед итогами
     reg_refresh: int = _int_env("T_REG_REFRESH", 15)     # обновление списка регистрации
     podium_pause: int = _int_env("T_PODIUM", 3)          # пауза между объявлениями мест
-    scheduler_tick: int = _int_env("T_TICK", 60)         # период опроса расписания
+    scheduler_tick: int = _int_env("T_TICK", 60)     # период опроса расписания
+
+
+# Во сколько по Москве публиковать анонс игрового дня. Пусто — не публиковать.
+ANNOUNCE_AT = os.environ.get("ANNOUNCE_AT", "12:00")
 
 
 @dataclass(frozen=True)

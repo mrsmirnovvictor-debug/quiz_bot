@@ -16,7 +16,8 @@ from telegram.ext import ContextTypes
 import db
 import engine
 import packs
-from config import MSK, TIMINGS
+import texts
+from config import ANNOUNCE_AT, MSK, TIMINGS
 
 log = logging.getLogger(__name__)
 
@@ -141,11 +142,87 @@ async def tick(context: ContextTypes.DEFAULT_TYPE) -> None:
         log.exception("Не удалось прочитать расписание")
         return
 
+    try:
+        await _announce_game_day(context, rows, now_msk, today)
+    except Exception:
+        log.exception("Ошибка публикации анонса")
+
     for row in rows:
         try:
             await _maybe_run(context, row, now_utc, now_msk, today)
         except Exception:
             log.exception("Слот #%s: ошибка обработки", row["id"])
+
+
+async def _announce_game_day(context, rows, now_msk, today: str) -> None:
+    """Публикует анонс игрового дня в назначенный час.
+
+    Темы показываются предварительно: при auto пакет выбирается в момент
+    старта слота, поэтому вечерний набор может отличаться, если днём
+    сыграют что-то вручную.
+    """
+    if not ANNOUNCE_AT:
+        return
+    try:
+        hour, minute = (int(x) for x in ANNOUNCE_AT.split(":"))
+    except ValueError:
+        return
+
+    announce_at = now_msk.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    # Окно в 10 минут: если бот в этот момент лежал, анонс всё равно выйдет.
+    if not (announce_at <= now_msk < announce_at + timedelta(minutes=10)):
+        return
+
+    by_chat: dict[int, list] = {}
+    for row in rows:
+        if days_match(row["days"], now_msk.weekday()) and row["skip_date"] != today:
+            by_chat.setdefault(row["chat_id"], []).append(row)
+
+    for chat_id, slots in by_chat.items():
+        if not await engine.to_db(db.claim_announcement, chat_id, today):
+            continue
+        try:
+            await _publish_announce(context, chat_id, slots, now_msk, today)
+        except Exception:
+            log.exception("Анонс для чата %s не отправлен", chat_id)
+
+
+async def _publish_announce(context, chat_id: int, slots, now_msk, today: str) -> None:
+    slots = sorted(slots, key=lambda r: r["time_msk"])
+    # Один и тот же пакет не должен попасть в анонс дважды.
+    занято = await engine.to_db(db.played_pack_ids, chat_id)
+    занято = set(занято)
+
+    строки = []
+    for row in slots:
+        if row["pack_source"] != "auto":
+            pack_id = row["pack_source"]
+        else:
+            доступно = [p for p in packs.list_pack_ids(row["pack_pool"])
+                        if p not in занято]
+            pack_id = доступно[0] if доступно else None
+        if not pack_id:
+            строки.append((row["time_msk"], "тема будет объявлена позже"))
+            continue
+        занято.add(pack_id)
+        try:
+            строки.append((row["time_msk"], packs.load_pack(pack_id).title))
+        except Exception:
+            строки.append((row["time_msk"], "тема будет объявлена позже"))
+
+    text = texts.game_day_announce(now_msk.date(), строки)
+    thread_id = slots[0]["thread_id"]
+    kwargs = {"chat_id": chat_id, "text": text}
+    if thread_id:
+        kwargs["message_thread_id"] = thread_id
+
+    msg = await context.bot.send_message(**kwargs)
+    await engine.to_db(db.save_announcement_message, chat_id, today, msg.message_id)
+    try:
+        await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id)
+    except Exception:
+        log.warning("Анонс не закрепился в чате %s", chat_id, exc_info=True)
+    log.info("Анонс игрового дня опубликован в чате %s (%s игр)", chat_id, len(строки))
 
 
 async def _maybe_run(context, row, now_utc, now_msk, today) -> None:

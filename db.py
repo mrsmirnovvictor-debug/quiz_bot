@@ -94,6 +94,15 @@ CREATE TABLE IF NOT EXISTS results (
 CREATE INDEX IF NOT EXISTS idx_results_chat ON results(chat_id, played_at);
 CREATE INDEX IF NOT EXISTS idx_results_user ON results(username);
 
+-- Чтобы анонс игрового дня выходил один раз, а не на каждом тике.
+CREATE TABLE IF NOT EXISTS announcements (
+    chat_id    INTEGER NOT NULL,
+    day        TEXT    NOT NULL,      -- YYYY-MM-DD по Москве
+    message_id INTEGER,
+    created_at TEXT    NOT NULL,
+    PRIMARY KEY (chat_id, day)
+);
+
 CREATE TABLE IF NOT EXISTS seasons (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id   INTEGER NOT NULL,
@@ -525,6 +534,29 @@ def set_skip_date(chat_id: int, skip_date: str) -> int:
         cur = c.execute("UPDATE schedules SET skip_date = ? WHERE chat_id = ? AND enabled = 1",
                         (skip_date, chat_id))
         return cur.rowcount
+
+
+# ==================== Анонсы игрового дня ====================
+
+def claim_announcement(chat_id: int, day: str) -> bool:
+    """Резервирует право опубликовать анонс. True ровно один раз за день."""
+    try:
+        with tx() as c:
+            c.execute(
+                "INSERT INTO announcements (chat_id, day, created_at) VALUES (?, ?, ?)",
+                (chat_id, day, _utcnow()),
+            )
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def save_announcement_message(chat_id: int, day: str, message_id: int) -> None:
+    with tx() as c:
+        c.execute(
+            "UPDATE announcements SET message_id = ? WHERE chat_id = ? AND day = ?",
+            (message_id, chat_id, day),
+        )
 
 
 # ==================== Сезоны ====================

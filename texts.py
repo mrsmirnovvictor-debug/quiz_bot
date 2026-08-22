@@ -158,6 +158,50 @@ def final_table(ranking: list[dict]) -> str:
     return "\n".join(lines)
 
 
+# ==================== Анонс игрового дня ====================
+
+WEEKDAY_NOMINATIVE = ["ПОНЕДЕЛЬНИК", "ВТОРНИК", "СРЕДА", "ЧЕТВЕРГ",
+                      "ПЯТНИЦА", "СУББОТА", "ВОСКРЕСЕНЬЕ"]
+
+MONTH_GENITIVE = ["января", "февраля", "марта", "апреля", "мая", "июня",
+                  "июля", "августа", "сентября", "октября", "ноября", "декабря"]
+
+
+def short_title(title: str) -> str:
+    """Убирает из названия пакета служебный хвост.
+
+    «🎭 Угадай сериал: 16 вопросов по 20 секунд» → «🎭 Угадай сериал»
+    """
+    cleaned = title.strip()
+    for marker in (". 16 ", ": 16 ", ", 16 ", ". 20 "):
+        if marker in cleaned:
+            cleaned = cleaned.split(marker)[0]
+            break
+    cleaned = cleaned.rstrip(" .:,;")
+    return cleaned
+
+
+def game_day_announce(day, slots: list[tuple[str, str]]) -> str:
+    """slots: [(время ЧЧ:ММ, название пакета)] в порядке проведения."""
+    header = (
+        "⭐️⭐️⭐️⭐️⭐️⭐️\n\n"
+        "GAMESDAY\n\n"
+        f"{WEEKDAY_NOMINATIVE[day.weekday()]}, 📆 {day.day} {MONTH_GENITIVE[day.month - 1]}\n"
+    )
+    if slots:
+        header += f"Начало в {slots[0][0]}\n"
+
+    body = ["", "Расписание игр на сегодня:", ""]
+    for time_msk, title in slots:
+        body.append(f"➡️ {time_msk} {short_title(title)}")
+        body.append("")
+
+    tail = ("\nРегистрация стартует за 45-60 минут до начала.\n\n"
+            "Всем удачи!\n\n"
+            "💞💓💕")
+    return header + "\n".join(body).rstrip() + "\n" + tail
+
+
 SCHEDULE_HELP = (
     "🗓 Управление автозапуском квизов\n\n"
     "`/schedule` — показать расписание группы\n"
