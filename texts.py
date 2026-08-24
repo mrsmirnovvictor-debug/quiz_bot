@@ -181,12 +181,17 @@ def short_title(title: str) -> str:
     return cleaned
 
 
-def game_day_announce(day, slots: list[tuple[str, str]]) -> str:
-    """slots: [(время ЧЧ:ММ, название пакета)] в порядке проведения."""
-    header = (
-        "⭐️⭐️⭐️⭐️⭐️⭐️\n\n"
-        "GAMESDAY\n\n"
-        f"{WEEKDAY_NOMINATIVE[day.weekday()]}, 📆 {day.day} {MONTH_GENITIVE[day.month - 1]}\n"
+def game_day_announce(day, slots: list[tuple[str, str]],
+                      with_image: bool = False) -> str:
+    """slots: [(время ЧЧ:ММ, название пакета)] в порядке проведения.
+
+    with_image=True — текст пойдёт подписью к картинке, поэтому
+    звёздочки и слово GAMESDAY из шапки убираются: они уже на картинке.
+    """
+    header = "" if with_image else "⭐️⭐️⭐️⭐️⭐️⭐️\n\nGAMESDAY\n\n"
+    header += (
+        f"{WEEKDAY_NOMINATIVE[day.weekday()]}, 📆 {day.day} "
+        f"{MONTH_GENITIVE[day.month - 1]}\n"
     )
     if slots:
         header += f"Начало в {slots[0][0]}\n"

@@ -551,6 +551,20 @@ def claim_announcement(chat_id: int, day: str) -> bool:
         return False
 
 
+def count_announcements(chat_id: int, month_prefix: str, since: str) -> int:
+    """Сколько анонсов уже вышло в этом месяце начиная с даты since.
+
+    Считаем по факту публикаций, а не по календарю: пропущенный день
+    не съедает номер картинки.
+    """
+    row = _row(
+        "SELECT COUNT(*) AS n FROM announcements "
+        "WHERE chat_id = ? AND day LIKE ? AND day >= ?",
+        (chat_id, month_prefix + "%", since),
+    )
+    return row["n"] if row else 0
+
+
 def save_announcement_message(chat_id: int, day: str, message_id: int) -> None:
     with tx() as c:
         c.execute(

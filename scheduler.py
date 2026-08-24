@@ -17,7 +17,8 @@ import db
 import engine
 import packs
 import texts
-from config import ANNOUNCE_AT, MSK, TIMINGS
+from config import (ANNOUNCE_AT, ANNOUNCE_IMAGE_BASE, ANNOUNCE_IMAGE_EXT,
+                    ANNOUNCE_IMAGE_FROM, MONTH_SLUG, MSK, TIMINGS)
 
 log = logging.getLogger(__name__)
 
@@ -187,6 +188,26 @@ async def _announce_game_day(context, rows, now_msk, today: str) -> None:
             log.exception("Анонс для чата %s не отправлен", chat_id)
 
 
+async def _announce_image(chat_id: int, now_msk, today: str) -> str | None:
+    """URL картинки для сегодняшнего анонса или None, если картинок нет.
+
+    Номер = сколько анонсов уже вышло в этом месяце (с даты начала
+    нумерации) плюс один. Отметку текущего дня claim_announcement уже
+    поставил, поэтому свой же анонс из счёта исключаем.
+    """
+    if not ANNOUNCE_IMAGE_BASE:
+        return None
+    month = MONTH_SLUG[now_msk.month - 1]
+    prefix = now_msk.strftime("%Y-%m")
+    since = max(ANNOUNCE_IMAGE_FROM, f"{prefix}-01")
+    if today < since:
+        return None
+
+    already = await engine.to_db(db.count_announcements, chat_id, prefix, since)
+    number = max(1, already)          # текущий день уже учтён в already
+    return f"{ANNOUNCE_IMAGE_BASE}{month}{number}{ANNOUNCE_IMAGE_EXT}"
+
+
 async def _publish_announce(context, chat_id: int, slots, now_msk, today: str) -> None:
     slots = sorted(slots, key=lambda r: r["time_msk"])
     # Один и тот же пакет не должен попасть в анонс дважды.
@@ -210,13 +231,24 @@ async def _publish_announce(context, chat_id: int, slots, now_msk, today: str) -
         except Exception:
             строки.append((row["time_msk"], "тема будет объявлена позже"))
 
-    text = texts.game_day_announce(now_msk.date(), строки)
+    image = await _announce_image(chat_id, now_msk, today)
     thread_id = slots[0]["thread_id"]
-    kwargs = {"chat_id": chat_id, "text": text}
+    base = {"chat_id": chat_id}
     if thread_id:
-        kwargs["message_thread_id"] = thread_id
+        base["message_thread_id"] = thread_id
 
-    msg = await context.bot.send_message(**kwargs)
+    msg = None
+    if image:
+        text = texts.game_day_announce(now_msk.date(), строки, with_image=True)
+        try:
+            msg = await context.bot.send_photo(photo=image, caption=text, **base)
+        except Exception:
+            # Картинки на этот месяц может не быть — анонс важнее оформления.
+            log.warning("Картинка анонса недоступна (%s), шлём текстом", image)
+
+    if msg is None:
+        text = texts.game_day_announce(now_msk.date(), строки)
+        msg = await context.bot.send_message(text=text, **base)
     await engine.to_db(db.save_announcement_message, chat_id, today, msg.message_id)
     try:
         await context.bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id)

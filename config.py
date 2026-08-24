@@ -51,6 +51,20 @@ class Timings:
 # Во сколько по Москве публиковать анонс игрового дня. Пусто — не публиковать.
 ANNOUNCE_AT = os.environ.get("ANNOUNCE_AT", "12:00")
 
+# Картинка-шапка анонса. Имя файла: префикс месяца + порядковый номер
+# игрового дня внутри месяца, например aug1.png, sep3.png.
+ANNOUNCE_IMAGE_BASE = os.environ.get(
+    "ANNOUNCE_IMAGE_BASE",
+    "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/announcements/",
+)
+ANNOUNCE_IMAGE_EXT = os.environ.get("ANNOUNCE_IMAGE_EXT", ".png")
+# С какой даты начинается нумерация. Анонсы до неё в счёт не идут —
+# нужно, чтобы первый день с картинками получил номер 1, а не следующий.
+ANNOUNCE_IMAGE_FROM = os.environ.get("ANNOUNCE_IMAGE_FROM", "2026-08-27")
+
+MONTH_SLUG = ["jan", "feb", "mar", "apr", "may", "jun",
+              "jul", "aug", "sep", "oct", "nov", "dec"]
+
 
 @dataclass(frozen=True)
 class Audio:
