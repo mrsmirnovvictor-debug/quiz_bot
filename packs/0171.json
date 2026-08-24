@@ -1,0 +1,197 @@
+{
+  "title": "🇪🇸 Испанский B1–B2: следующий уровень. 16 вопросов по 20 секунд",
+  "questions": [
+    {
+      "text": "Espero que ___ a la fiesta mañana.",
+      "image": "",
+      "options": [
+        "vendrás",
+        "venías",
+        "vienes",
+        "vengas"
+      ],
+      "correct": 3,
+      "comment": "После выражений надежды, желания и сомнения ставится subjuntivo. Espero que + presente de subjuntivo — базовая конструкция уровня B1."
+    },
+    {
+      "text": "Ojalá ___ más tiempo libre.",
+      "image": "",
+      "options": [
+        "tendré",
+        "tuviera",
+        "tengo",
+        "tenía"
+      ],
+      "correct": 1,
+      "comment": "Ojalá с imperfecto de subjuntivo выражает малореальное желание. Форма tuviese равноправна и означает ровно то же самое."
+    },
+    {
+      "text": "Si tuviera dinero, ___ un coche nuevo.",
+      "image": "",
+      "options": [
+        "compraré",
+        "compraría",
+        "compraba",
+        "compre"
+      ],
+      "correct": 1,
+      "comment": "Нереальное условие в настоящем: imperfecto de subjuntivo в придаточной части и condicional simple в главной."
+    },
+    {
+      "text": "Что означает «Está listo» в отличие от «Es listo»?",
+      "image": "",
+      "options": [
+        "Он опоздал",
+        "Он занят",
+        "Он готов",
+        "Он умный"
+      ],
+      "correct": 2,
+      "comment": "Ser listo — умный от природы, estar listo — готов к чему-то прямо сейчас. Похоже ведут себя пары ser/estar aburrido и ser/estar rico."
+    },
+    {
+      "text": "Что значит фраза «Estoy constipado»?",
+      "image": "",
+      "options": [
+        "Я расстроен",
+        "Я устал",
+        "Я простужен",
+        "У меня запор"
+      ],
+      "correct": 2,
+      "comment": "Коварный ложный друг: английское constipated означает совсем другое. Насморк по-испански — resfriado или constipado."
+    },
+    {
+      "text": "Что означает глагол «realizar»?",
+      "image": "",
+      "options": [
+        "Понимать",
+        "Замечать",
+        "Осуществлять",
+        "Осознавать"
+      ],
+      "correct": 2,
+      "comment": "В отличие от английского to realize, испанский глагол значит «выполнять, осуществлять». Осознавать — darse cuenta de algo."
+    },
+    {
+      "text": "Какая форма герундия у глагола «dormir»?",
+      "image": "",
+      "options": [
+        "durmiendo",
+        "dormiendo",
+        "dormando",
+        "durmando"
+      ],
+      "correct": 0,
+      "comment": "У глаголов на -ir с чередованием корневая гласная в герундии меняется: pedir даёт pidiendo, morir — muriendo."
+    },
+    {
+      "text": "No ___ tan rápido, por favor. (hablar, tú)",
+      "image": "",
+      "options": [
+        "hables",
+        "habla",
+        "hablar",
+        "hablas"
+      ],
+      "correct": 0,
+      "comment": "Отрицательный императив образуется через subjuntivo. Утвердительная форма выглядит иначе: habla más despacio."
+    },
+    {
+      "text": "Что означает «Llevo tres años estudiando español»?",
+      "image": "",
+      "options": [
+        "Начну через три года",
+        "Изучаю уже три года",
+        "Бросил три года назад",
+        "Изучал три года"
+      ],
+      "correct": 1,
+      "comment": "Llevar + герундий описывает действие, начатое в прошлом и продолжающееся сейчас. Русский переводит это настоящим временем."
+    },
+    {
+      "text": "Что означает «Acabo de llegar»?",
+      "image": "",
+      "options": [
+        "Я всегда приезжаю",
+        "Я скоро приеду",
+        "Я только что приехал",
+        "Я собираюсь уехать"
+      ],
+      "correct": 2,
+      "comment": "Acabar de + инфинитив означает действие, завершённое минуту назад. Не путать с acabar в значении «заканчивать»."
+    },
+    {
+      "text": "Почему в «Se lo di a Juan» стоит «se», а не «le»?",
+      "image": "",
+      "options": [
+        "Так требует прошедшее время",
+        "Le меняется перед lo",
+        "Такова разговорная норма",
+        "Это возвратное местоимение"
+      ],
+      "correct": 1,
+      "comment": "Из-за неблагозвучия сочетания le lo и les lo превращаются в se lo. Чисто фонетическое правило, смысл при этом не меняется."
+    },
+    {
+      "text": "Gracias ___ tu ayuda.",
+      "image": "",
+      "options": [
+        "en",
+        "de",
+        "para",
+        "por"
+      ],
+      "correct": 3,
+      "comment": "Por указывает на причину и мотив, para — на цель и адресата. Благодарность всегда выражается через por."
+    },
+    {
+      "text": "В какой стране вместо «tú» повсеместно используют «vos»?",
+      "image": "",
+      "options": [
+        "Аргентина",
+        "Мексика",
+        "Перу",
+        "Колумбия"
+      ],
+      "correct": 0,
+      "comment": "Явление называется voseo и требует особых форм глагола: vos tenés вместо tú tienes. Оно распространено также в Уругвае и Центральной Америке."
+    },
+    {
+      "text": "Как в Латинской Америке обычно говорят «сесть в автобус»?",
+      "image": "",
+      "options": [
+        "Poner el autobús",
+        "Llevar el autobús",
+        "Coger el autobús",
+        "Tomar el autobús"
+      ],
+      "correct": 3,
+      "comment": "В Испании нормально сказать coger, но в большинстве стран Латинской Америки у этого глагола есть грубое значение. Там используют tomar."
+    },
+    {
+      "text": "Где чаще услышишь «Hoy he comido paella» вместо «Hoy comí paella»?",
+      "image": "",
+      "options": [
+        "В Испании",
+        "В Аргентине",
+        "В Мексике",
+        "В Чили"
+      ],
+      "correct": 0,
+      "comment": "Pretérito perfecto для событий сегодняшнего дня характерен для Испании. В Латинской Америке в том же случае обычно используют indefinido."
+    },
+    {
+      "text": "Что означает выражение «estar en las nubes»?",
+      "image": "",
+      "options": [
+        "Заблудиться",
+        "Быть счастливым",
+        "Заболеть",
+        "Витать в облаках"
+      ],
+      "correct": 3,
+      "comment": "Означает быть рассеянным и невнимательным. Для счастья есть отдельное выражение — estar en el séptimo cielo."
+    }
+  ]
+}
