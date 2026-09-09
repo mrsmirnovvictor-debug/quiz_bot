@@ -3,7 +3,7 @@
   "questions": [
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/1.mp3",
       "duration": 20,
       "options": [
         "Тату",
@@ -16,7 +16,7 @@
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/2.mp3",
       "duration": 20,
       "options": [
         "Крематорий",
@@ -29,7 +29,7 @@
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/3.mp3",
       "duration": 20,
       "options": [
         "Земфира",
@@ -42,20 +42,20 @@
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/4.mp3",
       "duration": 20,
       "options": [
-        "Мальчишник",
-        "Сектор Газа",
-        "Отпетые Мошенники",
-        "Найк Борзов"
+        "ДДТ",
+        "Наутилус Помпилиус",
+        "Агата Кристи",
+        "Чайф"
       ],
       "correct": 3,
-      "comment": "«Гуманоид» — Найк Борзов, 2000 год."
+      "comment": "«Аргентина — Ямайка 5:0» — Чайф, 1998 год."
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/5.mp3",
       "duration": 20,
       "options": [
         "Король и Шут",
@@ -68,7 +68,7 @@
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/6.mp3",
       "duration": 20,
       "options": [
         "Смысловые Галлюцинации",
@@ -81,7 +81,7 @@
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/7.mp3",
       "duration": 20,
       "options": [
         "Секрет",
@@ -94,7 +94,7 @@
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/8.mp3",
       "duration": 20,
       "options": [
         "Отпетые Мошенники",
@@ -107,7 +107,7 @@
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/9.mp3",
       "duration": 20,
       "options": [
         "Фактор 2",
@@ -120,7 +120,7 @@
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/10.mp3",
       "duration": 20,
       "options": [
         "Ленинград",
@@ -129,11 +129,11 @@
         "Мальчишник"
       ],
       "correct": 1,
-      "comment": "«Небо стало ближе» — Дискотека Авария, 2001 год."
+      "comment": "«Небо» — Дискотека Авария, 2001 год. Песня из альбома «Маньяки», признанная в 2004 году лучшей песней и лучшим клипом года на «Муз-ТВ»."
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/11.mp3",
       "duration": 20,
       "options": [
         "Би-2",
@@ -146,7 +146,7 @@
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/12.mp3",
       "duration": 20,
       "options": [
         "Фабрика",
@@ -159,7 +159,7 @@
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/13.mp3",
       "duration": 20,
       "options": [
         "Жасмин",
@@ -172,7 +172,7 @@
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/14.mp3",
       "duration": 20,
       "options": [
         "Алсу",
@@ -185,7 +185,7 @@
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/15.mp3",
       "duration": 20,
       "options": [
         "Земляне",
@@ -198,16 +198,16 @@
     },
     {
       "text": "Кто исполняет?",
-      "audio": "",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/MusicQuiz/16.mp3",
       "duration": 20,
       "options": [
-        "Фактор 2",
-        "Дюна",
-        "Корни",
-        "Отпетые Мошенники"
+        "Найк Борзов",
+        "Смысловые Галлюцинации",
+        "Дельфин",
+        "Пилот"
       ],
       "correct": 2,
-      "comment": "«Малиновка» — Корни, 2002 год."
+      "comment": "«Любовь» — Дельфин, 1999 год."
     }
   ]
 }
