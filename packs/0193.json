@@ -1,0 +1,213 @@
+{
+  "title": "🎙️ Кто спел оригинал? 16 каверов на известные хиты",
+  "questions": [
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/1.mp3",
+      "duration": 20,
+      "options": [
+        "Donna Summer",
+        "The Weather Girls",
+        "Gloria Gaynor",
+        "ABBA"
+      ],
+      "correct": 1,
+      "comment": "Играет кавер Джери Холлиуэлл на «It's Raining Men» — оригинал группы The Weather Girls (1982)."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/2.mp3",
+      "duration": 20,
+      "options": [
+        "Джордж Майкл",
+        "Лайонел Ричи",
+        "Майкл Джексон",
+        "Принс"
+      ],
+      "correct": 2,
+      "comment": "Играет кавер Alien Ant Farm на «Smooth Criminal» — оригинал Майкла Джексона (1988)."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/3.mp3",
+      "duration": 20,
+      "options": [
+        "The Rolling Stones",
+        "Pink Floyd",
+        "Led Zeppelin",
+        "The Who"
+      ],
+      "correct": 3,
+      "comment": "Играет кавер Limp Bizkit на «Behind Blue Eyes» — оригинал The Who (1971)."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/4.mp3",
+      "duration": 20,
+      "options": [
+        "The Byrds",
+        "Mamas & the Papas",
+        "The Beach Boys",
+        "Simon & Garfunkel"
+      ],
+      "correct": 1,
+      "comment": "Играет кавер Sia на «California Dreamin'» — оригинал The Mamas & The Papas (1965)."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/5.mp3",
+      "duration": 20,
+      "options": [
+        "Gloria Jones",
+        "Donna Summer",
+        "Marilyn Manson",
+        "Soft Cell"
+      ],
+      "correct": 0,
+      "comment": "Играет кавер Soft Cell на «Tainted Love» — оригинал Глории Джонс (1964). Мэрилин Мэнсон записал свой, отдельный кавер уже в 2001 году."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/6.mp3",
+      "duration": 20,
+      "options": [
+        "Elton John",
+        "Rod Stewart",
+        "David Bowie",
+        "Billy Joel"
+      ],
+      "correct": 0,
+      "comment": "Играет кавер Florence + The Machine на «Tiny Dancer» — оригинал Элтона Джона (1971)."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/7.mp3",
+      "duration": 20,
+      "options": [
+        "Imagine Dragons",
+        "Linkin Park",
+        "Thirty Seconds to Mars",
+        "Fall Out Boy"
+      ],
+      "correct": 0,
+      "comment": "Играет кавер Bullet For My Valentine на «Radioactive» — оригинал Imagine Dragons (2012)."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/8.mp3",
+      "duration": 20,
+      "options": [
+        "Джанет Джексон",
+        "Бритни Спирс",
+        "Кристина Агилера",
+        "Пинк"
+      ],
+      "correct": 1,
+      "comment": "Играет кавер A Static Lullaby на «Toxic» — оригинал Бритни Спирс (2003)."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/9.mp3",
+      "duration": 20,
+      "options": [
+        "Жасмин",
+        "Валерия",
+        "Наташа Королева",
+        "Татьяна Буланова"
+      ],
+      "correct": 3,
+      "comment": "Играет совместный кавер IOWA, Acid Minerale и Atomic Heart на «Мой ненаглядный» — оригинал Татьяны Булановой."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/10.mp3",
+      "duration": 20,
+      "options": [
+        "Ночные Снайперы",
+        "Маша и Медведи",
+        "Танцы Минус",
+        "Земфира"
+      ],
+      "correct": 1,
+      "comment": "Играет кавер HOLLYFLAME на «Любочку» — оригинал группы «Маша и Медведи»."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/11.mp3",
+      "duration": 20,
+      "options": [
+        "Михей и Джуманджи",
+        "Отпетые Мошенники",
+        "Банд'Эрос",
+        "Дискотека Авария"
+      ],
+      "correct": 0,
+      "comment": "Играет кавер Kolya Funk и Tin Tin на «Туда» — оригинал «Михея и Джуманджи»."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/12.mp3",
+      "duration": 20,
+      "options": [
+        "Город 312",
+        "Демо",
+        "Rondo",
+        "Reflex"
+      ],
+      "correct": 2,
+      "comment": "Играет кавер Аси Пивоваровой на «Вселенную» — оригинал группы RONDO."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/13.mp3",
+      "duration": 20,
+      "options": [
+        "МакSим",
+        "Слава",
+        "Жасмин",
+        "Юлия Савичева"
+      ],
+      "correct": 3,
+      "comment": "Играет кавер группы СИИЯЙ на «Привет» — оригинал Юлии Савичевой."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/14.mp3",
+      "duration": 20,
+      "options": [
+        "Николай Носков",
+        "Александр Серов",
+        "Игорь Николаев",
+        "Валерий Меладзе"
+      ],
+      "correct": 3,
+      "comment": "Играет кавер Red Square на «Самбу белого мотылька» — оригинал Валерия Меладзе."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/15.mp3",
+      "duration": 20,
+      "options": [
+        "Отпетые Мошенники",
+        "Татьяна Овсиенко",
+        "Иванушки International",
+        "Руки Вверх"
+      ],
+      "correct": 2,
+      "comment": "Играет кавер группы «Моя Мишель» на «Колечко» — оригинал «Иванушки International»."
+    },
+    {
+      "text": "Чей это оригинал?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers/16.mp3",
+      "duration": 20,
+      "options": [
+        "Блестящие",
+        "Комбинация",
+        "Стрелки",
+        "Мираж"
+      ],
+      "correct": 2,
+      "comment": "Играет кавер Юлии Беретты на «На вечеринке лучших друзей» — оригинал группы «Стрелки»."
+    }
+  ]
+}
