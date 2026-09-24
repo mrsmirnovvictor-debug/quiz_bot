@@ -325,6 +325,26 @@ async def rename_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines))
 
 
+# ==================== /announce ====================
+
+async def announce_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Перевыпуск анонса игрового дня."""
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("Команда работает только в группах.")
+        return
+    if not await is_admin(update, update.effective_user.id):
+        await update.message.reply_text("❌ Только администраторы группы.")
+        return
+
+    try:
+        result = await scheduler.announce_now(context, update.effective_chat.id)
+    except Exception as e:
+        log.exception("Не удалось опубликовать анонс")
+        await update.message.reply_text(f"❌ Не получилось опубликовать анонс: {e}")
+        return
+    await update.message.reply_text(result)
+
+
 # ==================== /export ====================
 
 async def export_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
