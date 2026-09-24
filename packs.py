@@ -7,11 +7,22 @@
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 
 from config import PACKS_DIR
 
 log = logging.getLogger(__name__)
+
+# ID пакета — минимум четыре цифры. Ровно четыре было слишком жёстко: пул
+# вида «01» упирается в потолок на 0199, и продолжить его можно только
+# удлинив ID (0197 -> 01981), сохранив префикс. Только ASCII-цифры: ID
+# подставляется в имя файла, и ни точек, ни слэшей туда попасть не должно.
+PACK_ID_RE = re.compile(r"[0-9]{4,}")
+
+
+def is_pack_id(value: str) -> bool:
+    return PACK_ID_RE.fullmatch(value) is not None
 
 
 class PackError(Exception):
@@ -92,8 +103,8 @@ def _parse_question(raw: dict, n: int) -> Question:
 
 def load_pack(pack_id: str) -> Pack:
     """Читает и валидирует пакет. Бросает PackError с понятным сообщением."""
-    if not (len(pack_id) == 4 and pack_id.isdigit()):
-        raise PackError("ID пакета должен состоять из 4 цифр, например 0007")
+    if not is_pack_id(pack_id):
+        raise PackError("ID пакета — не меньше 4 цифр, например 0007 или 01981")
 
     path = os.path.join(PACKS_DIR, f"{pack_id}.json")
     if not os.path.exists(path):
@@ -132,7 +143,7 @@ def list_pack_ids(pool_prefix: str = "") -> list[str]:
         if not name.endswith(".json"):
             continue
         pid = name[:-5]
-        if len(pid) == 4 and pid.isdigit() and pid.startswith(pool_prefix):
+        if is_pack_id(pid) and pid.startswith(pool_prefix):
             ids.append(pid)
     return sorted(ids)
 
