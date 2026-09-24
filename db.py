@@ -551,6 +551,13 @@ def claim_announcement(chat_id: int, day: str) -> bool:
         return False
 
 
+def announcement(chat_id: int, day: str) -> sqlite3.Row | None:
+    """Отметка о дне: есть ли анонс и каким сообщением он опубликован."""
+    return _row(
+        "SELECT * FROM announcements WHERE chat_id = ? AND day = ?", (chat_id, day)
+    )
+
+
 def count_announcements(chat_id: int, month_prefix: str, since: str) -> int:
     """Сколько анонсов уже вышло в этом месяце начиная с даты since.
 

@@ -257,6 +257,41 @@ async def _publish_announce(context, chat_id: int, slots, now_msk, today: str) -
     log.info("Анонс игрового дня опубликован в чате %s (%s игр)", chat_id, len(строки))
 
 
+async def announce_now(context, chat_id: int) -> str:
+    """Публикует анонс игрового дня по требованию. Возвращает ответ админу.
+
+    Автоанонс выходит раз в день и строит расписание из того, что доступно
+    на тот момент. Если пакеты завели позже, в анонсе остаются заглушки
+    «тема будет объявлена позже», и переиграть это было нечем: отметку дня
+    claim_announcement второй раз не отдаёт.
+
+    Сначала публикуем, потом убираем прежнее сообщение: при обратном
+    порядке сорвавшаяся отправка оставила бы группу вообще без анонса.
+    """
+    now_msk = datetime.now(timezone.utc).astimezone(MSK)
+    today = now_msk.strftime("%Y-%m-%d")
+
+    rows = await engine.to_db(db.list_schedules, chat_id)
+    slots = [r for r in rows if r["enabled"]
+             and days_match(r["days"], now_msk.weekday())
+             and r["skip_date"] != today]
+    if not slots:
+        return "❌ На сегодня автозапусков в этой группе нет — анонсировать нечего."
+
+    previous = await engine.to_db(db.announcement, chat_id, today)
+    if previous is None:
+        # Нумерация картинок считает свой же день, поэтому отметка нужна
+        # до публикации, а не после.
+        await engine.to_db(db.claim_announcement, chat_id, today)
+
+    await _publish_announce(context, chat_id, slots, now_msk, today)
+
+    if previous is not None:
+        await engine.quiet_delete(context, chat_id, previous["message_id"])
+        return "✅ Анонс опубликован заново, прежний убран."
+    return "✅ Анонс опубликован."
+
+
 async def _maybe_run(context, row, now_utc, now_msk, today) -> None:
     """Проверяет один слот и при совпадении запускает квиз."""
     if not days_match(row["days"], now_msk.weekday()):
