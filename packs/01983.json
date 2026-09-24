@@ -12,7 +12,7 @@
         "Kanye West"
       ],
       "correct": 0,
-      "comment": "Играет кавер Madilyn Bailey на «Can't Hold Us» — оригинал Macklemore & Ryan Lewis (2011)."
+      "comment": "Играет кавер на «Can't Hold Us» — оригинал Macklemore & Ryan Lewis (2011)."
     },
     {
       "text": "Чей это оригинал?",
@@ -25,20 +25,20 @@
         "Halsey"
       ],
       "correct": 2,
-      "comment": "Играет кавер Madilyn Bailey на «Summertime Sadness» — оригинал Lana Del Rey (2012)."
+      "comment": "Играет кавер на «Summertime Sadness» — оригинал Lana Del Rey (2012)."
     },
     {
       "text": "Чей это оригинал?",
       "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers2/3.mp3",
       "duration": 20,
       "options": [
-        "Zedd",
+        "Ariana Grande",
         "The Chainsmokers",
         "Martin Garrix",
         "Clean Bandit"
       ],
       "correct": 3,
-      "comment": "Играет кавер Madilyn Bailey на «Rockabye» — оригинал Clean Bandit при участии Шона Пола и Энн-Мари (2016)."
+      "comment": "Играет кавер на «Rockabye» — оригинал Clean Bandit при участии Шона Пола и Энн-Мари (2016)."
     },
     {
       "text": "Чей это оригинал?",
@@ -47,11 +47,11 @@
       "options": [
         "The Chainsmokers",
         "Avicii",
-        "Zedd",
+        "Charlie Puth",
         "Martin Garrix"
       ],
       "correct": 1,
-      "comment": "Играет кавер Madilyn Bailey на «Wake Me Up» — оригинал Avicii (2013)."
+      "comment": "Играет кавер на «Wake Me Up» — оригинал Avicii (2013)."
     },
     {
       "text": "Чей это оригинал?",
@@ -59,12 +59,12 @@
       "duration": 20,
       "options": [
         "Martin Garrix",
-        "Ellie Goulding",
-        "Zedd",
+        "David Guetta",
+        "The Chainsmokers",
         "Calvin Harris"
       ],
       "correct": 3,
-      "comment": "Играет кавер Madilyn Bailey на «I Need Your Love» — оригинал Calvin Harris при участии Элли Голдинг (2013)."
+      "comment": "Играет кавер на «I Need Your Love» — оригинал Calvin Harris при участии Элли Голдинг (2013)."
     },
     {
       "text": "Чей это оригинал?",
@@ -77,7 +77,7 @@
         "Selena Gomez"
       ],
       "correct": 1,
-      "comment": "Играет кавер Madilyn Bailey на «Wrecking Ball» — оригинал Miley Cyrus (2013)."
+      "comment": "Играет кавер на «Wrecking Ball» — оригинал Miley Cyrus (2013)."
     },
     {
       "text": "Чей это оригинал?",
@@ -90,7 +90,7 @@
         "Bruno Mars"
       ],
       "correct": 0,
-      "comment": "Играет кавер Madilyn Bailey на «Mirrors» — оригинал Justin Timberlake (2013)."
+      "comment": "Играет кавер на «Mirrors» — оригинал Justin Timberlake (2013)."
     },
     {
       "text": "Чей это оригинал?",
@@ -99,11 +99,11 @@
       "options": [
         "Ariana Grande",
         "Selena Gomez",
-        "Meghan Trainor",
+        "Dua Lipa",
         "Demi Lovato"
       ],
       "correct": 3,
-      "comment": "Играет кавер Madilyn Bailey на «Heart Attack» — оригинал Demi Lovato (2013)."
+      "comment": "Играет кавер на «Heart Attack» — оригинал Demi Lovato (2013)."
     },
     {
       "text": "Чей это оригинал?",
@@ -116,7 +116,7 @@
         "Martin Garrix"
       ],
       "correct": 2,
-      "comment": "Играет кавер Madilyn Bailey на «Titanium» — оригинал David Guetta при участии Sia (2011)."
+      "comment": "Играет кавер на «Titanium» — оригинал David Guetta при участии Sia (2011)."
     },
     {
       "text": "Чей это оригинал?",
@@ -129,33 +129,33 @@
         "Nicki Minaj"
       ],
       "correct": 2,
-      "comment": "Играет кавер Madilyn Bailey на «Diamonds» — оригинал Rihanna (2012)."
+      "comment": "Играет кавер на «Diamonds» — оригинал Rihanna (2012)."
     },
     {
       "text": "Чей это оригинал?",
       "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers2/11.mp3",
       "duration": 20,
       "options": [
-        "Beyoncé",
+        "Dua Lipa",
         "Christina Aguilera",
         "Adele",
         "Alicia Keys"
       ],
       "correct": 2,
-      "comment": "Играет кавер Madilyn Bailey на «Skyfall» — оригинал Adele (2012), заглавная песня одноимённого фильма о Бонде."
+      "comment": "Играет кавер на «Skyfall» — оригинал Adele (2012), заглавная песня одноимённого фильма о Бонде."
     },
     {
       "text": "Чей это оригинал?",
       "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers2/12.mp3",
       "duration": 20,
       "options": [
-        "Dua Lipa",
+        "Shakira",
         "Camila Cabello",
         "Ariana Grande",
         "Selena Gomez"
       ],
       "correct": 1,
-      "comment": "Играет кавер Madilyn Bailey на «Señorita» — оригинал Camila Cabello при участии Шона Мендеса (2019)."
+      "comment": "Играет кавер на «Señorita» — оригинал Camila Cabello при участии Шона Мендеса (2019)."
     },
     {
       "text": "Чей это оригинал?",
@@ -168,7 +168,7 @@
         "Ed Sheeran"
       ],
       "correct": 3,
-      "comment": "Играет кавер Madilyn Bailey на «Bad Habits» — оригинал Ed Sheeran (2021)."
+      "comment": "Играет кавер на «Bad Habits» — оригинал Ed Sheeran (2021)."
     },
     {
       "text": "Чей это оригинал?",
@@ -181,7 +181,7 @@
         "Dua Lipa"
       ],
       "correct": 0,
-      "comment": "Играет кавер Madilyn Bailey на «Unstoppable» — оригинал Sia (2016)."
+      "comment": "Играет кавер на «Unstoppable» — оригинал Sia (2016)."
     },
     {
       "text": "Чей это оригинал?",
@@ -194,20 +194,20 @@
         "Imagine Dragons"
       ],
       "correct": 0,
-      "comment": "Играет кавер Madilyn Bailey на «What Makes You Beautiful» — оригинал One Direction (2011)."
+      "comment": "Играет кавер на «What Makes You Beautiful» — оригинал One Direction (2011)."
     },
     {
       "text": "Чей это оригинал?",
       "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/covers2/16.mp3",
       "duration": 20,
       "options": [
-        "Kim Petras",
+        "Bruno Mars",
         "Sam Smith",
         "Charlie Puth",
         "Shawn Mendes"
       ],
       "correct": 1,
-      "comment": "Играет кавер Madilyn Bailey на «Unholy» — оригинал Sam Smith при участии Ким Петрас (2022)."
+      "comment": "Играет кавер на «Unholy» — оригинал Sam Smith при участии Ким Петрас (2022)."
     }
   ]
 }
