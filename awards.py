@@ -19,7 +19,7 @@ import db
 import engine
 import texts
 import themes
-from config import MSK, TIMINGS
+from config import MSK, TIMINGS, award_photo_url
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +39,20 @@ async def _say(context, chat_id: int, thread_id: int | None, text: str, **kwargs
         return None
 
 
+async def _say_photo(context, chat_id: int, thread_id: int | None, photo: str,
+                     caption: str):
+    """Карточка награждения. Недоступная ссылка не должна съесть объявление."""
+    kw = dict(chat_id=chat_id, photo=photo, caption=caption)
+    if thread_id:
+        kw["message_thread_id"] = thread_id
+    try:
+        return await context.bot.send_photo(**kw)
+    except TelegramError:
+        log.warning("Карточка %s не отправилась, объявляем текстом", photo,
+                    exc_info=True)
+        return await _say(context, chat_id, thread_id, caption)
+
+
 def season_standings(chat_id: int) -> tuple[str | None, list, int]:
     """(название сезона, строки зачёта, сыграно игр).
 
@@ -55,17 +69,24 @@ def season_standings(chat_id: int) -> tuple[str | None, list, int]:
 
 
 async def run(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
-              thread_id: int | None) -> bool:
-    """Проводит церемонию. Паузы дают организатору вставить картинки."""
+              thread_id: int | None, title: str | None = None) -> bool:
+    """Проводит церемонию.
+
+    title — как назвать сезон вслух: в базе он зовётся «Q3 2026», а на кубке
+    выгравировано другое, и расхождение в одной церемонии бросается в глаза.
+    """
     name, rows, games = await engine.to_db(season_standings, chat_id)
     if not rows:
         await _say(context, chat_id, thread_id, texts.AWARD_EMPTY)
         return False
 
     зачёт = [(r["username"], r["games_count"], r["total_points"] or 0) for r in rows]
+    # Своё название подставляется как есть: «Второй сезон квизов Vegas» уже
+    # содержит слово «сезон», и приписывать его ещё раз нельзя.
+    подпись_сезона = title or (f"Сезон {name}" if name else "Сезон")
 
     await _say(context, chat_id, thread_id,
-               texts.award_intro(name, len(зачёт), games))
+               texts.award_intro(подпись_сезона, len(зачёт), games))
     await asyncio.sleep(TIMINGS.award_pause)
 
     champion = None
@@ -76,8 +97,12 @@ async def run(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
         await asyncio.sleep(TIMINGS.award_suspense)
 
         username, сыграл, очки = зачёт[place - 1]
-        msg = await _say(context, chat_id, thread_id,
-                         texts.award_reveal(place, username, сыграл, очки))
+        реплика = texts.award_reveal(place, username, сыграл, очки)
+        картинка = award_photo_url(username, place)
+        if картинка:
+            msg = await _say_photo(context, chat_id, thread_id, картинка, реплика)
+        else:
+            msg = await _say(context, chat_id, thread_id, реплика)
         if place == 1:
             champion = msg
         # Длинная пауза: сюда организатор вставляет картинку награждения.
@@ -89,8 +114,8 @@ async def run(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
         await _say(context, chat_id, thread_id,
                    texts.award_tie_note(зачёт[0][1] == зачёт[1][1]))
 
-    await _say(context, chat_id, thread_id, texts.award_final(зачёт, name),
-               parse_mode="Markdown")
+    await _say(context, chat_id, thread_id,
+               texts.award_final(зачёт, подпись_сезона), parse_mode="Markdown")
 
     if champion:
         try:
@@ -99,7 +124,8 @@ async def run(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
         except TelegramError:
             log.warning("Церемония: сообщение чемпиона не закрепилось", exc_info=True)
 
-    log.info("Церемония награждения проведена в чате %s (сезон %s)", chat_id, name)
+    log.info("Церемония награждения проведена в чате %s (сезон %s)", chat_id,
+             подпись_сезона)
     return True
 
 
@@ -131,7 +157,7 @@ async def maybe_run(context: ContextTypes.DEFAULT_TYPE, now_utc, now_msk,
         # Атомарная заявка: второй тик церемонию не повторит.
         if not await engine.to_db(db.claim_award, chat_id, run_date):
             continue
-        await run(context, chat_id, row["thread_id"])
+        await run(context, chat_id, row["thread_id"], row["title"])
 
 
 def parse_date(raw: str) -> str:

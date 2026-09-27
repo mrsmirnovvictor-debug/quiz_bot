@@ -175,6 +175,8 @@ def award_tie_note(same_games: bool) -> str:
 AWARD_HELP = (
     "🏆 Награждение по итогам сезона\n\n"
     "`/award 2026-09-28 22:15` — назначить церемонию\n"
+    "`/award 2026-09-28 22:15 | Второй сезон квизов Vegas` — со своим "
+    "названием сезона\n"
     "`/award` — что назначено\n"
     "`/award off` — отменить\n\n"
     "Бот объявит третье, второе и первое место с паузами — между "
@@ -195,12 +197,12 @@ _AWARD_WORDS = {
 }
 
 
-def award_intro(season: str | None, players: int, games: int) -> str:
-    подзаголовок = f"Сезон {season} завершён." if season else "Сезон завершён."
+def award_intro(label: str, players: int, games: int) -> str:
+    """label — готовая подпись сезона, например «Сезон Q3 2026»."""
     return (
         "🏆 🏆 🏆\n\n"
         "ИТОГИ СЕЗОНА\n\n"
-        f"{подзаголовок}\n"
+        f"{label} завершён.\n"
         f"Сыграно игр: {games}\n"
         f"Участников в зачёте: {players}\n\n"
         "Очки посчитаны, таблица закрыта, спорить больше не о чем.\n"
@@ -221,12 +223,11 @@ def award_reveal(place: int, name: str, games: int, points: int) -> str:
     )
 
 
-def award_final(rows: list[tuple[str, int, int]], season: str | None,
+def award_final(rows: list[tuple[str, int, int]], label: str,
                 limit: int = 10) -> str:
     """Финальная таблица сезона и слова на прощание."""
-    период = f" · сезон {season}" if season else ""
     return (
-        f"{rating_table(rows[:limit], period=период)}\n\n"
+        f"{rating_table(rows[:limit], period=f' · {label}')}\n\n"
         "Спасибо всем, кто играл этот сезон: за скорость, за споры в чате "
         "и за то, что приходили даже в будни.\n\n"
         "Новый сезон — новый отсчёт. Рейтинг обнуляется, шансы равны. 💞💓💕"

@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS awards (
     time_msk   TEXT    NOT NULL,      -- 'HH:MM'
     thread_id  INTEGER,
     done_at    TEXT,                  -- заполняется при проведении
+    title      TEXT,                  -- как назвать сезон в церемонии
     created_by INTEGER,
     created_at TEXT    NOT NULL,
     PRIMARY KEY (chat_id, run_date)
@@ -196,6 +197,11 @@ def _migrate(c: sqlite3.Connection) -> None:
     if "changed" not in existing:
         c.execute("ALTER TABLE answers ADD COLUMN changed INTEGER NOT NULL DEFAULT 0")
         log.info("Миграция: добавлена колонка answers.changed")
+
+    existing = {r["name"] for r in c.execute("PRAGMA table_info(awards)")}
+    if existing and "title" not in existing:
+        c.execute("ALTER TABLE awards ADD COLUMN title TEXT")
+        log.info("Миграция: добавлена колонка awards.title")
 
 
 @contextmanager
@@ -618,18 +624,19 @@ def save_announcement_message(chat_id: int, day: str, message_id: int) -> None:
 # ==================== Награждение ====================
 
 def set_award(chat_id: int, run_date: str, time_msk: str, thread_id: int | None,
-              created_by: int) -> None:
+              created_by: int, title: str | None = None) -> None:
     """Назначает церемонию. Повторное назначение той же даты — переигровка."""
     with tx() as c:
         c.execute(
             """INSERT INTO awards (chat_id, run_date, time_msk, thread_id,
-                                   created_by, created_at)
-               VALUES (?, ?, ?, ?, ?, ?)
+                                   title, created_by, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(chat_id, run_date) DO UPDATE SET
                    time_msk = excluded.time_msk,
                    thread_id = excluded.thread_id,
+                   title = excluded.title,
                    done_at = NULL""",
-            (chat_id, run_date, time_msk, thread_id, created_by, _utcnow()),
+            (chat_id, run_date, time_msk, thread_id, title, created_by, _utcnow()),
         )
 
 
