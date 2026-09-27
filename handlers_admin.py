@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from telegram import Update
 from telegram.ext import ContextTypes
 
+import awards
 import db
 import engine
 import packs
@@ -323,6 +324,75 @@ async def rename_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     await update.message.reply_text("\n".join(lines))
+
+
+# ==================== /award ====================
+
+async def award_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Назначает награждение по итогам сезона.
+
+    `/award` — что назначено, `/award 2026-09-28 22:15` — назначить,
+    `/award off` — отменить. Церемония проводится сама на тике: если в
+    назначенный момент в чате идёт квиз, она дожидается его конца.
+    """
+    chat_id = update.effective_chat.id
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("Команда работает только в группах.")
+        return
+    if not await is_admin(update, update.effective_user.id):
+        await update.message.reply_text("❌ Только администраторы группы.")
+        return
+
+    args = _args(update.message.text, "/award").split()
+
+    if not args:
+        rows = await engine.to_db(db.awards_for_chat, chat_id)
+        if not rows:
+            await update.message.reply_text(texts.AWARD_HELP, parse_mode="Markdown")
+            return
+        lines = ["🏆 Награждения этой группы:\n"]
+        for r in rows:
+            состояние = "проведено" if r["done_at"] else "ждёт"
+            lines.append(f"• {r['run_date']} в {r['time_msk']} МСК — {состояние}")
+        lines.append("\n" + texts.AWARD_HELP)
+        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+        return
+
+    if args[0].lower() in ("off", "отмена", "del"):
+        удалено = await engine.to_db(db.delete_pending_awards, chat_id)
+        await update.message.reply_text(
+            f"✅ Отменено назначений: {удалено}." if удалено
+            else "ℹ️ Нечего отменять: назначенных церемоний нет."
+        )
+        return
+
+    if len(args) != 2:
+        await update.message.reply_text(texts.AWARD_HELP, parse_mode="Markdown")
+        return
+
+    try:
+        run_date = awards.parse_date(args[0])
+    except ValueError:
+        await update.message.reply_text("❌ Дата указывается как ГГГГ-ММ-ДД, например 2026-09-28.")
+        return
+    try:
+        time_msk = scheduler.parse_time(args[1])
+    except scheduler.ScheduleError as e:
+        await update.message.reply_text(f"❌ {e}")
+        return
+
+    if run_date < awards.today_msk():
+        await update.message.reply_text("❌ Эта дата уже прошла.")
+        return
+
+    thread_id = update.message.message_thread_id
+    await engine.to_db(db.set_award, chat_id, run_date, time_msk, thread_id,
+                       update.effective_user.id)
+    await update.message.reply_text(
+        f"✅ Награждение назначено на {run_date}, {time_msk} МСК.\n"
+        "Если к этому времени игра ещё не закончится, бот дождётся её финала.\n"
+        "Зачёт — по очкам сезонного рейтинга, как в /rating."
+    )
 
 
 # ==================== /announce ====================

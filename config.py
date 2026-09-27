@@ -46,6 +46,10 @@ class Timings:
     reg_refresh: int = _int_env("T_REG_REFRESH", 15)     # обновление списка регистрации
     podium_pause: int = _int_env("T_PODIUM", 3)          # пауза между объявлениями мест
     scheduler_tick: int = _int_env("T_TICK", 60)     # период опроса расписания
+    # Награждение в конце сезона. Длинная пауза — чтобы организатор успел
+    # вставить картинку победителя между репликами бота.
+    award_suspense: int = _int_env("T_AWARD_SUSPENSE", 6)   # барабанная дробь
+    award_pause: int = _int_env("T_AWARD_PAUSE", 20)        # пауза на картинку
 
 
 # Во сколько по Москве публиковать анонс игрового дня. Пусто — не публиковать.

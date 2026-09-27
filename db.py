@@ -103,6 +103,18 @@ CREATE TABLE IF NOT EXISTS announcements (
     PRIMARY KEY (chat_id, day)
 );
 
+-- Награждение по итогам сезона: одна церемония на дату и группу.
+CREATE TABLE IF NOT EXISTS awards (
+    chat_id    INTEGER NOT NULL,
+    run_date   TEXT    NOT NULL,      -- YYYY-MM-DD по Москве
+    time_msk   TEXT    NOT NULL,      -- 'HH:MM'
+    thread_id  INTEGER,
+    done_at    TEXT,                  -- заполняется при проведении
+    created_by INTEGER,
+    created_at TEXT    NOT NULL,
+    PRIMARY KEY (chat_id, run_date)
+);
+
 CREATE TABLE IF NOT EXISTS seasons (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id   INTEGER NOT NULL,
@@ -385,13 +397,20 @@ def rating_table(chat_id: int) -> list[sqlite3.Row]:
            FROM results
            WHERE chat_id = ?
            GROUP BY username
-           ORDER BY total_points DESC, games_count ASC""",
+           ORDER BY total_points DESC, games_count ASC, AVG(elo) DESC,
+                    username ASC""",
         (chat_id,),
     )
 
 
 def rating_table_period(chat_id: int, since: str, until: str) -> list[sqlite3.Row]:
-    """Рейтинг за период. Границы включительно, сравнение по дате игры."""
+    """Рейтинг за период. Границы включительно, сравнение по дате игры.
+
+    Порядок: очки, затем меньшее число игр, затем среднее ELO, затем ник.
+    Двух последних критериев раньше не было, и при полном равенстве очков
+    и игр SQLite отдавал произвольный порядок — на церемонии награждения
+    это означало бы случайного чемпиона.
+    """
     return _rows(
         """SELECT username,
                   COUNT(*)            AS games_count,
@@ -399,9 +418,25 @@ def rating_table_period(chat_id: int, since: str, until: str) -> list[sqlite3.Ro
            FROM results
            WHERE chat_id = ? AND played_at >= ? AND played_at <= ?
            GROUP BY username
-           ORDER BY total_points DESC, games_count ASC""",
+           ORDER BY total_points DESC, games_count ASC, AVG(elo) DESC,
+                    username ASC""",
         (chat_id, since, until),
     )
+
+
+def games_played(chat_id: int, since: str | None = None,
+                 until: str | None = None) -> int:
+    """Сколько игр сыграно в группе, опционально в границах периода."""
+    sql = "SELECT COUNT(DISTINCT game_id) AS n FROM results WHERE chat_id = ?"
+    params: list = [chat_id]
+    if since:
+        sql += " AND played_at >= ?"
+        params.append(since)
+    if until:
+        sql += " AND played_at <= ?"
+        params.append(until)
+    row = _row(sql, tuple(params))
+    return row["n"] if row else 0
 
 
 def elo_snapshot(chat_id: int, until: str | None = None) -> dict[str, tuple[int, float]]:
@@ -578,6 +613,55 @@ def save_announcement_message(chat_id: int, day: str, message_id: int) -> None:
             "UPDATE announcements SET message_id = ? WHERE chat_id = ? AND day = ?",
             (message_id, chat_id, day),
         )
+
+
+# ==================== Награждение ====================
+
+def set_award(chat_id: int, run_date: str, time_msk: str, thread_id: int | None,
+              created_by: int) -> None:
+    """Назначает церемонию. Повторное назначение той же даты — переигровка."""
+    with tx() as c:
+        c.execute(
+            """INSERT INTO awards (chat_id, run_date, time_msk, thread_id,
+                                   created_by, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(chat_id, run_date) DO UPDATE SET
+                   time_msk = excluded.time_msk,
+                   thread_id = excluded.thread_id,
+                   done_at = NULL""",
+            (chat_id, run_date, time_msk, thread_id, created_by, _utcnow()),
+        )
+
+
+def pending_awards(run_date: str) -> list[sqlite3.Row]:
+    return _rows(
+        "SELECT * FROM awards WHERE run_date = ? AND done_at IS NULL", (run_date,)
+    )
+
+
+def claim_award(chat_id: int, run_date: str) -> bool:
+    """Атомарная заявка: церемония проводится ровно один раз."""
+    with tx() as c:
+        cur = c.execute(
+            "UPDATE awards SET done_at = ? WHERE chat_id = ? AND run_date = ? "
+            "AND done_at IS NULL",
+            (_utcnow(), chat_id, run_date),
+        )
+        return cur.rowcount > 0
+
+
+def awards_for_chat(chat_id: int) -> list[sqlite3.Row]:
+    return _rows(
+        "SELECT * FROM awards WHERE chat_id = ? ORDER BY run_date", (chat_id,)
+    )
+
+
+def delete_pending_awards(chat_id: int) -> int:
+    with tx() as c:
+        cur = c.execute(
+            "DELETE FROM awards WHERE chat_id = ? AND done_at IS NULL", (chat_id,)
+        )
+        return cur.rowcount
 
 
 # ==================== Сезоны ====================

@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 from telegram.ext import ContextTypes
 
+import awards
 import db
 import engine
 import packs
@@ -147,6 +148,11 @@ async def tick(context: ContextTypes.DEFAULT_TYPE) -> None:
         await _announce_game_day(context, rows, now_msk, today)
     except Exception:
         log.exception("Ошибка публикации анонса")
+
+    try:
+        await awards.maybe_run(context, now_utc, now_msk, today)
+    except Exception:
+        log.exception("Ошибка церемонии награждения")
 
     for row in rows:
         try:
