@@ -20,6 +20,43 @@ GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS", "")
 GOOGLE_SHEET_ID = os.environ.get("GOOGLE_SHEET_ID", "")
 SHEETS_ENABLED = bool(GOOGLE_CREDENTIALS_JSON and GOOGLE_SHEET_ID)
 
+# -------------------- Карточки награждения --------------------
+# Папка с картинками победителей: <база><файл>_<место>.<расширение>,
+# например .../awards/denis_1.png. Пусто — церемония идёт текстом.
+AWARD_IMAGE_BASE = os.environ.get("AWARD_IMAGE_BASE", "")
+AWARD_IMAGE_EXT = os.environ.get("AWARD_IMAGE_EXT", ".png")
+
+
+def _parse_award_photos() -> dict[str, str]:
+    """AWARD_PHOTOS='@hard2sleep:denis,@valeisss:lera'
+
+    Ник в базе записан как в Telegram, а файл назван по-человечески —
+    вывести одно из другого нельзя, соответствие задаётся руками.
+    Ключи нормализуем: регистр ника в Telegram не значим, и @ в настройке
+    легко забыть.
+    """
+    result: dict[str, str] = {}
+    for chunk in os.environ.get("AWARD_PHOTOS", "").split(","):
+        ник, _, файл = chunk.strip().partition(":")
+        ник, файл = ник.strip().lstrip("@").lower(), файл.strip()
+        if ник and файл:
+            result[ник] = файл
+    return result
+
+
+AWARD_PHOTOS = _parse_award_photos()
+
+
+def award_photo_url(username: str, place: int) -> str | None:
+    """Ссылка на карточку награждения или None, если её не настроили."""
+    if not AWARD_IMAGE_BASE:
+        return None
+    файл = AWARD_PHOTOS.get(username.strip().lstrip("@").lower())
+    if not файл:
+        return None
+    return f"{AWARD_IMAGE_BASE}{файл}_{place}{AWARD_IMAGE_EXT}"
+
+
 # -------------------- Медиа --------------------
 TIMER_VIDEO_URL = os.environ.get("TIMER_VIDEO_URL", "")
 

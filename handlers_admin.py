@@ -343,7 +343,12 @@ async def award_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Только администраторы группы.")
         return
 
-    args = _args(update.message.text, "/award").split()
+    raw = _args(update.message.text, "/award")
+    # Название сезона идёт после вертикальной черты — тем же разделителем,
+    # что в /quiz и /schedule.
+    команда, _, название = raw.partition("|")
+    название = название.strip() or None
+    args = команда.split()
 
     if not args:
         rows = await engine.to_db(db.awards_for_chat, chat_id)
@@ -387,12 +392,13 @@ async def award_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     thread_id = update.message.message_thread_id
     await engine.to_db(db.set_award, chat_id, run_date, time_msk, thread_id,
-                       update.effective_user.id)
-    await update.message.reply_text(
-        f"✅ Награждение назначено на {run_date}, {time_msk} МСК.\n"
-        "Если к этому времени игра ещё не закончится, бот дождётся её финала.\n"
-        "Зачёт — по очкам сезонного рейтинга, как в /rating."
-    )
+                       update.effective_user.id, название)
+    ответ = [f"✅ Награждение назначено на {run_date}, {time_msk} МСК."]
+    if название:
+        ответ.append(f"Сезон будет назван так: «{название}».")
+    ответ.append("Если к этому времени игра ещё не закончится, бот дождётся её финала.")
+    ответ.append("Зачёт — по очкам сезонного рейтинга, как в /rating.")
+    await update.message.reply_text("\n".join(ответ))
 
 
 # ==================== /announce ====================
