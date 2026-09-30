@@ -169,20 +169,28 @@
     font-size:12px;
     color:var(--muted);
   }
+  /* Карточка награждения занимает столбец целиком: это портрет победителя,
+     в иконке 58×58 от него ничего не разобрать. */
   .podium-award{
-    width:58px;
-    height:58px;
+    width:100%;
     margin:0 auto 10px;
     position:relative;
   }
-  .podium-award-fallback{
-    font-size: 42px; line-height: 58px; text-align:center;
-  }
   .podium-award-img{
     width:100%;
-    height:100%;
-    object-fit:contain;
+    height:auto;
     display:block;
+    border-radius:10px;
+    border:1px solid var(--line);
+  }
+  /* Медаль эмодзи — наоборот, мелкая: во всю ширину вокруг неё будет одна
+     пустота. Тот же класс получает и карточка, которая не загрузилась. */
+  .podium-award.medal{
+    width:58px;
+    height:58px;
+  }
+  .podium-award-fallback{
+    font-size:42px; line-height:58px; text-align:center;
   }
   /* CSS-drawn cup */
   .cup-art .cup-bowl{
@@ -222,35 +230,6 @@
   }
   .cup-art .cup-handle.left{ left:2px; border-right:0; }
   .cup-art .cup-handle.right{ right:2px; border-left:0; }
-
-  /* CSS-drawn medals */
-  .medal-art{
-    border-radius:50%;
-    width:45px; height:45px;
-    margin-top:6px;
-    border:3px solid currentColor;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:15px;
-    font-weight:600;
-    box-shadow:0 0 0 3px rgba(255,255,255,.04);
-  }
-  .medal-art.silver{ color:#d5d7dc; }
-  .medal-art.bronze{ color:#c48762; }
-  .medal-ribbon{
-    position:absolute;
-    left:50%;
-    transform:translateX(-50%);
-    top:0;
-    width:13px; height:14px;
-    border-left:5px solid currentColor;
-    border-right:5px solid currentColor;
-    opacity:.8;
-  }
-  .podium-slot.second .medal-art{ margin-top:6px; }
-  .podium-slot.third .medal-art{ margin-top:6px; }
 
   .qualification-divider{
     display:flex;
@@ -298,7 +277,7 @@
     .podium-slot.third .podium-block{ height:51px; }
     .podium-name{ font-size:12.5px; }
     .podium-elo{ font-size:10px; }
-    .podium-award{ transform:scale(.9); transform-origin:center bottom; margin-bottom:6px; }
+    .podium-award.medal{ transform:scale(.9); transform-origin:center bottom; margin-bottom:6px; }
   }
 
   /* ---- Leaderboard ---- */
@@ -890,9 +869,15 @@
           </div>`;
       }
 
-      const award = `<div class="podium-award">
+      // Карточки награждения рисовали под сезон на очках. У сезона по ELO
+      // своих карточек нет, поэтому там медаль, а не чужая картинка.
+      const award = mode === 'points'
+        ? `<div class="podium-award">
              <img class="podium-award-img" src="${places[i]}.png" alt="${places[i]} место"
                   data-place="${places[i]}">
+           </div>`
+        : `<div class="podium-award medal">
+             <div class="podium-award-fallback">${MEDALS[places[i]] || '🏆'}</div>
            </div>`;
 
       const metric = mode === 'points'
@@ -911,13 +896,15 @@
         </div>`;
     }).join('');
 
-    // Картинки медалей лежат рядом со страницей. Нет их — подиум не должен
-    // зиять битой иконкой, поэтому подставляем эмодзи.
+    // Карточки лежат рядом со страницей. Не загрузились — подиум не должен
+    // зиять битой иконкой: подставляем медаль и сжимаем рамку до её размера.
     podiumElement.querySelectorAll('.podium-award-img').forEach(img => {
       img.addEventListener('error', () => {
         const заглушка = document.createElement('div');
         заглушка.className = 'podium-award-fallback';
         заглушка.textContent = MEDALS[Number(img.dataset.place)] || '🏆';
+        const рамка = img.closest('.podium-award');
+        if(рамка) рамка.classList.add('medal');
         img.replaceWith(заглушка);
       });
     });
