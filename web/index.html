@@ -1,0 +1,1321 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Рейтинг онлайн-квиза Vegas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --board-bg: #17181a;
+    --board-bg-2: #1f2123;
+    --flap-cream: #f1e9da;
+    --ink: #17181a;
+    --amber: #e0a33e;
+    --teal: #4f9d95;
+    --silver: #b9bec7;
+    --bronze: #c98a5a;
+    --muted: #8a8d92;
+    --line: #2c2e31;
+    --green: #7fbf8f;
+    --red: #d97757;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; overflow-x: hidden; }
+  body{
+    background: radial-gradient(ellipse at 50% -10%, #232527 0%, var(--board-bg) 55%);
+    color: var(--flap-cream);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    padding: 48px 20px 80px;
+    width: 100%;
+  }
+  .wrap{ max-width: 720px; margin: 0 auto; width: 100%; }
+
+  header{ margin-bottom: 24px; }
+  .eyebrow{
+    display:flex; align-items:center; gap:8px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 14px;
+  }
+  .dot{ width:7px; height:7px; border-radius:50%; background: var(--teal); box-shadow: 0 0 0 3px rgba(79,157,149,0.18); flex-shrink:0; }
+  h1{
+    font-family:'Archivo Black', sans-serif;
+    font-size: clamp(28px, 6vw, 42px);
+    line-height: 1.08;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+  .sub{
+    color: var(--muted);
+    font-size: 14px;
+    display:flex; flex-wrap:wrap; gap: 6px 16px;
+    word-break: break-word;
+  }
+  .sub b{ color: var(--flap-cream); font-weight: 600; }
+
+  .season-select{
+    background: var(--board-bg-2);
+    border: 1px solid var(--line);
+    color: var(--flap-cream);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 5px 10px; border-radius: 8px; cursor: pointer;
+  }
+  .season-select:focus{ outline: none; border-color: var(--amber); }
+  .champion{ color: var(--amber); }
+  .archive-note{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11.5px; color: var(--muted);
+    margin-top: 10px;
+  }
+
+  .status{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px; color: var(--muted);
+    margin-top: 18px; min-height: 16px;
+  }
+  .status.err{ color: var(--red); }
+
+  /* ---- Tabs ---- */
+  .tabs{
+    display:flex; gap: 8px;
+    margin: 22px 0 6px;
+  }
+  .tab-btn{
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .tab-btn:hover{ color: var(--flap-cream); }
+  .tab-btn.active{
+    background: var(--board-bg-2);
+    color: var(--flap-cream);
+    border-color: var(--amber);
+  }
+
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+
+  .board{
+    background: var(--board-bg-2);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 6px;
+    margin-top: 14px;
+  }
+  .row{
+    display:grid;
+    grid-template-columns: 56px 1fr auto auto;
+    align-items:center;
+    gap: 14px;
+    padding: 14px 14px;
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .row:hover{ background: rgba(255,255,255,0.03); }
+  .row + .row{ border-top: 1px solid var(--line); }
+
+  .rank-flap{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--ink);
+    background: var(--flap-cream);
+    width: 40px; height: 40px;
+    border-radius: 8px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.25) inset;
+  }
+  .row[data-rank="1"] .rank-flap{ background: var(--amber); }
+  .row[data-rank="2"] .rank-flap{ background: var(--silver); }
+  .row[data-rank="3"] .rank-flap{ background: var(--bronze); }
+
+  .name{
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: 0.01em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .games{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .games b{ color: var(--flap-cream); font-weight: 500; }
+  .elo-badge{
+    display:block;
+    margin-top: 3px;
+    color: var(--teal);
+    font-size: 10px;
+    letter-spacing: 0.02em;
+  }
+
+  .points{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 20px;
+    color: var(--flap-cream);
+    min-width: 64px;
+    text-align: right;
+  }
+  .row[data-rank="1"] .points{ color: var(--amber); }
+
+  .empty{
+    padding: 40px 14px;
+    text-align:center;
+    color: var(--muted);
+    font-size: 14px;
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  footer{
+    margin-top: 28px;
+    font-size: 12px;
+    color: var(--muted);
+    text-align:center;
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  @media (max-width: 480px){
+    .row{ grid-template-columns: 44px 1fr auto; gap: 10px; padding: 12px 10px; }
+    .games{ display:none; }
+    .rank-flap{ width:34px; height:34px; font-size:15px; }
+    .points{ font-size:17px; }
+  }
+
+  @media (prefers-reduced-motion: no-preference){
+    .row{ animation: rise 0.4s ease backwards; }
+  }
+  @keyframes rise{
+    from{ opacity:0; transform: translateY(6px); }
+    to{ opacity:1; transform: translateY(0); }
+  }
+
+  /* ---- Games tab filters ---- */
+  .games-filters{
+    display:flex; gap: 10px; margin: 18px 0 18px;
+    flex-wrap: wrap;
+  }
+  .filter-chip{
+    background: var(--board-bg-2);
+    border: 1px solid var(--line);
+    color: var(--flap-cream);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    cursor: pointer;
+    display:flex; align-items:center; gap: 7px;
+    transition: border-color 0.15s ease;
+  }
+  .filter-chip .ic{ font-size:14px; }
+  .filter-chip.active{ border-color: var(--amber); }
+  .filter-chip .fc-muted{ color: var(--muted); }
+
+  .game-session{ margin-bottom: 22px; }
+  .game-session-head{ margin-bottom: 10px; }
+  .game-session-title{ font-weight:600; font-size:15px; line-height:1.3; }
+  .game-session-date{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px; color: var(--muted); margin-top: 3px;
+  }
+  .game-session .game-table{
+    background: var(--board-bg-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 4px 10px;
+  }
+
+  /* game detail table (shared: modal + games tab) */
+  .game-table{ display:flex; flex-direction:column; }
+  .game-row{
+    display:grid;
+    grid-template-columns: 28px 1fr 42px 42px 42px 42px 40px 56px 50px;
+    gap: 6px;
+    align-items:center;
+    padding: 9px 4px;
+    font-size: 12.5px;
+  }
+  .game-row + .game-row{ border-top: 1px solid var(--line); }
+  .game-row.head{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    border-top: none;
+    padding-bottom: 8px;
+  }
+  .game-row.me{ background: rgba(224,163,62,0.08); border-radius: 8px; }
+  .g-place{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight: 600;
+  }
+  .g-place.top3{ color: var(--amber); }
+  .g-name{
+    overflow-wrap: break-word;
+    word-break: break-word;
+    font-weight: 500;
+    min-width: 0;
+  }
+  .g-num{
+    font-family:'IBM Plex Mono', monospace;
+    text-align: right;
+    color: var(--flap-cream);
+  }
+  .g-pts{
+    font-family:'IBM Plex Mono', monospace;
+    text-align: right;
+    font-weight: 600;
+  }
+  .g-pts.pos{ color: var(--green); }
+  .g-pts.neg{ color: var(--red); }
+
+  @media (max-width: 480px){
+    .game-row{ grid-template-columns: 22px 1fr 38px 46px; gap: 8px; }
+    .game-row .hide-mobile{ display:none; }
+  }
+
+  /* ---- Modal ---- */
+  .overlay{
+    position: fixed; inset: 0;
+    background: rgba(10,10,11,0.72);
+    backdrop-filter: blur(3px);
+    display:flex; align-items:flex-end; justify-content:center;
+    z-index: 100;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .overlay.open{ opacity: 1; pointer-events: auto; }
+  @media (min-width: 640px){
+    .overlay{ align-items:center; }
+  }
+
+  .modal{
+    background: var(--board-bg-2);
+    border: 1px solid var(--line);
+    border-radius: 18px 18px 0 0;
+    width: 100%; max-width: 620px;
+    max-height: 86vh;
+    overflow-y: auto;
+    padding: 26px 22px 30px;
+    transform: translateY(24px);
+    transition: transform 0.25s ease;
+  }
+  .overlay.open .modal{ transform: translateY(0); }
+  @media (min-width: 640px){
+    .modal{ border-radius: 18px; }
+  }
+
+  .modal-head{
+    display:flex; align-items:flex-start; justify-content:space-between;
+    gap: 12px; margin-bottom: 20px;
+  }
+  .modal-head-left{ display:flex; align-items:flex-start; gap: 10px; min-width: 0; }
+  .modal-back{
+    background: var(--board-bg);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .modal-back:hover{ color: var(--flap-cream); }
+  .modal-title{
+    font-family:'Archivo Black', sans-serif;
+    font-size: 22px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .modal-title.wrap{
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    line-height: 1.2;
+  }
+  .modal-subtitle{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .modal-close{
+    background: var(--board-bg);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .modal-close:hover{ color: var(--flap-cream); }
+
+  .stat-grid{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .stat-tile{
+    background: var(--board-bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 10px;
+  }
+  .stat-tile .v{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 18px;
+  }
+  .stat-tile .l{
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .history-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 10px;
+  }
+
+  /* ---- Awards shelf ---- */
+  .awards-shelf{
+    display:flex; gap: 10px;
+    overflow-x: auto;
+    padding: 2px 2px 12px;
+    margin-bottom: 22px;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .awards-shelf::-webkit-scrollbar{ height: 5px; }
+  .awards-shelf::-webkit-scrollbar-thumb{ background: var(--line); border-radius: 3px; }
+  .award{
+    flex: 0 0 auto;
+    width: 74px;
+    background: var(--board-bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 6px 10px;
+    text-align:center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .award:hover{ border-color: var(--amber); background: rgba(224,163,62,0.1); }
+  .award .cup{ font-size: 26px; line-height: 1; }
+  .award .aw-date{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 9.5px; color: var(--muted);
+    margin-top: 7px; letter-spacing: 0.02em;
+  }
+  .awards-none{
+    font-size: 12.5px; color: var(--muted);
+    font-family:'IBM Plex Mono', monospace;
+    padding: 6px 0 20px;
+  }
+  .hist-row{
+    display:grid;
+    grid-template-columns: 90px 1fr auto auto;
+    gap: 10px;
+    align-items:center;
+    padding: 10px 4px;
+    font-size: 13px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .hist-row:hover{ background: rgba(255,255,255,0.04); }
+  .hist-row + .hist-row{ border-top: 1px solid var(--line); }
+  .hist-date{
+    font-family:'IBM Plex Mono', monospace;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .hist-quiz{
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .hist-place{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .hist-place.top3{ color: var(--amber); }
+  .hist-pts{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight: 600;
+    text-align: right;
+    min-width: 40px;
+  }
+  .hist-pts.pos{ color: var(--green); }
+  .hist-pts.neg{ color: var(--red); }
+
+  @media (max-width: 480px){
+    .hist-row{ grid-template-columns: 60px 1fr auto; }
+    .hist-place{ display:none; }
+  }
+
+  /* ---- Calendar picker ---- */
+  .cal-month{ margin-bottom: 18px; }
+  .cal-month-title{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin-bottom: 8px;
+  }
+  .cal-grid{
+    display:grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .cal-weekday{
+    font-size: 10px; text-align:center; color: var(--muted);
+    font-family:'IBM Plex Mono', monospace; padding-bottom: 4px;
+  }
+  .cal-day{
+    aspect-ratio: 1;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    border-radius: 8px;
+    font-size: 12.5px;
+    cursor: pointer;
+    position: relative;
+    background: var(--board-bg);
+    border: 1px solid transparent;
+  }
+  .cal-day.empty{ visibility:hidden; cursor:default; }
+  .cal-day.has-games::after{
+    content:''; width:4px; height:4px; border-radius:50%;
+    background: var(--teal); position:absolute; bottom:4px;
+  }
+  .cal-day.in-range{ background: rgba(224,163,62,0.16); }
+  .cal-day.range-edge{ background: var(--amber); color: var(--ink); font-weight:600; }
+  .cal-day.range-edge::after{ background: var(--ink); }
+  .cal-day:hover{ border-color: var(--line); }
+
+  .cal-mobile-view{ display:none; }
+  .cal-mobile-grid{
+    display:flex; flex-wrap:wrap; gap: 6px;
+    margin-bottom: 6px;
+  }
+  .cal-day-pill{
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: var(--board-bg);
+    border: 1px solid var(--line);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    cursor: pointer;
+  }
+  .cal-day-pill.in-range{ background: rgba(224,163,62,0.16); }
+  .cal-day-pill.range-edge{ background: var(--amber); color: var(--ink); font-weight:600; border-color: var(--amber); }
+
+  @media (max-width: 480px){
+    .cal-desktop-view{ display:none; }
+    .cal-mobile-view{ display:block; }
+  }
+
+  .cal-summary{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px; margin: 16px 0 4px; color: var(--flap-cream);
+  }
+  .cal-actions{ display:flex; gap: 10px; margin-top: 12px; }
+  .btn{
+    flex:1; padding: 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--board-bg);
+    color: var(--flap-cream); font-family:'IBM Plex Mono', monospace;
+    font-size: 13px; cursor: pointer;
+  }
+  .btn.primary{
+    background: var(--amber); color: var(--ink);
+    border-color: var(--amber); font-weight:600;
+  }
+
+  /* ---- Player picker ---- */
+  .player-search{
+    width:100%; padding: 11px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--board-bg);
+    color: var(--flap-cream); font-family:'Inter', sans-serif;
+    font-size: 14px; margin-bottom: 14px;
+  }
+  .player-search:focus{ outline: none; border-color: var(--amber); }
+  .player-list{ max-height: 50vh; overflow-y:auto; }
+  .player-item{
+    padding: 12px 8px; border-radius: 8px; cursor: pointer; font-size: 14px;
+  }
+  .player-item:hover{ background: rgba(255,255,255,0.04); }
+  .player-item + .player-item{ border-top: 1px solid var(--line); }
+  .player-item.selected{ color: var(--amber); font-weight:600; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="eyebrow">
+        <span class="dot"></span>
+        <select class="season-select" id="season-select" aria-label="Сезон"></select>
+      </div>
+      <h1>Рейтинг онлайн-квиза Vegas</h1>
+      <div class="sub">
+        <span>Период: <b id="period-label">—</b></span>
+        <span>Игроков в зачёте: <b id="count-label">—</b></span>
+        <span class="champion" id="champion-label"></span>
+      </div>
+      <div class="archive-note" id="archive-note"></div>
+      <div class="status" id="status">Загружаю данные из таблицы…</div>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="rating">Рейтинг</button>
+      <button class="tab-btn" data-tab="games">Игры</button>
+    </div>
+
+    <div class="tab-panel active" id="panel-rating">
+      <div class="board" id="board">
+        <div class="empty">Загрузка…</div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="panel-games">
+      <div class="games-filters">
+        <button class="filter-chip active" id="filter-date-btn">
+          <span class="ic">📅</span><span id="filter-date-label">Дата</span>
+        </button>
+        <button class="filter-chip" id="filter-player-btn">
+          <span class="ic">👤</span><span id="filter-player-label" class="fc-muted">Игрок</span>
+        </button>
+        <button class="filter-chip" id="filter-reset-btn" style="display:none;">
+          <span class="ic">↺</span><span class="fc-muted">Сбросить</span>
+        </button>
+      </div>
+      <div id="games-list">
+        <div class="empty">Загрузка…</div>
+      </div>
+    </div>
+
+    <footer>Данные подтягиваются напрямую из Google Sheets · нажмите на игрока или игру — для подробностей</footer>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="modal" id="modal-body"></div>
+  </div>
+
+<script>
+  const SHEET_ID = '11wFVe0mZP-gIXlbD3_gAK8vNsza1931BhJwbvD9JmoQ';
+  const GAMES_SHEET_NAME = 'Games';
+  const CHAT_ID = '-1002440363847';
+
+  // Сезон — календарный квартал: так их заводит бот (Q3 2026 = 1 июля — 30 сентября).
+  // Список сезонов выводится из самих игр, поэтому новый квартал появляется в
+  // архиве сам, без правки файла. Здесь — только человеческие имена.
+  const SEASON_NAMES = {
+    '2026-Q3': 'Второй сезон',
+    '2026-Q4': 'Третий сезон',
+  };
+
+  // Порог калибровки: столько игр нужно, чтобы показать средний ELO.
+  const MIN_GAMES_FOR_ELO = 10;
+
+  const boardEl = document.getElementById('board');
+  const statusEl = document.getElementById('status');
+  const countEl = document.getElementById('count-label');
+  const periodEl = document.getElementById('period-label');
+  const championEl = document.getElementById('champion-label');
+  const archiveNoteEl = document.getElementById('archive-note');
+  const seasonSelectEl = document.getElementById('season-select');
+  const overlayEl = document.getElementById('overlay');
+  const modalEl = document.getElementById('modal-body');
+  const gamesListEl = document.getElementById('games-list');
+  const filterDateBtn = document.getElementById('filter-date-btn');
+  const filterPlayerBtn = document.getElementById('filter-player-btn');
+  const filterDateLabel = document.getElementById('filter-date-label');
+  const filterPlayerLabel = document.getElementById('filter-player-label');
+  const resetFiltersBtn = document.getElementById('filter-reset-btn');
+
+  const SHORT_MONTHS = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  const FULL_MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const GENITIVE_MONTHS = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+  // ---- State ----
+  let currentSeason = null;
+  let gamesFilterMode = 'date'; // 'date' | 'player'
+  let dateRange = { start: null, end: null };     // committed, dateKey strings
+  let pendingRange = { start: null, end: null };  // used while calendar open
+  let selectedPlayerGames = null;
+
+  function csvUrl(sheetName){
+    return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`;
+  }
+
+  function parseCSV(text){
+    const rows = [];
+    let row = [], field = '', inQuotes = false;
+    for(let i = 0; i < text.length; i++){
+      const c = text[i], next = text[i+1];
+      if(inQuotes){
+        if(c === '"' && next === '"'){ field += '"'; i++; }
+        else if(c === '"'){ inQuotes = false; }
+        else { field += c; }
+      } else {
+        if(c === '"'){ inQuotes = true; }
+        else if(c === ','){ row.push(field); field = ''; }
+        else if(c === '\r'){ /* skip */ }
+        else if(c === '\n'){ row.push(field); rows.push(row); row = []; field = ''; }
+        else { field += c; }
+      }
+    }
+    if(field.length || row.length){ row.push(field); rows.push(row); }
+    return rows.filter(r => r.some(cell => cell.trim() !== ''));
+  }
+
+  function toNumber(raw){
+    if(raw == null) return 0;
+    const cleaned = raw.toString().trim().replace(/\s/g, '').replace(',', '.');
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function pad2(n){ return String(n).padStart(2, '0'); }
+
+  // ---- Сезоны ----
+  function seasonKeyOf(date){
+    return `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`;
+  }
+
+  function seasonBounds(key){
+    const [year, q] = key.split('-Q').map(Number);
+    const firstMonth = (q - 1) * 3;
+    return {
+      year,
+      firstMonth,
+      start: new Date(year, firstMonth, 1),
+      end: new Date(year, firstMonth + 3, 1),   // граница исключающая
+    };
+  }
+
+  function seasonLabel(key){
+    if(SEASON_NAMES[key]) return SEASON_NAMES[key];
+    const [year, q] = key.split('-Q');
+    return `Сезон Q${q} ${year}`;
+  }
+
+  function seasonPeriod(key){
+    const { start, end } = seasonBounds(key);
+    const last = new Date(end.getTime() - 86400000);
+    return `${start.getDate()} ${GENITIVE_MONTHS[start.getMonth()]} — ` +
+           `${last.getDate()} ${GENITIVE_MONTHS[last.getMonth()]} ${last.getFullYear()}`;
+  }
+
+  function seasonFinished(key){
+    return seasonBounds(key).end.getTime() <= Date.now();
+  }
+
+  function seasonMonths(key){
+    const { year, firstMonth } = seasonBounds(key);
+    return [0, 1, 2].map(i => ({ year, month: firstMonth + i }));
+  }
+
+  /* Рейтинг сезона считается прямо из листа Games.
+     Лист Rating_<chat> бот пересобирает только под текущий сезон, поэтому
+     архив прошлых сезонов из него не достать — а в Games лежит вся история.
+     Порядок повторяет бота: очки, затем меньшее число игр, затем средний
+     ELO, затем ник. Иначе страница и /rating разошлись бы на равных очках. */
+  function ratingFor(key){
+    const byPlayer = {};
+    (window.__allGames || []).forEach(g => {
+      if(g.season !== key) return;
+      let p = byPlayer[g.player];
+      if(!p){
+        p = byPlayer[g.player] = { name: g.player, games: 0, points: 0, eloSum: 0, eloCount: 0 };
+      }
+      p.games += 1;
+      p.points += g.ratingPoints;
+      if(g.elo > 0){ p.eloSum += g.elo; p.eloCount += 1; }
+    });
+    const list = Object.values(byPlayer);
+    list.forEach(p => { p.avgElo = p.eloCount ? p.eloSum / p.eloCount : 0; });
+    list.sort((a, b) =>
+      b.points - a.points ||
+      a.games - b.games ||
+      b.avgElo - a.avgElo ||
+      a.name.localeCompare(b.name, 'ru'));
+    return list;
+  }
+
+  function parseGameDate(str){
+    if(!str) return null;
+    const iso = str.trim().replace(' ', 'T');
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function dateKey(d){
+    return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  }
+
+  function fmtDate(d){
+    if(!d) return '—';
+    const dd = pad2(d.getDate());
+    const mm = pad2(d.getMonth()+1);
+    const hh = pad2(d.getHours());
+    const mi = pad2(d.getMinutes());
+    return `${dd}.${mm} ${hh}:${mi}`;
+  }
+
+  function fmtDayShort(dk){
+    const [y, m, d] = dk.split('-').map(Number);
+    return `${d} ${SHORT_MONTHS[m-1]}`;
+  }
+
+  function render(players){
+    if(!players.length){
+      boardEl.innerHTML = '<div class="empty">Пока нет данных за этот сезон.</div>';
+      countEl.textContent = '0';
+      championEl.textContent = '';
+      return;
+    }
+    countEl.textContent = players.length;
+    championEl.textContent = seasonFinished(currentSeason)
+      ? `🏆 Чемпион: ${players[0].name}`
+      : '';
+
+    boardEl.innerHTML = players.map((p, i) => {
+      const rank = i + 1;
+      const delay = Math.min(i * 0.04, 0.5);
+      const eloHtml = (p.games >= MIN_GAMES_FOR_ELO && p.avgElo)
+        ? `<span class="elo-badge">ELO ~${Math.round(p.avgElo)}</span>` : '';
+      return `
+        <div class="row" data-rank="${rank}" data-player="${encodeURIComponent(p.name)}" style="animation-delay:${delay}s">
+          <div class="rank-flap">${rank}</div>
+          <div class="name">${p.name}</div>
+          <div class="games">игр: <b>${p.games}</b>${eloHtml}</div>
+          <div class="points">${p.points.toLocaleString('ru-RU')}</div>
+        </div>`;
+    }).join('');
+
+    boardEl.querySelectorAll('.row').forEach(el => {
+      el.addEventListener('click', () => {
+        openPlayerModal(decodeURIComponent(el.getAttribute('data-player')));
+      });
+    });
+  }
+
+  // ---- Shared: render a full game results table ----
+  function renderGameTableHtml(rows, highlightPlayer){
+    const sorted = rows.slice().sort((a,b) => (a.place || 999) - (b.place || 999));
+    const body = sorted.map(p => {
+      const isTop3 = p.place >= 1 && p.place <= 3;
+      const isMe = highlightPlayer && p.player === highlightPlayer;
+      const ptsClass = p.ratingPoints > 0 ? 'pos' : (p.ratingPoints < 0 ? 'neg' : '');
+      const ptsSign = p.ratingPoints > 0 ? '+' : '';
+      const avgTimeSec = p.avgTime ? (p.avgTime / 100).toFixed(1) : '—';
+      const pct = p.pctCorrect ? p.pctCorrect.toFixed(0) + '%' : '—';
+      return `
+        <div class="game-row ${isMe ? 'me' : ''}">
+          <div class="g-place ${isTop3 ? 'top3' : ''}">${p.place || '—'}</div>
+          <div class="g-name">${p.player}</div>
+          <div class="g-num">${p.score || 0}</div>
+          <div class="g-num hide-mobile">${p.correct || 0}</div>
+          <div class="g-num hide-mobile">${p.wrong || 0}</div>
+          <div class="g-num hide-mobile">${p.skipped || 0}</div>
+          <div class="g-num hide-mobile">${pct}</div>
+          <div class="g-num hide-mobile">${avgTimeSec}с</div>
+          <div class="g-pts ${ptsClass}">${ptsSign}${p.ratingPoints}</div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="game-table">
+        <div class="game-row head">
+          <div>#</div>
+          <div>Игрок</div>
+          <div style="text-align:right;">Счёт</div>
+          <div class="hide-mobile" style="text-align:right;">Прав.</div>
+          <div class="hide-mobile" style="text-align:right;">Непр.</div>
+          <div class="hide-mobile" style="text-align:right;">Проп.</div>
+          <div class="hide-mobile" style="text-align:right;">%</div>
+          <div class="hide-mobile" style="text-align:right;">Ср. время</div>
+          <div style="text-align:right;">Баллы</div>
+        </div>
+        ${body}
+      </div>`;
+  }
+
+  // ---- Player modal (Rating tab) ----
+  function openPlayerModal(name){
+    const games = (window.__gamesByPlayer && window.__gamesByPlayer[name]) || [];
+    const gamesCount = games.length;
+    const totalRating = games.reduce((s,g) => s + g.ratingPoints, 0);
+    const totalScore = games.reduce((s,g) => s + g.score, 0);
+    const avgScore = gamesCount ? Math.round(totalScore / gamesCount) : 0;
+    const avgTime = gamesCount ? (games.reduce((s,g) => s + g.avgTime, 0) / gamesCount / 100) : 0;
+    const avgPct = gamesCount ? (games.reduce((s,g) => s + g.pctCorrect, 0) / gamesCount) : 0;
+
+    const sorted = games.slice().sort((a,b) => (b.date ? b.date.getTime() : 0) - (a.date ? a.date.getTime() : 0));
+
+    const historyHtml = sorted.length
+      ? sorted.map(g => {
+          const isTop3 = g.place >= 1 && g.place <= 3;
+          const ptsClass = g.ratingPoints > 0 ? 'pos' : (g.ratingPoints < 0 ? 'neg' : '');
+          const ptsSign = g.ratingPoints > 0 ? '+' : '';
+          return `
+            <div class="hist-row" data-key="${encodeURIComponent(g.key)}" data-back="${encodeURIComponent(name)}">
+              <div class="hist-date">${fmtDate(g.date)}</div>
+              <div class="hist-quiz">${g.quiz}</div>
+              <div class="hist-place ${isTop3 ? 'top3' : ''}">${g.place ? g.place + ' место' : '—'}</div>
+              <div class="hist-pts ${ptsClass}">${ptsSign}${g.ratingPoints}</div>
+            </div>`;
+        }).join('')
+      : '<div class="empty">Нет игр за этот сезон.</div>';
+
+    modalEl.innerHTML = `
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">${name}</div>
+          <div class="modal-subtitle">${seasonLabel(currentSeason)}</div>
+        </div>
+        <button class="modal-close" id="modal-close-btn">✕</button>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-tile"><div class="v">${gamesCount}</div><div class="l">игр сыграно</div></div>
+        <div class="stat-tile"><div class="v">${totalRating.toLocaleString('ru-RU')}</div><div class="l">очков рейтинга</div></div>
+        <div class="stat-tile"><div class="v">${avgScore}</div><div class="l">средний счёт за игру</div></div>
+        <div class="stat-tile"><div class="v">${avgTime ? avgTime.toFixed(1) + 'с' : '—'}</div><div class="l">среднее время ответа</div></div>
+        <div class="stat-tile"><div class="v">${avgPct ? avgPct.toFixed(0) + '%' : '—'}</div><div class="l">правильных ответов</div></div>
+        <div class="stat-tile"><div class="v">${totalScore.toLocaleString('ru-RU')}</div><div class="l">всего баллов за квизы</div></div>
+      </div>
+      <div class="history-label">История игр · нажмите на игру для подробностей</div>
+      <div class="history-list">${historyHtml}</div>
+    `;
+
+    document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+    modalEl.querySelectorAll('.hist-row').forEach(el => {
+      el.addEventListener('click', () => {
+        openGameModal(decodeURIComponent(el.getAttribute('data-key')),
+                      decodeURIComponent(el.getAttribute('data-back')));
+      });
+    });
+
+    overlayEl.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  // ---- Single game detail modal ----
+  function openGameModal(key, backToPlayer){
+    const group = (window.__gameGroups && window.__gameGroups[key]) || [];
+    if(!group.length){
+      modalEl.innerHTML = `<div class="empty">Нет данных по этой игре.</div>`;
+      return;
+    }
+    modalEl.innerHTML = `
+      <div class="modal-head">
+        <div class="modal-head-left">
+          <button class="modal-back" id="modal-back-btn">←</button>
+          <div>
+            <div class="modal-title wrap">${group[0].quiz}</div>
+            <div class="modal-subtitle">${fmtDate(group[0].date)}</div>
+          </div>
+        </div>
+        <button class="modal-close" id="modal-close-btn">✕</button>
+      </div>
+      ${renderGameTableHtml(group, backToPlayer)}
+    `;
+
+    document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+    document.getElementById('modal-back-btn').addEventListener('click', () => openPlayerModal(backToPlayer));
+  }
+
+  function closeModal(){
+    overlayEl.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  overlayEl.addEventListener('click', (e) => {
+    if(e.target === overlayEl) closeModal();
+  });
+
+  // ---- Tabs ----
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---- Games tab: filter chips ----
+  filterDateBtn.addEventListener('click', () => {
+    pendingRange = { start: dateRange.start, end: dateRange.end };
+    openCalendarModal();
+  });
+  filterPlayerBtn.addEventListener('click', openPlayerPickerModal);
+  resetFiltersBtn.addEventListener('click', () => {
+    gamesFilterMode = 'date';
+    selectedPlayerGames = null;
+    if(window.__latestDateKey){
+      dateRange = { start: window.__latestDateKey, end: window.__latestDateKey };
+    }
+    updateFilterChips();
+    renderGamesList();
+  });
+
+  function updateFilterChips(){
+    const dateActive = gamesFilterMode === 'date';
+    filterDateBtn.classList.toggle('active', dateActive);
+    filterPlayerBtn.classList.toggle('active', !dateActive);
+
+    if(dateActive && dateRange.start && dateRange.end){
+      filterDateLabel.textContent = dateRange.start === dateRange.end
+        ? fmtDayShort(dateRange.start)
+        : `${fmtDayShort(dateRange.start)} – ${fmtDayShort(dateRange.end)}`;
+      filterDateLabel.classList.remove('fc-muted');
+    } else {
+      filterDateLabel.textContent = 'Дата';
+      filterDateLabel.classList.add('fc-muted');
+    }
+
+    if(!dateActive && selectedPlayerGames){
+      filterPlayerLabel.textContent = selectedPlayerGames;
+      filterPlayerLabel.classList.remove('fc-muted');
+    } else {
+      filterPlayerLabel.textContent = 'Игрок';
+      filterPlayerLabel.classList.add('fc-muted');
+    }
+
+    const atDefault = dateActive && window.__latestDateKey
+      && dateRange.start === window.__latestDateKey
+      && dateRange.end === window.__latestDateKey;
+    resetFiltersBtn.style.display = atDefault ? 'none' : 'inline-flex';
+  }
+
+  // ---- Calendar modal ----
+  function buildMonthGrid(year, monthIndex){
+    const firstWeekday = (new Date(year, monthIndex, 1).getDay() + 6) % 7; // Mon=0
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    let cells = '';
+    for(let i = 0; i < firstWeekday; i++){
+      cells += `<div class="cal-day empty"></div>`;
+    }
+    for(let day = 1; day <= daysInMonth; day++){
+      const dk = `${year}-${pad2(monthIndex+1)}-${pad2(day)}`;
+      const hasGames = window.__sessionDateKeys && window.__sessionDateKeys.has(dk);
+      let cls = 'cal-day';
+      if(hasGames) cls += ' has-games';
+      if(pendingRange.start && pendingRange.end && dk >= pendingRange.start && dk <= pendingRange.end) cls += ' in-range';
+      if(dk === pendingRange.start || dk === pendingRange.end) cls += ' range-edge';
+      cells += `<div class="${cls}" data-key="${dk}">${day}</div>`;
+    }
+    const weekdaysHtml = WEEKDAYS.map(w => `<div class="cal-weekday">${w}</div>`).join('');
+    return `
+      <div class="cal-month">
+        <div class="cal-month-title">${FULL_MONTHS[monthIndex]}</div>
+        <div class="cal-grid">${weekdaysHtml}${cells}</div>
+      </div>`;
+  }
+
+  function buildMobileDayList(){
+    const keys = Array.from(window.__sessionDateKeys || []).sort();
+    if(!keys.length) return '<div class="empty">Нет игр за этот сезон.</div>';
+    const pills = keys.map(dk => {
+      let cls = 'cal-day-pill';
+      if(pendingRange.start && pendingRange.end && dk >= pendingRange.start && dk <= pendingRange.end) cls += ' in-range';
+      if(dk === pendingRange.start || dk === pendingRange.end) cls += ' range-edge';
+      return `<div class="${cls}" data-key="${dk}">${fmtDayShort(dk)}</div>`;
+    }).join('');
+    return `<div class="cal-mobile-grid">${pills}</div>`;
+  }
+
+  function openCalendarModal(){
+    const monthsHtml = seasonMonths(currentSeason)
+      .map(m => buildMonthGrid(m.year, m.month)).join('');
+    const mobileHtml = buildMobileDayList();
+
+    let summary = 'Выберите дату или период';
+    if(pendingRange.start){
+      summary = pendingRange.end && pendingRange.end !== pendingRange.start
+        ? `Выбрано: ${fmtDayShort(pendingRange.start)} – ${fmtDayShort(pendingRange.end)}`
+        : `Выбрано: ${fmtDayShort(pendingRange.start)}`;
+    }
+
+    modalEl.innerHTML = `
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">Выбор даты</div>
+          <div class="modal-subtitle">${seasonLabel(currentSeason)}</div>
+        </div>
+        <button class="modal-close" id="modal-close-btn">✕</button>
+      </div>
+      <div class="cal-desktop-view">${monthsHtml}</div>
+      <div class="cal-mobile-view">${mobileHtml}</div>
+      <div class="cal-summary">${summary}</div>
+      <div class="cal-actions">
+        <button class="btn" id="cal-cancel-btn">Отмена</button>
+        <button class="btn primary" id="cal-apply-btn">Показать игры</button>
+      </div>
+    `;
+
+    document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+    document.getElementById('cal-cancel-btn').addEventListener('click', closeModal);
+    document.getElementById('cal-apply-btn').addEventListener('click', () => {
+      if(!pendingRange.start){ closeModal(); return; }
+      dateRange = { start: pendingRange.start, end: pendingRange.end || pendingRange.start };
+      gamesFilterMode = 'date';
+      selectedPlayerGames = null;
+      closeModal();
+      updateFilterChips();
+      renderGamesList();
+    });
+
+    function onDayPick(dk){
+      if(!pendingRange.start || pendingRange.end){
+        pendingRange = { start: dk, end: null };
+      } else if(dk < pendingRange.start){
+        pendingRange = { start: dk, end: pendingRange.start };
+      } else {
+        pendingRange.end = dk;
+      }
+      openCalendarModal();
+    }
+
+    modalEl.querySelectorAll('.cal-day[data-key], .cal-day-pill[data-key]').forEach(el => {
+      el.addEventListener('click', () => onDayPick(el.getAttribute('data-key')));
+    });
+
+    overlayEl.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  // ---- Player picker modal ----
+  function openPlayerPickerModal(){
+    const players = window.__gamePlayersList || [];
+
+    function renderList(filterText){
+      const q = (filterText || '').trim().toLowerCase();
+      const filtered = q ? players.filter(p => p.toLowerCase().includes(q)) : players;
+      if(!filtered.length) return '<div class="empty">Никого не найдено.</div>';
+      return `<div class="player-list">${filtered.map(p => `
+        <div class="player-item ${p === selectedPlayerGames ? 'selected' : ''}" data-name="${encodeURIComponent(p)}">${p}</div>
+      `).join('')}</div>`;
+    }
+
+    modalEl.innerHTML = `
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">Выбор игрока</div>
+          <div class="modal-subtitle">${seasonLabel(currentSeason)}</div>
+        </div>
+        <button class="modal-close" id="modal-close-btn">✕</button>
+      </div>
+      <input type="text" class="player-search" id="player-search-input" placeholder="Поиск по нику…">
+      <div id="player-list-wrap">${renderList('')}</div>
+    `;
+
+    document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+
+    function bindItemClicks(){
+      modalEl.querySelectorAll('.player-item[data-name]').forEach(el => {
+        el.addEventListener('click', () => {
+          selectedPlayerGames = decodeURIComponent(el.getAttribute('data-name'));
+          gamesFilterMode = 'player';
+          closeModal();
+          updateFilterChips();
+          renderGamesList();
+        });
+      });
+    }
+    bindItemClicks();
+
+    document.getElementById('player-search-input').addEventListener('input', (e) => {
+      document.getElementById('player-list-wrap').innerHTML = renderList(e.target.value);
+      bindItemClicks();
+    });
+
+    overlayEl.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  // ---- Games tab: render list of sessions ----
+  function renderGamesList(){
+    const sessions = window.__sessionsSorted || [];
+    let filtered = [];
+
+    if(gamesFilterMode === 'date'){
+      if(!dateRange.start){
+        gamesListEl.innerHTML = '<div class="empty">Нет игр за этот сезон.</div>';
+        return;
+      }
+      filtered = sessions.filter(s => {
+        const dk = dateKey(s.date);
+        return dk >= dateRange.start && dk <= dateRange.end;
+      });
+    } else {
+      if(!selectedPlayerGames){
+        gamesListEl.innerHTML = '<div class="empty">Выберите игрока, чтобы увидеть его игры.</div>';
+        return;
+      }
+      filtered = sessions.filter(s => {
+        const group = window.__gameGroups[s.key] || [];
+        return group.some(r => r.player === selectedPlayerGames);
+      });
+    }
+
+    if(!filtered.length){
+      gamesListEl.innerHTML = '<div class="empty">Игр не найдено.</div>';
+      return;
+    }
+
+    const highlight = gamesFilterMode === 'player' ? selectedPlayerGames : null;
+    gamesListEl.innerHTML = filtered.map(s => `
+      <div class="game-session">
+        <div class="game-session-head">
+          <div class="game-session-title">${s.quiz}</div>
+          <div class="game-session-date">${fmtDate(s.date)}</div>
+        </div>
+        ${renderGameTableHtml(window.__gameGroups[s.key] || [], highlight)}
+      </div>`).join('');
+  }
+
+  // ---- Переключение сезона ----
+  function selectSeason(key){
+    currentSeason = key;
+    if(seasonSelectEl.value !== key) seasonSelectEl.value = key;
+
+    periodEl.textContent = seasonPeriod(key);
+    archiveNoteEl.textContent = seasonFinished(key)
+      ? 'Архив: сезон завершён, данные заморожены.'
+      : 'Идёт сейчас · таблица обновляется после каждой игры.';
+
+    const players = ratingFor(key);
+    render(players);
+
+    // Всё остальное на странице смотрит только на выбранный сезон.
+    const byPlayer = {};
+    (window.__allGames || []).forEach(g => {
+      if(g.season !== key) return;
+      (byPlayer[g.player] || (byPlayer[g.player] = [])).push(g);
+    });
+    window.__gamesByPlayer = byPlayer;
+
+    const sessions = (window.__allSessions || []).filter(s => s.season === key);
+    window.__sessionsSorted = sessions;
+    window.__sessionDateKeys = new Set(sessions.map(s => dateKey(s.date)));
+    window.__gamePlayersList = players.map(p => p.name).filter(n => byPlayer[n]);
+
+    gamesFilterMode = 'date';
+    selectedPlayerGames = null;
+    window.__latestDateKey = sessions.length ? dateKey(sessions[0].date) : null;
+    dateRange = window.__latestDateKey
+      ? { start: window.__latestDateKey, end: window.__latestDateKey }
+      : { start: null, end: null };
+
+    updateFilterChips();
+    renderGamesList();
+    closeModal();
+  }
+
+  function buildSeasonSwitch(seasons){
+    seasonSelectEl.innerHTML = seasons.map(key => {
+      const suffix = seasonFinished(key) ? ' · архив' : '';
+      return `<option value="${key}">${seasonLabel(key)}${suffix}</option>`;
+    }).join('');
+    seasonSelectEl.addEventListener('change', () => selectSeason(seasonSelectEl.value));
+  }
+
+  async function fetchCSV(sheetName){
+    const res = await fetch(csvUrl(sheetName));
+    if(!res.ok) throw new Error('HTTP ' + res.status + ' for ' + sheetName);
+    return parseCSV(await res.text());
+  }
+
+  async function load(){
+    try{
+      const gamesRows = await fetchCSV(GAMES_SHEET_NAME);
+      if(gamesRows.length < 2) throw new Error('Пустой ответ от Games');
+
+      const all = [];
+      const groups = {};
+      const sessionsMap = {};
+
+      for(let i = 1; i < gamesRows.length; i++){
+        const r = gamesRows[i];
+        if(!r || r.length < 16) continue;
+        if((r[1] || '').trim() !== CHAT_ID) continue;
+        const date = parseGameDate(r[0]);
+        if(!date) continue;
+        const player = (r[3] || '').trim();
+        if(!player) continue;
+
+        const quiz = (r[2] || '').trim();
+        const key = date.getTime() + '||' + quiz;
+        const game = {
+          key, date, quiz, player,
+          season: seasonKeyOf(date),
+          place: toNumber(r[4]),
+          score: toNumber(r[5]),
+          questions: toNumber(r[6]),
+          correct: toNumber(r[7]),
+          wrong: toNumber(r[8]),
+          skipped: toNumber(r[9]),
+          avgTime: toNumber(r[12]),
+          elo: toNumber(r[14]),
+          pctCorrect: toNumber(r[15]),
+          ratingPoints: toNumber(r[r.length - 1]),
+        };
+
+        all.push(game);
+        (groups[key] || (groups[key] = [])).push(game);
+        if(!sessionsMap[key]) sessionsMap[key] = { key, date, quiz, season: game.season };
+      }
+
+      window.__allGames = all;
+      window.__gameGroups = groups;
+      window.__allSessions = Object.values(sessionsMap)
+        .sort((a, b) => b.date.getTime() - a.date.getTime());
+
+      // Сезоны берутся из самих игр, новые сверху — так архив ведёт себя сам.
+      const seasons = Array.from(new Set(all.map(g => g.season))).sort().reverse();
+      if(!seasons.length){
+        boardEl.innerHTML = '<div class="empty">Нет данных</div>';
+        gamesListEl.innerHTML = '<div class="empty">Нет данных</div>';
+        statusEl.textContent = 'В таблице нет игр этой группы.';
+        return;
+      }
+
+      buildSeasonSwitch(seasons);
+      const today = seasonKeyOf(new Date());
+      selectSeason(seasons.includes(today) ? today : seasons[0]);
+
+      const now = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      statusEl.textContent = `Обновлено в ${now}`;
+      statusEl.classList.remove('err');
+    } catch(err){
+      statusEl.textContent = 'Не удалось загрузить таблицу. Проверьте, что доступ к листу открыт по ссылке.';
+      statusEl.classList.add('err');
+      boardEl.innerHTML = '<div class="empty">Нет данных</div>';
+      gamesListEl.innerHTML = '<div class="empty">Нет данных</div>';
+      console.error(err);
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>
