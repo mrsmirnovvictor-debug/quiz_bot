@@ -712,11 +712,10 @@
   // и начало берётся из самой ранней игры в таблице.
   // Сезоны после 1 января 2027 добавляются сами, по кварталу.
   //
-  // Если в первом сезоне очков за места ещё не вели, поменяйте у него
-  // type на 'elo' — тогда он будет считаться по среднему ELO.
+  // Первый сезон шёл по среднему ELO, второй и далее — по очкам за места.
   function buildSeasons(){
     const seasons = [
-      { id: 1, label: 'Сезон 1', start: null,                 end: new Date(2026, 6, 1), type: 'points' },
+      { id: 1, label: 'Сезон 1', start: null,                 end: new Date(2026, 6, 1), type: 'elo' },
       { id: 2, label: 'Сезон 2', start: new Date(2026, 6, 1), end: new Date(2026, 9, 1), type: 'points' },
       { id: 3, label: 'Сезон 3', start: new Date(2026, 9, 1), end: new Date(2027, 0, 1), type: 'points' },
     ];
@@ -763,6 +762,12 @@
   // Правило «пропустил больше 8 вопросов — очки не начисляются» бот уже
   // применил, здесь оно нужно только чтобы подписать игру словом «выбыл».
   const MAX_MISSED_FOR_POINTS = 8;
+
+  // Сколько игр нужно, чтобы попасть в зачёт по ELO (первый сезон).
+  // У бота это порог калибровки: CALIBRATION_BY_CHAT для Вегаса — 10 игр,
+  // тот же порог применяют /stats и /rank. Если у вас он другой — меняйте
+  // здесь, иначе подиум первого сезона разойдётся с тем, что показывал бот.
+  const MIN_GAMES_FOR_ELO = 10;
   const MEDALS = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
   function csvUrl(sheetName){
@@ -832,7 +837,8 @@
         const totalPoints = list.reduce((s,g) => s + g.points, 0);
         return { name, games: list.length, totalPoints, avgElo, qualified: true };
       }
-      return { name, games: list.length, avgElo, qualified: list.length >= 3 };
+      return { name, games: list.length, avgElo,
+               qualified: list.length >= MIN_GAMES_FOR_ELO };
     });
 
     if(minGames > 0){
@@ -941,7 +947,7 @@
         : `${p.avgElo.toFixed(1)}<small>ELO</small>`;
 
       return `
-        ${isDivider ? `<div class="qualification-divider">Вне зачёта · менее 3 игр</div>` : ''}
+        ${isDivider ? `<div class="qualification-divider">Вне зачёта · менее ${MIN_GAMES_FOR_ELO} игр</div>` : ''}
         <div class="row ${unqualified ? 'unqualified' : ''}" data-rank="${rank}" data-player="${encodeURIComponent(p.name)}">
           <div class="rank-num">${rank}</div>
           <div class="name">${p.name}${unqualified ? '<span class="qualification-tag">вне зачёта</span>' : ''}</div>
@@ -1025,7 +1031,9 @@
     const podiumElement = document.getElementById('archive-podium');
     document.getElementById('archive-season-title').textContent = `${season.label} · ${fmtSeasonRange(season)}`;
     document.getElementById('archive-season-note').textContent =
-      season.type === 'points' ? 'Зачёт по очкам за места — как в /rating' : 'Зачёт по среднему ELO';
+      season.type === 'points'
+        ? 'Зачёт по очкам за места — как в /rating'
+        : `Зачёт по среднему ELO · в зачёте от ${MIN_GAMES_FOR_ELO} игр`;
 
     if(!players.length){
       seasonFinalElement.style.display = 'none';
