@@ -13,14 +13,21 @@ import logging
 import re
 from datetime import date
 
+import asyncio
+
 import db
 import engine
+import sheets
+import texts
 import themes
-from config import THEME_LIMIT, THEMES_CHATS, themes_enabled
+from config import SHEETS_ENABLED, THEME_LIMIT, THEMES_CHATS, themes_enabled
 from telegram import Update
 from telegram.ext import ContextTypes
 
 log = logging.getLogger(__name__)
+
+# Длиннее одной строки тема всё равно не читается, а лист в Sheets разъезжается.
+THEME_TEXT_LIMIT = 200
 
 
 def username_of(user) -> str:
@@ -352,3 +359,46 @@ async def season_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"✅ Сезон «{name}»: {starts} — {ends}\nКвоты отсчитываются заново."
     )
+
+
+# ==================== /game ====================
+
+async def game_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Заявка на тему от любого участника.
+
+    В отличие от /order — это не заказ победителя в счёт квоты, а общая
+    копилка идей: пишет кто угодно, организатор разбирает потом.
+    """
+    if update.effective_chat.type == "private":
+        await update.message.reply_text(
+            "📩 Тему предлагайте в группе клуба — там её увидят все.")
+        return
+
+    theme = _args(update.message.text)
+    if not theme:
+        await update.message.reply_text(texts.GAME_HELP, parse_mode="Markdown")
+        return
+    if len(theme) > THEME_TEXT_LIMIT:
+        await update.message.reply_text(
+            f"❌ Слишком длинно: уложитесь в {THEME_TEXT_LIMIT} символов, "
+            f"сейчас {len(theme)}.")
+        return
+
+    user = update.effective_user
+    await engine.to_db(db.add_game_request, update.effective_chat.id, user.id,
+                       username_of(user), theme)
+    всего = await engine.to_db(db.count_game_requests, update.effective_chat.id)
+    await update.message.reply_text(
+        f"✅ Записал: «{theme}»\n"
+        f"Всего идей в копилке: {всего}. Спасибо!")
+
+    # Ответ не ждёт Google: заявка уже в базе, а лист догонит.
+    if SHEETS_ENABLED:
+        asyncio.create_task(_export_requests_later())
+
+
+async def _export_requests_later() -> None:
+    try:
+        await engine.to_db(sheets.export_requests)
+    except Exception:
+        log.exception("Выгрузка заявок на темы не удалась")

@@ -37,12 +37,23 @@ class Question:
     image: str = ""
     comment: str = ""
     audio: str = ""          # URL или путь к mp3 относительно корня проекта
+    video: str = ""          # URL или путь к видеоотрывку
+    answer_image: str = ""   # картинка-ответ, когда она не та же, что в вопросе
     duration: int = 0        # 0 = взять значение по умолчанию
     audio_mode: str = ""     # voice|audio, пусто = из настроек
 
     @property
     def is_audio(self) -> bool:
         return bool(self.audio)
+
+    @property
+    def is_video(self) -> bool:
+        return bool(self.video)
+
+    @property
+    def self_timed(self) -> bool:
+        """Отрывок сам отмеряет время — видео-таймер поверх него не нужен."""
+        return self.is_audio or self.is_video
 
 
 @dataclass
@@ -53,6 +64,18 @@ class Pack:
 
     def __len__(self) -> int:
         return len(self.questions)
+
+
+def _media(value, n: int, что: str) -> str:
+    """Ссылка или путь к медиафайлу. Локальный файл проверяем сразу.
+
+    Битый путь должен всплыть на /quiz, а не посреди игры.
+    """
+    path = str(value or "").strip()
+    if path and not path.startswith(("http://", "https://")):
+        if not os.path.exists(path):
+            raise PackError(f"вопрос {n}: {что} не найден ({path})")
+    return path
 
 
 def _parse_question(raw: dict, n: int) -> Question:
@@ -74,10 +97,10 @@ def _parse_question(raw: dict, n: int) -> Question:
     if not isinstance(correct, int) or not (0 <= correct < len(options)):
         raise PackError(f"вопрос {n}: неверный индекс правильного ответа ({correct!r})")
 
-    audio = str(raw.get("audio") or "").strip()
-    if audio and not audio.startswith(("http://", "https://")):
-        if not os.path.exists(audio):
-            raise PackError(f"вопрос {n}: аудиофайл не найден ({audio})")
+    audio = _media(raw.get("audio"), n, "аудиофайл")
+    video = _media(raw.get("video"), n, "видеофайл")
+    if audio and video:
+        raise PackError(f"вопрос {n}: нельзя задать сразу и аудио, и видео")
 
     duration = raw.get("duration") or 0
     if not isinstance(duration, int) or duration < 0 or duration > 300:
@@ -96,6 +119,9 @@ def _parse_question(raw: dict, n: int) -> Question:
         image=str(raw.get("image") or "").strip(),
         comment=str(raw.get("comment") or "").strip(),
         audio=audio,
+        video=video,
+        # Ответ картинкой: показать в разборе не тот кадр, что был в вопросе.
+        answer_image=str(raw.get("answer_image") or raw.get("answerImage") or "").strip(),
         duration=duration,
         audio_mode=audio_mode,
     )

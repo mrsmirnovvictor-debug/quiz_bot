@@ -103,6 +103,19 @@ CREATE TABLE IF NOT EXISTS announcements (
     PRIMARY KEY (chat_id, day)
 );
 
+-- Заявки на темы от участников: /game <тема>. Первичное хранилище здесь,
+-- в Sheets уходит копия для организаторов.
+CREATE TABLE IF NOT EXISTS game_requests (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id    INTEGER NOT NULL,
+    user_id    INTEGER NOT NULL,
+    username   TEXT    NOT NULL,
+    theme      TEXT    NOT NULL,
+    created_at TEXT    NOT NULL,
+    exported   INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_requests_pending ON game_requests(exported);
+
 -- Награждение по итогам сезона: одна церемония на дату и группу.
 CREATE TABLE IF NOT EXISTS awards (
     chat_id    INTEGER NOT NULL,
@@ -541,6 +554,21 @@ def list_schedules(chat_id: int | None = None) -> list[sqlite3.Row]:
     return _rows("SELECT * FROM schedules WHERE chat_id = ? ORDER BY id", (chat_id,))
 
 
+def set_schedule_pool(chat_id: int, pool: str) -> int:
+    """Меняет префикс пула у всех авто-слотов группы, возвращает их число.
+
+    Смена сезона иначе означала бы удалить и завести заново четыре слота —
+    с риском потерять ветку, время старта или запас на регистрацию.
+    """
+    with tx() as c:
+        cur = c.execute(
+            "UPDATE schedules SET pack_pool = ? "
+            "WHERE chat_id = ? AND pack_source = 'auto'",
+            (pool, chat_id),
+        )
+        return cur.rowcount
+
+
 def delete_schedule(schedule_id: int, chat_id: int) -> bool:
     with tx() as c:
         cur = c.execute("DELETE FROM schedules WHERE id = ? AND chat_id = ?",
@@ -599,26 +627,45 @@ def announcement(chat_id: int, day: str) -> sqlite3.Row | None:
     )
 
 
-def count_announcements(chat_id: int, month_prefix: str, since: str) -> int:
-    """Сколько анонсов уже вышло в этом месяце начиная с даты since.
-
-    Считаем по факту публикаций, а не по календарю: пропущенный день
-    не съедает номер картинки.
-    """
-    row = _row(
-        "SELECT COUNT(*) AS n FROM announcements "
-        "WHERE chat_id = ? AND day LIKE ? AND day >= ?",
-        (chat_id, month_prefix + "%", since),
-    )
-    return row["n"] if row else 0
-
-
 def save_announcement_message(chat_id: int, day: str, message_id: int) -> None:
     with tx() as c:
         c.execute(
             "UPDATE announcements SET message_id = ? WHERE chat_id = ? AND day = ?",
             (message_id, chat_id, day),
         )
+
+
+# ==================== Заявки на темы ====================
+
+def add_game_request(chat_id: int, user_id: int, username: str, theme: str) -> int:
+    with tx() as c:
+        cur = c.execute(
+            "INSERT INTO game_requests (chat_id, user_id, username, theme, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (chat_id, user_id, username, theme, _utcnow()),
+        )
+        return cur.lastrowid
+
+
+def game_requests_pending() -> list[sqlite3.Row]:
+    return _rows("SELECT * FROM game_requests WHERE exported = 0 ORDER BY id")
+
+
+def mark_request_exported(request_id: int) -> None:
+    with tx() as c:
+        c.execute("UPDATE game_requests SET exported = 1 WHERE id = ?", (request_id,))
+
+
+def game_requests_for_chat(chat_id: int, limit: int = 10) -> list[sqlite3.Row]:
+    return _rows(
+        "SELECT * FROM game_requests WHERE chat_id = ? ORDER BY id DESC LIMIT ?",
+        (chat_id, limit),
+    )
+
+
+def count_game_requests(chat_id: int) -> int:
+    row = _row("SELECT COUNT(*) AS n FROM game_requests WHERE chat_id = ?", (chat_id,))
+    return row["n"] if row else 0
 
 
 # ==================== Награждение ====================

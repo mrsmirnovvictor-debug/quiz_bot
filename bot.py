@@ -48,6 +48,9 @@ async def on_startup(application: Application) -> None:
             count = await engine.to_db(sheets.export_pending)
             if count:
                 log.info("Догружено в Sheets игр: %s", count)
+            заявок = await engine.to_db(sheets.export_requests)
+            if заявок:
+                log.info("Догружено в Sheets заявок на темы: %s", заявок)
         except Exception:
             log.exception("Догрузка в Sheets не удалась")
 
@@ -75,6 +78,7 @@ def main() -> None:
     app.add_handler(CommandHandler("export", admin.export_command))
     app.add_handler(CommandHandler("refresh", admin.export_command))   # старое имя
 
+    app.add_handler(CommandHandler("game", themes_h.game_command))
     app.add_handler(CommandHandler("themes", themes_h.themes_command))
     app.add_handler(CommandHandler("order", themes_h.order_command))
     app.add_handler(CommandHandler("order_del", themes_h.order_del_command))

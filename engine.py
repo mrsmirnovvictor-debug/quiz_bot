@@ -16,7 +16,7 @@ import db
 import sheets
 import texts
 from config import (AUDIO, MSK, RULES, SHEETS_ENABLED, TIMER_VIDEO_URL,
-                    TIMINGS)
+                    TIMINGS, VIDEO)
 
 # Насколько бот готов опоздать со стартом после возвращения из даунтайма.
 RECOVERY_GRACE = timedelta(minutes=15)
@@ -60,6 +60,47 @@ async def say_photo(context: ContextTypes.DEFAULT_TYPE, game: Game, photo: str,
     except TelegramError:
         log.warning("Фото не отправилось, шлём текстом", exc_info=True)
         return await say(context, game, caption, **kwargs)
+
+
+async def say_video(context: ContextTypes.DEFAULT_TYPE, game: Game, question,
+                    caption: str, **kwargs):
+    """Отправляет видеовопрос коротким отрывком.
+
+    Ссылку Telegram скачивает сам; локальный файл заливаем один раз и
+    дальше шлём по file_id — иначе каждый показ пакета грузил бы десятки
+    мегабайт заново.
+    """
+    path = question.video
+    kw = dict(chat_id=game.chat_id, caption=caption, supports_streaming=True, **kwargs)
+    if game.thread_id:
+        kw["message_thread_id"] = game.thread_id
+
+    if path.startswith(("http://", "https://")):
+        try:
+            return await context.bot.send_video(video=path, **kw)
+        except TelegramError:
+            log.exception("Видео по ссылке не отправилось: %s", path)
+            return await say(context, game, caption, **kwargs)
+
+    cache_key = f"video:{path}"
+    cached = await to_db(db.get_cached_file_id, cache_key)
+    if cached:
+        try:
+            return await context.bot.send_video(video=cached, **kw)
+        except TelegramError:
+            log.warning("file_id протух, перезаливаем %s", path)
+            await to_db(db.drop_cached_file_id, cache_key)
+
+    try:
+        with open(path, "rb") as f:
+            msg = await context.bot.send_video(video=f, **kw)
+    except (TelegramError, OSError):
+        log.exception("Не удалось отправить видео %s", path)
+        return await say(context, game, caption, **kwargs)
+
+    if msg and msg.video:
+        await to_db(db.cache_file_id, cache_key, msg.video.file_id)
+    return msg
 
 
 async def say_audio(context: ContextTypes.DEFAULT_TYPE, game: Game, question,
@@ -315,13 +356,16 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE, game: Game):
     caption = texts.question(idx, game.total_questions, text)
     question = game.pack.questions[idx]
 
-    # У аудиовопроса плеер сам служит таймером, видео только мешало бы.
+    # У аудио- и видеовопроса отрывок сам служит таймером, ролик поверх
+    # него только мешал бы.
     if question.is_audio:
         seconds = question.duration or AUDIO.question_seconds
+    elif question.is_video:
+        seconds = question.duration or VIDEO.question_seconds
     else:
         seconds = question.duration or TIMINGS.question
 
-    if TIMER_VIDEO_URL and not question.is_audio:
+    if TIMER_VIDEO_URL and not question.self_timed:
         try:
             video = await context.bot.send_video(
                 chat_id=game.chat_id, video=TIMER_VIDEO_URL, width=200, height=150,
@@ -335,6 +379,8 @@ async def start_question(context: ContextTypes.DEFAULT_TYPE, game: Game):
 
     if question.is_audio:
         msg = await say_audio(context, game, question, caption, reply_markup=keyboard)
+    elif question.is_video:
+        msg = await say_video(context, game, question, caption, reply_markup=keyboard)
     elif image:
         msg = await say_photo(context, game, image, caption, reply_markup=keyboard)
     else:
@@ -441,10 +487,14 @@ async def end_question(context: ContextTypes.DEFAULT_TYPE, game: Game):
     # при переполнении рейтинг уходит отдельно.
     inline_board = board if RULES.leaderboard_mode == "inline" else None
     combined = f"{result_text}\n\n{inline_board}" if inline_board else result_text
-    caption_overflow = question.image and len(combined) > 1000
 
-    if question.image:
-        await say_photo(context, game, question.image,
+    # Ответ может быть отдельной картинкой: показали силуэт — открываем
+    # фотографию. Не задан — повторяем картинку вопроса, как было раньше.
+    ответ_картинкой = question.answer_image or question.image
+    caption_overflow = ответ_картинкой and len(combined) > 1000
+
+    if ответ_картинкой:
+        await say_photo(context, game, ответ_картинкой,
                         result_text if caption_overflow else combined)
     else:
         await say(context, game, combined)
