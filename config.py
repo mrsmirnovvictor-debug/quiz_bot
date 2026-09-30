@@ -92,16 +92,14 @@ class Timings:
 # Во сколько по Москве публиковать анонс игрового дня. Пусто — не публиковать.
 ANNOUNCE_AT = os.environ.get("ANNOUNCE_AT", "12:00")
 
-# Картинка-шапка анонса. Имя файла: префикс месяца + порядковый номер
-# игрового дня внутри месяца, например aug1.png, sep3.png.
+# Картинка-шапка анонса. Имя файла: префикс месяца + число месяца,
+# например oct5.png. Порядковый номер игрового дня не годится: пропуск
+# или перевыпуск анонса сдвигал бы всю оставшуюся серию.
 ANNOUNCE_IMAGE_BASE = os.environ.get(
     "ANNOUNCE_IMAGE_BASE",
     "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/announcements/",
 )
 ANNOUNCE_IMAGE_EXT = os.environ.get("ANNOUNCE_IMAGE_EXT", ".png")
-# С какой даты начинается нумерация. Анонсы до неё в счёт не идут —
-# нужно, чтобы первый день с картинками получил номер 1, а не следующий.
-ANNOUNCE_IMAGE_FROM = os.environ.get("ANNOUNCE_IMAGE_FROM", "2026-08-27")
 
 MONTH_SLUG = ["jan", "feb", "mar", "apr", "may", "jun",
               "jul", "aug", "sep", "oct", "nov", "dec"]
@@ -126,6 +124,17 @@ class Audio:
     # Используются только в режиме audio.
     performer: str = os.environ.get("AUDIO_PERFORMER", "Квиз")
     title_template: str = os.environ.get("AUDIO_TITLE", "Вопрос {n}")
+
+
+@dataclass(frozen=True)
+class Video:
+    """Видеовопросы: короткий отрывок вместо текста.
+
+    Как и у аудио, отрывок сам служит таймером, поэтому видео-таймер
+    поверх него не шлётся.
+    """
+
+    question_seconds: int = _int_env("T_QUESTION_VIDEO", 20)
 
 
 @dataclass(frozen=True)
@@ -154,6 +163,7 @@ class Rules:
 TIMINGS = Timings()
 RULES = Rules()
 AUDIO = Audio()
+VIDEO = Video()
 
 
 def _parse_chat_list(name: str) -> set[int]:

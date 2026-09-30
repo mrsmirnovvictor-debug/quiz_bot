@@ -277,6 +277,42 @@ def rebuild_chat(chat_id: int) -> None:
     _rebuild_ranking(chat_id)
 
 
+REQUEST_HEADERS = ["Дата", "Chat ID", "Игрок", "Тема"]
+
+
+def export_requests() -> int:
+    """Дописывает заявки на темы одной пачкой. Возвращает число строк.
+
+    Заявка уже лежит в SQLite, поэтому неудача здесь ничего не теряет:
+    непрослеженные строки догрузятся при следующем вызове.
+    """
+    if not SHEETS_ENABLED:
+        return 0
+    pending = db.game_requests_pending()
+    if not pending:
+        return 0
+
+    ws = _worksheet("Requests", REQUEST_HEADERS)
+    if ws is None:
+        return 0
+
+    rows = []
+    for r in pending:
+        когда = datetime.fromisoformat(r["created_at"]).astimezone(MSK)
+        rows.append([когда.strftime("%Y-%m-%d %H:%M:%S"), str(r["chat_id"]),
+                     r["username"], r["theme"]])
+    try:
+        ws.append_rows(rows, value_input_option="USER_ENTERED")
+    except Exception:
+        log.exception("Не удалось выгрузить заявки на темы")
+        return 0
+
+    for r in pending:
+        db.mark_request_exported(r["id"])
+    log.info("Заявок на темы выгружено: %s", len(rows))
+    return len(rows)
+
+
 def export_pending() -> int:
     """Догоняет выгрузку игр, не попавших в Sheets (например, из-за квоты)."""
     exported = 0

@@ -19,7 +19,7 @@ import engine
 import packs
 import texts
 from config import (ANNOUNCE_AT, ANNOUNCE_IMAGE_BASE, ANNOUNCE_IMAGE_EXT,
-                    ANNOUNCE_IMAGE_FROM, MONTH_SLUG, MSK, TIMINGS)
+                    MONTH_SLUG, MSK, TIMINGS)
 
 log = logging.getLogger(__name__)
 
@@ -194,24 +194,19 @@ async def _announce_game_day(context, rows, now_msk, today: str) -> None:
             log.exception("Анонс для чата %s не отправлен", chat_id)
 
 
-async def _announce_image(chat_id: int, now_msk, today: str) -> str | None:
-    """URL картинки для сегодняшнего анонса или None, если картинок нет.
+def _announce_image(now_msk) -> str | None:
+    """URL картинки для сегодняшнего анонса: <месяц><число>, например oct5.png.
 
-    Номер = сколько анонсов уже вышло в этом месяце (с даты начала
-    нумерации) плюс один. Отметку текущего дня claim_announcement уже
-    поставил, поэтому свой же анонс из счёта исключаем.
+    Раньше номер был порядковым и считался по таблице анонсов. Любой сбой
+    в счёте — пропущенный день, перевыпуск, ручная правка — сдвигал всю
+    оставшуюся месячную серию, и картинки разъезжались с днями. Число
+    месяца ни от чего не зависит и совпадает с тем, как файлы называют
+    руками, когда рисуют их заранее на месяц вперёд.
     """
     if not ANNOUNCE_IMAGE_BASE:
         return None
-    month = MONTH_SLUG[now_msk.month - 1]
-    prefix = now_msk.strftime("%Y-%m")
-    since = max(ANNOUNCE_IMAGE_FROM, f"{prefix}-01")
-    if today < since:
-        return None
-
-    already = await engine.to_db(db.count_announcements, chat_id, prefix, since)
-    number = max(1, already)          # текущий день уже учтён в already
-    return f"{ANNOUNCE_IMAGE_BASE}{month}{number}{ANNOUNCE_IMAGE_EXT}"
+    месяц = MONTH_SLUG[now_msk.month - 1]
+    return f"{ANNOUNCE_IMAGE_BASE}{месяц}{now_msk.day}{ANNOUNCE_IMAGE_EXT}"
 
 
 async def _publish_announce(context, chat_id: int, slots, now_msk, today: str) -> None:
@@ -237,7 +232,7 @@ async def _publish_announce(context, chat_id: int, slots, now_msk, today: str) -
         except Exception:
             строки.append((row["time_msk"], "тема будет объявлена позже"))
 
-    image = await _announce_image(chat_id, now_msk, today)
+    image = _announce_image(now_msk)
     thread_id = slots[0]["thread_id"]
     base = {"chat_id": chat_id}
     if thread_id:

@@ -27,8 +27,15 @@ async def is_admin(update: Update, user_id: int) -> bool:
         return False
 
 
-def _args(message_text: str, command: str) -> str:
-    return message_text[len(command) + 1:].strip()
+def _args(message_text: str, command: str = "") -> str:
+    """Аргументы команды.
+
+    Режем по первому пробелу, а не по длине команды: в группе Telegram
+    подставляет /quiz@ИмяБота, и отсчёт по длине съедал бы первые символы
+    аргумента. Так же это сделано в handlers_themes.
+    """
+    parts = (message_text or "").strip().split(maxsplit=1)
+    return parts[1].strip() if len(parts) > 1 else ""
 
 
 # ==================== /quiz ====================
@@ -175,6 +182,8 @@ async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _delete_schedule(update, chat_id, rest)
     elif action in ("on", "off", "вкл", "выкл"):
         await _toggle_schedule(update, chat_id, rest, action in ("on", "вкл"))
+    elif action in ("pool", "пул"):
+        await _set_pool(update, chat_id, rest)
     else:
         await update.message.reply_text(texts.SCHEDULE_HELP, parse_mode="Markdown")
 
@@ -191,6 +200,40 @@ async def _show_schedule(update: Update, chat_id: int):
     lines += [scheduler.describe(r) for r in rows]
     lines.append("\n`/schedule add ...` — добавить, `/schedule del N` — удалить")
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
+async def _set_pool(update: Update, chat_id: int, rest: str):
+    """Переводит все авто-слоты группы на другой префикс пакетов."""
+    pool = rest.strip()
+    if not pool or not (pool.isascii() and pool.isdigit()):
+        await update.message.reply_text(
+            "❌ Пул — числовой префикс ID пакета, например `/schedule pool 02`.",
+            parse_mode="Markdown")
+        return
+
+    доступно = await engine.to_db(packs.list_pack_ids, pool)
+    if not доступно:
+        await update.message.reply_text(
+            f"❌ В пуле «{pool}» нет ни одного пакета — слоты не тронуты.")
+        return
+
+    изменено = await engine.to_db(db.set_schedule_pool, chat_id, pool)
+    if not изменено:
+        await update.message.reply_text(
+            "ℹ️ В этой группе нет слотов с автовыбором пакета.")
+        return
+
+    сыграно = await engine.to_db(db.played_pack_ids, chat_id)
+    свежие = [p for p in доступно if p not in сыграно]
+    lines = [
+        f"✅ Слотов переведено на пул «{pool}»: {изменено}.",
+        f"Пакетов в пуле: {len(доступно)}, из них не игранных: {len(свежие)}.",
+    ]
+    if свежие:
+        lines.append("Ближайшие в очереди: " + ", ".join(свежие[:8]))
+    else:
+        lines.append("⚠️ Все пакеты пула уже сыграны — бот будет брать повторы.")
+    await update.message.reply_text("\n".join(lines))
 
 
 async def _add_schedule(update: Update, chat_id: int, rest: str):
