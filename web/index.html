@@ -683,6 +683,9 @@
   let pendingRange = { start: null, end: null };
   let selectedPlayerGames = null;
   let archiveSelectedSeasonId = null;
+  // Сезон, из которого открыли карточку игрока. Нужен, чтобы кнопка «назад»
+  // из разбора игры вернула ту же карточку, а не карточку другого сезона.
+  let modalSeason = null;
 
   // ---- Сезоны ----
   // Бот ведёт сезоны поквартально. У Вегаса второй сезон — это Q3 2026
@@ -843,7 +846,8 @@
     return players;
   }
 
-  function renderPodiumInto(podiumElement, seasonFinalElement, players, mode){
+  function renderPodiumInto(podiumElement, seasonFinalElement, players, season){
+    const mode = season.type;
     const qualified = players.filter(p => p.qualified);
     const top = [qualified[1] || null, qualified[0] || null, qualified[2] || null];
     const classes = ['second','first','third'];
@@ -911,12 +915,13 @@
 
     podiumElement.querySelectorAll('.podium-slot[data-player]').forEach(el => {
       el.addEventListener('click', () => {
-        openPlayerModal(decodeURIComponent(el.getAttribute('data-player')));
+        openPlayerModal(decodeURIComponent(el.getAttribute('data-player')), season);
       });
     });
   }
 
-  function renderBoardInto(boardElement, players, mode){
+  function renderBoardInto(boardElement, players, season){
+    const mode = season.type;
     if(!players.length){
       boardElement.innerHTML = '<div class="empty">Пока нет данных.</div>';
       return;
@@ -947,7 +952,7 @@
 
     boardElement.querySelectorAll('.row').forEach(el => {
       el.addEventListener('click', () => {
-        openPlayerModal(decodeURIComponent(el.getAttribute('data-player')));
+        openPlayerModal(decodeURIComponent(el.getAttribute('data-player')), season);
       });
     });
   }
@@ -967,7 +972,7 @@
     }
 
     countEl.textContent = players.length;
-    renderBoardInto(boardEl, players, season.type);
+    renderBoardInto(boardEl, players, season);
   }
 
   // ---- Архив: завершённые сезоны ----
@@ -1028,8 +1033,8 @@
       return;
     }
 
-    renderPodiumInto(podiumElement, seasonFinalElement, players, season.type);
-    renderBoardInto(boardElement, players, season.type);
+    renderPodiumInto(podiumElement, seasonFinalElement, players, season);
+    renderBoardInto(boardElement, players, season);
   }
 
   function renderGameTableHtml(rows, highlightPlayer, mode){
@@ -1073,16 +1078,33 @@
       </div>`;
   }
 
-  function openPlayerModal(name){
-    const games = (window.__gamesByPlayer && window.__gamesByPlayer[name]) || [];
+  function openPlayerModal(name, season){
+    // Карточка всегда про один сезон: смешивать сезоны нельзя — в первом
+    // считали ELO, во втором очки, и сумма по обоим ничего не значит.
+    season = season || modalSeason || getCurrentSeason();
+    modalSeason = season;
+
+    const все = (window.__gamesByPlayer && window.__gamesByPlayer[name]) || [];
+    const games = все.filter(g => g.seasonId === season.id);
     const gamesCount = games.length;
+
     const eloGames = games.filter(g => g.elo > 0);
     const avgElo = eloGames.length ? eloGames.reduce((s,g) => s + g.elo, 0) / eloGames.length : 0;
-    const pointsGames = games.filter(g => g.mode === 'points');
-    const totalPoints = pointsGames.reduce((s,g) => s + (g.dropped ? 0 : g.points), 0);
+    const totalPoints = games.reduce((s,g) => s + g.points, 0);
+    const totalScore = games.reduce((s,g) => s + g.score, 0);
+    const avgScore = gamesCount ? Math.round(totalScore / gamesCount) : 0;
     const avgTime = gamesCount ? (games.reduce((s,g) => s + g.avgTime, 0) / gamesCount / 100) : 0;
     const avgPct = gamesCount ? (games.reduce((s,g) => s + g.pctCorrect, 0) / gamesCount) : 0;
     const wins = games.filter(g => g.place === 1 && !g.dropped).length;
+
+    // В сезоне по ELO очков за места не вели — ноль там означает «не считали»,
+    // а не «заработал нисколько», поэтому показываем прочерк.
+    const очкиВедут = season.type === 'points' || totalPoints > 0;
+    // Третья плитка: в сезоне по очкам — средний счёт за игру, в сезоне по
+    // ELO на её месте сам ELO.
+    const третья = season.type === 'points'
+      ? { значение: gamesCount ? avgScore : '—', подпись: 'средние баллы за игру' }
+      : { значение: eloGames.length ? avgElo.toFixed(1) : '—', подпись: 'средний ELO' };
 
     const sorted = games.slice().sort((a,b) => b.date.getTime() - a.date.getTime());
     const historyHtml = sorted.length
@@ -1096,22 +1118,25 @@
             <div class="hist-elo">${valueLabel}</div>
           </div>`;
         }).join('')
-      : '<div class="empty">Нет игр.</div>';
+      : '<div class="empty">Нет игр в этом сезоне.</div>';
 
     modalEl.innerHTML = `
       <div class="modal-head">
-        <div class="modal-title">${name}</div>
+        <div>
+          <div class="modal-title">${name}</div>
+          <div class="modal-subtitle">${season.label} · ${fmtSeasonRange(season)}</div>
+        </div>
         <button class="modal-close" id="modal-close-btn">✕</button>
       </div>
       <div class="stat-grid">
-        <div class="stat-tile"><div class="v hl">${eloGames.length ? avgElo.toFixed(1) : '—'}</div><div class="l">средний ELO</div></div>
-        <div class="stat-tile"><div class="v hl">${pointsGames.length ? totalPoints : '—'}</div><div class="l">очков всего</div></div>
         <div class="stat-tile"><div class="v">${gamesCount}</div><div class="l">игр сыграно</div></div>
+        <div class="stat-tile"><div class="v${season.type === 'points' ? ' hl' : ''}">${очкиВедут ? totalPoints : '—'}</div><div class="l">всего очков</div></div>
+        <div class="stat-tile"><div class="v${season.type === 'points' ? '' : ' hl'}">${третья.значение}</div><div class="l">${третья.подпись}</div></div>
         <div class="stat-tile"><div class="v">${wins}</div><div class="l">побед</div></div>
-        <div class="stat-tile"><div class="v">${avgPct ? avgPct.toFixed(0) + '%' : '—'}</div><div class="l">правильных ответов</div></div>
+        <div class="stat-tile"><div class="v">${avgPct ? avgPct.toFixed(0) + '%' : '—'}</div><div class="l">% правильных ответов</div></div>
         <div class="stat-tile"><div class="v">${avgTime ? avgTime.toFixed(1) + 'с' : '—'}</div><div class="l">среднее время ответа</div></div>
       </div>
-      <div class="history-label">История игр</div>
+      <div class="history-label">Игры сезона</div>
       <div>${historyHtml}</div>
     `;
 
@@ -1144,7 +1169,7 @@
       ${renderGameTableHtml(group, backToPlayer, mode)}
     `;
     document.getElementById('modal-close-btn').addEventListener('click', closeModal);
-    document.getElementById('modal-back-btn').addEventListener('click', () => openPlayerModal(backToPlayer));
+    document.getElementById('modal-back-btn').addEventListener('click', () => openPlayerModal(backToPlayer, modalSeason));
   }
 
   function closeModal(){
