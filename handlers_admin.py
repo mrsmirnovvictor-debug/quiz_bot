@@ -184,6 +184,10 @@ async def schedule_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _toggle_schedule(update, chat_id, rest, action in ("on", "вкл"))
     elif action in ("pool", "пул"):
         await _set_pool(update, chat_id, rest)
+    elif action in ("time", "время"):
+        await _set_times(update, chat_id, rest)
+    elif action in ("days", "дни"):
+        await _set_days(update, chat_id, rest)
     else:
         await update.message.reply_text(texts.SCHEDULE_HELP, parse_mode="Markdown")
 
@@ -197,9 +201,84 @@ async def _show_schedule(update: Update, chat_id: int):
         )
         return
     lines = ["🗓 Расписание квизов:\n"]
-    lines += [scheduler.describe(r) for r in rows]
+    lines += _schedule_lines(rows)
     lines.append("\n`/schedule add ...` — добавить, `/schedule del N` — удалить")
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
+def _schedule_lines(rows) -> list[str]:
+    return [scheduler.describe(r) for r in sorted(rows, key=lambda r: r["time_msk"])]
+
+
+async def _set_times(update: Update, chat_id: int, rest: str):
+    """Переписывает время всех слотов группы, не трогая остального.
+
+    Через del+add пришлось бы заново указать пул, запас на регистрацию и
+    попасть в нужную ветку — четыре слота означали бы восемь команд и
+    четыре шанса потерять настройку.
+    """
+    куски = [c for c in re.split(r"[\s,]+", rest.strip()) if c]
+    if not куски:
+        await update.message.reply_text(
+            "❌ Укажите время слотов: `/schedule time 14:00 15:00 18:00 19:00`",
+            parse_mode="Markdown")
+        return
+    try:
+        времена = sorted(scheduler.parse_time(c) for c in куски)
+    except scheduler.ScheduleError as e:
+        await update.message.reply_text(f"❌ {e}")
+        return
+    if len(set(времена)) != len(времена):
+        await update.message.reply_text("❌ Время слотов не должно повторяться.")
+        return
+
+    rows = await engine.to_db(db.list_schedules, chat_id)
+    if not rows:
+        await update.message.reply_text(
+            "ℹ️ В этой группе нет слотов. Добавьте их через `/schedule add`.",
+            parse_mode="Markdown")
+        return
+    if len(времена) != len(rows):
+        await update.message.reply_text(
+            f"❌ Слотов в группе {len(rows)}, а времён указано {len(времена)}.\n"
+            "Команда меняет время существующих слотов и их число не трогает.\n"
+            "Добавить или убрать слот — `/schedule add` и `/schedule del`.",
+            parse_mode="Markdown")
+        return
+
+    # Самый ранний слот получает самое раннее время, так что порядок, в
+    # котором их перечислили, значения не имеет.
+    по_порядку = sorted(rows, key=lambda r: (r["time_msk"], r["id"]))
+    await engine.to_db(db.set_schedule_times, chat_id,
+                       list(zip([r["id"] for r in по_порядку], времена)))
+
+    rows = await engine.to_db(db.list_schedules, chat_id)
+    await update.message.reply_text("\n".join(
+        ["✅ Время слотов обновлено:\n"] + _schedule_lines(rows)
+        + ["\nСлот, чьё время на сегодня уже прошло, сегодня не запустится — "
+           "бот дождётся следующего игрового дня."]))
+
+
+async def _set_days(update: Update, chat_id: int, rest: str):
+    """Меняет дни недели у всех слотов группы."""
+    if not rest.strip():
+        await update.message.reply_text(
+            "❌ Укажите дни: `/schedule days пн,чт`", parse_mode="Markdown")
+        return
+    try:
+        days = scheduler.parse_days(rest)
+    except scheduler.ScheduleError as e:
+        await update.message.reply_text(f"❌ {e}")
+        return
+
+    изменено = await engine.to_db(db.set_schedule_days, chat_id, days)
+    if not изменено:
+        await update.message.reply_text("ℹ️ В этой группе нет слотов.")
+        return
+
+    rows = await engine.to_db(db.list_schedules, chat_id)
+    await update.message.reply_text("\n".join(
+        [f"✅ Дни обновлены, слотов затронуто: {изменено}.\n"] + _schedule_lines(rows)))
 
 
 async def _set_pool(update: Update, chat_id: int, rest: str):
