@@ -206,8 +206,13 @@ async def _show_schedule(update: Update, chat_id: int):
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
+def _days_label(days: str) -> str:
+    return "ежедневно" if days == "daily" else days
+
+
 def _schedule_lines(rows) -> list[str]:
-    return [scheduler.describe(r) for r in sorted(rows, key=lambda r: r["time_msk"])]
+    return [scheduler.describe(r)
+            for r in sorted(rows, key=lambda r: (r["days"], r["time_msk"]))]
 
 
 async def _set_times(update: Update, chat_id: int, rest: str):
@@ -238,19 +243,33 @@ async def _set_times(update: Update, chat_id: int, rest: str):
             "ℹ️ В этой группе нет слотов. Добавьте их через `/schedule add`.",
             parse_mode="Markdown")
         return
-    if len(времена) != len(rows):
-        await update.message.reply_text(
-            f"❌ Слотов в группе {len(rows)}, а времён указано {len(времена)}.\n"
-            "Команда меняет время существующих слотов и их число не трогает.\n"
-            "Добавить или убрать слот — `/schedule add` и `/schedule del`.",
-            parse_mode="Markdown")
+
+    # Слоты одного игрового дня — это группа с одинаковым набором дней.
+    # Время назначается внутри группы, поэтому расписание вида «четыре слота
+    # по понедельникам и четыре по четвергам» получает одну и ту же четвёрку
+    # времён, а не восемь разных.
+    группы: dict[str, list] = {}
+    for r in rows:
+        группы.setdefault(r["days"], []).append(r)
+
+    кривые = {д: len(г) for д, г in группы.items() if len(г) != len(времена)}
+    if кривые:
+        await update.message.reply_text("\n".join(
+            [f"❌ Времён указано {len(времена)}, а слотов в группах столько:"]
+            + [f"• {_days_label(д)} — {n}" for д, n in кривые.items()]
+            + ["", "Команда меняет время существующих слотов и их число не трогает.",
+               "Сейчас настроено так:", ""]
+            + _schedule_lines(rows)
+            + ["", "Добавить или убрать слот — /schedule add и /schedule del."]))
         return
 
-    # Самый ранний слот получает самое раннее время, так что порядок, в
-    # котором их перечислили, значения не имеет.
-    по_порядку = sorted(rows, key=lambda r: (r["time_msk"], r["id"]))
-    await engine.to_db(db.set_schedule_times, chat_id,
-                       list(zip([r["id"] for r in по_порядку], времена)))
+    # Внутри группы самый ранний слот получает самое раннее время, так что
+    # порядок, в котором их перечислили, значения не имеет.
+    пары = []
+    for слоты in группы.values():
+        по_порядку = sorted(слоты, key=lambda r: (r["time_msk"], r["id"]))
+        пары += list(zip([r["id"] for r in по_порядку], времена))
+    await engine.to_db(db.set_schedule_times, chat_id, пары)
 
     rows = await engine.to_db(db.list_schedules, chat_id)
     await update.message.reply_text("\n".join(
@@ -271,11 +290,27 @@ async def _set_days(update: Update, chat_id: int, rest: str):
         await update.message.reply_text(f"❌ {e}")
         return
 
-    изменено = await engine.to_db(db.set_schedule_days, chat_id, days)
-    if not изменено:
+    rows = await engine.to_db(db.list_schedules, chat_id)
+    if not rows:
         await update.message.reply_text("ℹ️ В этой группе нет слотов.")
         return
 
+    # Слоты разных дней могли стоять на одном времени. Свалив их в одни дни,
+    # мы получим две игры на один час: вторую отбросит защита от наложения,
+    # и пакет пропадёт впустую. Лучше отказаться и показать, что мешает.
+    времена = [r["time_msk"] for r in rows]
+    дубли = sorted({t for t in времена if времена.count(t) > 1})
+    if дубли:
+        await update.message.reply_text("\n".join(
+            [f"❌ После смены дней слоты наложатся друг на друга: "
+             f"на {', '.join(дубли)} окажется по два слота.",
+             "", "Сейчас настроено так:", ""]
+            + _schedule_lines(rows)
+            + ["", "Сначала уберите лишние слоты через /schedule del, "
+               "либо разведите их по времени через /schedule time."]))
+        return
+
+    изменено = await engine.to_db(db.set_schedule_days, chat_id, days)
     rows = await engine.to_db(db.list_schedules, chat_id)
     await update.message.reply_text("\n".join(
         [f"✅ Дни обновлены, слотов затронуто: {изменено}.\n"] + _schedule_lines(rows)))
