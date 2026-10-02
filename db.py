@@ -554,6 +554,29 @@ def list_schedules(chat_id: int | None = None) -> list[sqlite3.Row]:
     return _rows("SELECT * FROM schedules WHERE chat_id = ? ORDER BY id", (chat_id,))
 
 
+def set_schedule_times(chat_id: int, pairs: list[tuple[int, str]]) -> int:
+    """Переписывает время перечисленных слотов одной транзакцией.
+
+    Всё или ничего: расписание с половиной обновлённых слотов — это
+    расписание, которого никто не планировал.
+    """
+    with tx() as c:
+        c.executemany(
+            "UPDATE schedules SET time_msk = ? WHERE id = ? AND chat_id = ?",
+            [(время, sid, chat_id) for sid, время in pairs],
+        )
+    return len(pairs)
+
+
+def set_schedule_days(chat_id: int, days: str) -> int:
+    """Меняет дни у всех слотов группы, возвращает их число."""
+    with tx() as c:
+        cur = c.execute(
+            "UPDATE schedules SET days = ? WHERE chat_id = ?", (days, chat_id)
+        )
+        return cur.rowcount
+
+
 def set_schedule_pool(chat_id: int, pool: str) -> int:
     """Меняет префикс пула у всех авто-слотов группы, возвращает их число.
 
