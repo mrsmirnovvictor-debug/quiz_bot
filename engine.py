@@ -38,16 +38,22 @@ async def to_db(fn, *args, **kwargs):
 
 # ==================== Отправка сообщений ====================
 
-async def say(context: ContextTypes.DEFAULT_TYPE, game: Game, text: str, **kwargs):
-    """Единый хелпер вместо 25 копий блока с message_thread_id."""
-    kw = dict(chat_id=game.chat_id, text=text, **kwargs)
-    if game.thread_id:
-        kw["message_thread_id"] = game.thread_id
+async def say_to(context: ContextTypes.DEFAULT_TYPE, chat_id: int,
+                 thread_id: int | None, text: str, **kwargs):
+    """Отправка по chat_id. Нужна, когда объекта игры ещё или уже нет."""
+    kw = dict(chat_id=chat_id, text=text, **kwargs)
+    if thread_id:
+        kw["message_thread_id"] = thread_id
     try:
         return await context.bot.send_message(**kw)
     except TelegramError:
-        log.exception("Не удалось отправить сообщение в чат %s", game.chat_id)
+        log.exception("Не удалось отправить сообщение в чат %s", chat_id)
         return None
+
+
+async def say(context: ContextTypes.DEFAULT_TYPE, game: Game, text: str, **kwargs):
+    """Единый хелпер вместо 25 копий блока с message_thread_id."""
+    return await say_to(context, game.chat_id, game.thread_id, text, **kwargs)
 
 
 async def say_photo(context: ContextTypes.DEFAULT_TYPE, game: Game, photo: str,
@@ -611,8 +617,14 @@ async def recover(context: ContextTypes.DEFAULT_TYPE):
         try:
             pack = load_pack(row["pack_id"])
         except Exception:
+            # Молчать здесь нельзя: в чате остаётся живая кнопка регистрации,
+            # и люди будут жать её, получая «Регистрация закрыта», пока кто-то
+            # не догадается посмотреть логи. Снимаем кнопку и говорим вслух.
             log.exception("Пакет игры %s не читается, помечаем aborted", game_id)
             await to_db(db.update_game, game_id, status="aborted")
+            await _drop_registration_button(context, row)
+            await say_to(context, chat_id, row["thread_id"],
+                         texts.cancelled_broken_pack(row["pack_id"]))
             continue
 
         start_utc = datetime.fromisoformat(row["scheduled_start_utc"])
@@ -655,6 +667,18 @@ async def recover(context: ContextTypes.DEFAULT_TYPE):
         # Всё остальное закрываем: доигрывать вопрос с потерянным таймером
         # ненадёжно, а результаты по сыгранному сохранить нужно.
         await _finalize_interrupted(context, row, pack)
+
+
+async def _drop_registration_button(context: ContextTypes.DEFAULT_TYPE, row) -> None:
+    """Убирает кнопку у приглашения отменённой игры."""
+    if not row["reg_msg_id"]:
+        return
+    try:
+        await context.bot.edit_message_reply_markup(
+            chat_id=row["chat_id"], message_id=row["reg_msg_id"], reply_markup=None)
+    except TelegramError:
+        log.warning("Кнопку регистрации игры %s снять не удалось", row["id"],
+                    exc_info=True)
 
 
 def _rebuild_game(row, pack) -> Game:
