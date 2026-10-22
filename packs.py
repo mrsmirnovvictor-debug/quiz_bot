@@ -10,7 +10,7 @@ import os
 import re
 from dataclasses import dataclass, field
 
-from config import PACKS_DIR
+from config import PACKS_DIR, UPLOADED_PACKS_DIR
 
 log = logging.getLogger(__name__)
 
@@ -127,13 +127,72 @@ def _parse_question(raw: dict, n: int) -> Question:
     )
 
 
+def _dirs() -> list[str]:
+    """Где искать пакеты. Загруженные вручную идут первыми и перекрывают
+    репозиторий: иначе починить пакет без деплоя было бы нечем."""
+    return [UPLOADED_PACKS_DIR, PACKS_DIR]
+
+
+def pack_path(pack_id: str) -> str | None:
+    for каталог in _dirs():
+        путь = os.path.join(каталог, f"{pack_id}.json")
+        if os.path.exists(путь):
+            return путь
+    return None
+
+
+def is_uploaded(pack_id: str) -> bool:
+    """Пакет пришёл файлом, а не из репозитория."""
+    return os.path.exists(os.path.join(UPLOADED_PACKS_DIR, f"{pack_id}.json"))
+
+
+def parse_pack(pack_id: str, raw_text: str, откуда: str = "") -> Pack:
+    """Разбирает и валидирует содержимое пакета, не трогая диск."""
+    if not is_pack_id(pack_id):
+        raise PackError("ID пакета — не меньше 4 цифр, например 0007 или 01981")
+    try:
+        raw = json.loads(raw_text)
+    except json.JSONDecodeError as e:
+        raise PackError(f"пакет {pack_id}: некорректный JSON ({e})") from e
+    if not isinstance(raw, dict):
+        raise PackError(f"пакет {pack_id}: в файле должен быть объект JSON")
+    return _build_pack(pack_id, raw, откуда)
+
+
+def save_uploaded(pack_id: str, raw_text: str) -> Pack:
+    """Проверяет пакет и только потом кладёт на том.
+
+    Порядок важен: записать сначала означало бы положить рядом с рабочими
+    пакетами битый, который сорвёт игру при следующем автозапуске.
+    """
+    pack = parse_pack(pack_id, raw_text)
+    os.makedirs(UPLOADED_PACKS_DIR, exist_ok=True)
+    путь = os.path.join(UPLOADED_PACKS_DIR, f"{pack_id}.json")
+    временный = путь + ".tmp"
+    with open(временный, "w", encoding="utf-8") as f:
+        f.write(raw_text)
+    os.replace(временный, путь)     # атомарно: читатель не увидит половину файла
+    log.info("Пакет %s загружен файлом: %s", pack_id, pack.title)
+    return pack
+
+
+def delete_uploaded(pack_id: str) -> bool:
+    """Убирает загруженный пакет. Репозиторный при этом снова виден."""
+    путь = os.path.join(UPLOADED_PACKS_DIR, f"{pack_id}.json")
+    if not os.path.exists(путь):
+        return False
+    os.remove(путь)
+    log.info("Загруженный пакет %s удалён", pack_id)
+    return True
+
+
 def load_pack(pack_id: str) -> Pack:
     """Читает и валидирует пакет. Бросает PackError с понятным сообщением."""
     if not is_pack_id(pack_id):
         raise PackError("ID пакета — не меньше 4 цифр, например 0007 или 01981")
 
-    path = os.path.join(PACKS_DIR, f"{pack_id}.json")
-    if not os.path.exists(path):
+    path = pack_path(pack_id)
+    if path is None:
         raise PackError(f"пакет {pack_id} не найден")
 
     try:
@@ -142,6 +201,10 @@ def load_pack(pack_id: str) -> Pack:
     except json.JSONDecodeError as e:
         raise PackError(f"пакет {pack_id}: некорректный JSON ({e})") from e
 
+    return _build_pack(pack_id, raw, path)
+
+
+def _build_pack(pack_id: str, raw: dict, откуда: str = "") -> Pack:
     title = str(raw.get("title") or "").strip()
     if not title:
         raise PackError(f"пакет {pack_id}: не указан title")
@@ -156,21 +219,23 @@ def load_pack(pack_id: str) -> Pack:
             questions.append(_parse_question(item, i + 1))
         except PackError as e:
             # Без ID пакета такое предупреждение в логах бесполезно.
-            raise PackError(f"пакет {pack_id} ({path}): {e}") from None
+            место = f" ({откуда})" if откуда else ""
+            raise PackError(f"пакет {pack_id}{место}: {e}") from None
     return Pack(pack_id=pack_id, title=title, questions=questions)
 
 
 def list_pack_ids(pool_prefix: str = "") -> list[str]:
-    """Все корректные ID пакетов, опционально отфильтрованные по префиксу."""
-    if not os.path.isdir(PACKS_DIR):
-        return []
-    ids = []
-    for name in os.listdir(PACKS_DIR):
-        if not name.endswith(".json"):
+    """Все корректные ID пакетов из обоих каталогов, без повторов."""
+    ids = set()
+    for каталог in _dirs():
+        if not os.path.isdir(каталог):
             continue
-        pid = name[:-5]
-        if is_pack_id(pid) and pid.startswith(pool_prefix):
-            ids.append(pid)
+        for name in os.listdir(каталог):
+            if not name.endswith(".json"):
+                continue
+            pid = name[:-5]
+            if is_pack_id(pid) and pid.startswith(pool_prefix):
+                ids.add(pid)
     return sorted(ids)
 
 

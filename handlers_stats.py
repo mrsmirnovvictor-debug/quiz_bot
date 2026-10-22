@@ -238,9 +238,13 @@ async def games_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Нет доступных квизов.")
         return
 
+    загружены = {p for p in titles if await engine.to_db(packs.is_uploaded, p)}
     lines = ["📚 Список доступных квизов:\n"]
+    if загружены:
+        lines.append("📦 — загружен файлом, не из репозитория\n")
     for pack_id, title in titles.items():
         short = title if len(title) <= 50 else title[:47] + "..."
+        short = f"📦 {short}" if pack_id in загружены else short
         lines.append(f"`{pack_id}` — {short}")
     await _reply_long(update, "\n".join(lines), parse_mode="Markdown")
 
