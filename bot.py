@@ -75,6 +75,13 @@ def main() -> None:
     app.add_handler(CommandHandler("rename", admin.rename_command))
     app.add_handler(CommandHandler("announce", admin.announce_command))
     app.add_handler(CommandHandler("award", admin.award_command))
+    app.add_handler(CommandHandler("addpack", admin.addpack_command))
+    app.add_handler(CommandHandler("delpack", admin.delpack_command))
+    # Файл приходит документом, а подпись командой не считается,
+    # поэтому для него нужен отдельный обработчик.
+    app.add_handler(MessageHandler(
+        filters.Document.ALL & filters.CaptionRegex(r"^/addpack"),
+        admin.addpack_command))
     app.add_handler(CommandHandler("export", admin.export_command))
     app.add_handler(CommandHandler("refresh", admin.export_command))   # старое имя
 

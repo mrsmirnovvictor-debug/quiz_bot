@@ -15,6 +15,14 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 DB_PATH = os.environ.get("DB_PATH", "/data/quiz.db")
 PACKS_DIR = os.environ.get("PACKS_DIR", "packs")
 
+# Пакеты, загруженные в бота файлом на ходу. Лежат на томе рядом с базой,
+# поэтому переживают перезапуск и не требуют деплоя: пакет из репозитория
+# попадает в бота только сборкой, а игру надо проводить и тогда, когда
+# сборки не идут. При совпадении ID загруженный пакет перекрывает тот,
+# что в репозитории, — это и есть способ починить пакет без деплоя.
+UPLOADED_PACKS_DIR = os.environ.get(
+    "UPLOADED_PACKS_DIR", os.path.join(os.path.dirname(DB_PATH) or ".", "packs"))
+
 # -------------------- Google Sheets (витрина, не первичное хранилище) ------
 GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS", "")
 GOOGLE_SHEET_ID = os.environ.get("GOOGLE_SHEET_ID", "")

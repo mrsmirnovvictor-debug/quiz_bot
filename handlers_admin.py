@@ -5,6 +5,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from telegram import Update
+from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 import awards
@@ -17,6 +18,10 @@ import texts
 from config import MSK, SHEETS_ENABLED
 
 log = logging.getLogger(__name__)
+
+# Пакет вопросов — это десятки килобайт. Файл крупнее присылают по ошибке,
+# и качать его с серверов Telegram незачем.
+ADDPACK_MAX_BYTES = 512 * 1024
 
 
 async def is_admin(update: Update, user_id: int) -> bool:
@@ -481,6 +486,102 @@ async def rename_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     await update.message.reply_text("\n".join(lines))
+
+
+# ==================== /addpack и /delpack ====================
+
+async def addpack_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Загрузка пакета вопросов файлом, без деплоя.
+
+    Пакет из репозитория попадает в бота только сборкой. Когда сборки не
+    идут, игру всё равно надо чем-то проводить, поэтому файл можно отдать
+    боту прямо в чат: он проверит его и положит на том, который переживает
+    перезапуск.
+    """
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("Пришлите файл в группу клуба.")
+        return
+    if not await is_admin(update, update.effective_user.id):
+        await update.message.reply_text("❌ Только администраторы группы.")
+        return
+
+    doc = update.message.document
+    if doc is None:
+        await update.message.reply_text(texts.ADDPACK_HELP, parse_mode="Markdown")
+        return
+    if doc.file_size and doc.file_size > ADDPACK_MAX_BYTES:
+        await update.message.reply_text(
+            f"❌ Файл больше {ADDPACK_MAX_BYTES // 1024} КБ — "
+            "это не похоже на пакет вопросов.")
+        return
+
+    # ID берём из подписи, иначе из имени файла: привычны оба способа.
+    из_подписи = _args(update.message.caption or "")
+    pack_id = (из_подписи.split()[0] if из_подписи
+               else (doc.file_name or "").removesuffix(".json"))
+    if not packs.is_pack_id(pack_id):
+        await update.message.reply_text(
+            "❌ Не понял ID пакета. Назовите файл `02061.json` либо укажите ID "
+            "в подписи: `/addpack 02061`", parse_mode="Markdown")
+        return
+
+    try:
+        файл = await doc.get_file()
+        сырое = bytes(await файл.download_as_bytearray()).decode("utf-8")
+    except UnicodeDecodeError:
+        await update.message.reply_text("❌ Файл не в кодировке UTF-8.")
+        return
+    except TelegramError:
+        log.exception("Файл пакета %s не скачался", pack_id)
+        await update.message.reply_text("❌ Не удалось скачать файл, попробуйте ещё раз.")
+        return
+
+    подменяет = await engine.to_db(packs.pack_path, pack_id) is not None
+    try:
+        pack = await engine.to_db(packs.save_uploaded, pack_id, сырое)
+    except packs.PackError as e:
+        await update.message.reply_text(f"❌ {e}")
+        return
+    except OSError:
+        log.exception("Пакет %s не записался на том", pack_id)
+        await update.message.reply_text("❌ Не удалось сохранить пакет на диск.")
+        return
+
+    ответ = [f"✅ Пакет {pack_id} загружен: {pack.title}",
+             f"Вопросов: {len(pack)}"]
+    if подменяет:
+        ответ.append(f"⚠️ Он перекрывает пакет {pack_id}, который уже был у бота. "
+                     f"Вернуть прежний — `/delpack {pack_id}`.")
+    ответ.append("Пакет лежит на томе: доступен движку сразу и переживёт "
+                 "перезапуск, деплой не нужен.")
+    await update.message.reply_text("\n".join(ответ), parse_mode="Markdown")
+
+
+async def delpack_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Убирает загруженный файлом пакет. Репозиторный снова становится виден."""
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("Команда работает в группе клуба.")
+        return
+    if not await is_admin(update, update.effective_user.id):
+        await update.message.reply_text("❌ Только администраторы группы.")
+        return
+
+    pack_id = _args(update.message.text).split()[0] if _args(update.message.text) else ""
+    if not packs.is_pack_id(pack_id):
+        await update.message.reply_text(
+            "❌ Укажите ID: `/delpack 02061`", parse_mode="Markdown")
+        return
+
+    if not await engine.to_db(packs.delete_uploaded, pack_id):
+        await update.message.reply_text(
+            f"ℹ️ Пакет {pack_id} файлом не загружали — удалять нечего.")
+        return
+
+    в_репозитории = await engine.to_db(packs.pack_path, pack_id) is not None
+    await update.message.reply_text(
+        f"✅ Загруженный пакет {pack_id} удалён."
+        + (" Снова действует версия из репозитория." if в_репозитории
+           else " Этого пакета у бота больше нет."))
 
 
 # ==================== /award ====================
