@@ -1,0 +1,213 @@
+{
+  "title": "📼 Хиты 90-х: угадай исполнителя. 16 вопросов по 20 секунд",
+  "questions": [
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/1.mp3",
+      "duration": 20,
+      "options": [
+        "C.C. Catch",
+        "Bad Boys Blue",
+        "Modern Talking",
+        "Fancy"
+      ],
+      "correct": 2,
+      "comment": "«You’re Not Alone» — Modern Talking."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/2.mp3",
+      "duration": 20,
+      "options": [
+        "Suede",
+        "Pulp",
+        "Oasis",
+        "Blur"
+      ],
+      "correct": 2,
+      "comment": "«Wonderwall» — Oasis (1995)."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/3.mp3",
+      "duration": 20,
+      "options": [
+        "Cassius",
+        "Moby",
+        "Daft Punk",
+        "Air"
+      ],
+      "correct": 2,
+      "comment": "«Around the World» — Daft Punk (1997)."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/4.mp3",
+      "duration": 20,
+      "options": [
+        "Britney Spears",
+        "Mandy Moore",
+        "Christina Aguilera",
+        "Jessica Simpson"
+      ],
+      "correct": 0,
+      "comment": "«Oops!… I Did It Again» — Britney Spears."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/5.mp3",
+      "duration": 20,
+      "options": [
+        "Spice Girls",
+        "Atomic Kitten",
+        "Destiny’s Child",
+        "All Saints"
+      ],
+      "correct": 0,
+      "comment": "«Wannabe» — Spice Girls (1996)."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/6.mp3",
+      "duration": 20,
+      "options": [
+        "Coolio",
+        "MC Hammer",
+        "Vanilla Ice",
+        "Snap"
+      ],
+      "correct": 1,
+      "comment": "«U Can’t Touch This» — MC Hammer (1990)."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/7.mp3",
+      "duration": 20,
+      "options": [
+        "Savage Garden",
+        "Eagle-Eye Cherry",
+        "Lighthouse Family",
+        "Hanson"
+      ],
+      "correct": 0,
+      "comment": "«To the Moon and Back» — Savage Garden (1997)."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/8.mp3",
+      "duration": 20,
+      "options": [
+        "Garbage",
+        "No Doubt",
+        "Hole",
+        "The Cranberries"
+      ],
+      "correct": 1,
+      "comment": "«Don’t Speak» — No Doubt (1996)."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/9.mp3",
+      "duration": 20,
+      "options": [
+        "Army of Lovers",
+        "A-ha",
+        "Roxette",
+        "Ace of Base"
+      ],
+      "correct": 3,
+      "comment": "«All That She Wants» — Ace of Base (1992)."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/10.mp3",
+      "duration": 20,
+      "options": [
+        "Scatman John",
+        "Scatman Mike",
+        "Scatman Bob",
+        "Scatman Jim"
+      ],
+      "correct": 0,
+      "comment": "«Scatman» — Scatman John (1994)."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/11.mp3",
+      "duration": 20,
+      "options": [
+        "Orbital",
+        "Underworld",
+        "Fatboy Slim",
+        "The Prodigy"
+      ],
+      "correct": 3,
+      "comment": "«Firestarter» — The Prodigy (1996)."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/12.mp3",
+      "duration": 20,
+      "options": [
+        "Mariah Carey",
+        "Celine Dion",
+        "Shania Twain",
+        "Whitney Houston"
+      ],
+      "correct": 1,
+      "comment": "«My Heart Will Go On» — Celine Dion (1997)."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/13.mp3",
+      "duration": 20,
+      "options": [
+        "NSYNC",
+        "Westlife",
+        "Take That",
+        "Backstreet Boys"
+      ],
+      "correct": 3,
+      "comment": "«Everybody (Backstreet’s Back)» — Backstreet Boys (1997)."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/14.mp3",
+      "duration": 20,
+      "options": [
+        "Alice Deejay",
+        "Whigfield",
+        "Eiffel 65",
+        "Captain Jack"
+      ],
+      "correct": 2,
+      "comment": "«Blue (Da Ba Dee)» — Eiffel 65 (1998)."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/15.mp3",
+      "duration": 20,
+      "options": [
+        "Mustafa Sandal",
+        "Tarkan",
+        "Sezen Aksu",
+        "Kenan Doğulu"
+      ],
+      "correct": 1,
+      "comment": "«Şımarık» — Tarkan."
+    },
+    {
+      "text": "Кто исполняет этот хит 90-х?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/hit90/16.mp3",
+      "duration": 20,
+      "options": [
+        "Smash Mouth",
+        "Vengaboys",
+        "Cartoons",
+        "Aqua"
+      ],
+      "correct": 3,
+      "comment": "«Barbie Girl» — Aqua (1997)."
+    }
+  ]
+}
