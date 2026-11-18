@@ -1,0 +1,213 @@
+{
+  "title": "🎤 Русский рэп 18+: угадай исполнителя. 16 вопросов по 20 секунд",
+  "questions": [
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/1.mp3",
+      "duration": 20,
+      "options": [
+        "Каста",
+        "Смоки Мо",
+        "Гуф",
+        "Ноггано"
+      ],
+      "correct": 0,
+      "comment": "«Ревность» — Каста."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/2.mp3",
+      "duration": 20,
+      "options": [
+        "Скриптонит",
+        "Krec",
+        "Хаски",
+        "Face"
+      ],
+      "correct": 1,
+      "comment": "«Нежность» — Krec."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/3.mp3",
+      "duration": 20,
+      "options": [
+        "Крип-А-Крип",
+        "Ноггано",
+        "ST",
+        "Мот"
+      ],
+      "correct": 0,
+      "comment": "«СБП» — Крип-А-Крип."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/4.mp3",
+      "duration": 20,
+      "options": [
+        "Тони Раут",
+        "Centr",
+        "Смоки Мо",
+        "Рем Дигга"
+      ],
+      "correct": 1,
+      "comment": "«Город дорог» — Centr."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/5.mp3",
+      "duration": 20,
+      "options": [
+        "Мот",
+        "Рем Дигга",
+        "Децл",
+        "Дельфин"
+      ],
+      "correct": 2,
+      "comment": "«Кто ты» — Децл."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/6.mp3",
+      "duration": 20,
+      "options": [
+        "Смоки Мо",
+        "Мот",
+        "ST",
+        "Многоточия"
+      ],
+      "correct": 3,
+      "comment": "«Щемит в душе тоска» — Многоточия."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/7.mp3",
+      "duration": 20,
+      "options": [
+        "Гуф",
+        "Лигалайз",
+        "Ноггано",
+        "Тони Раут"
+      ],
+      "correct": 1,
+      "comment": "«Будущие мамы» — Лигалайз."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/8.mp3",
+      "duration": 20,
+      "options": [
+        "Мот",
+        "Серега",
+        "ST",
+        "Витя АК-47"
+      ],
+      "correct": 1,
+      "comment": "«Чёрный бумер» — Серега."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/9.mp3",
+      "duration": 20,
+      "options": [
+        "Ноггано",
+        "Мот",
+        "Тимати",
+        "Ярмак"
+      ],
+      "correct": 2,
+      "comment": "«В клубе» — Тимати."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/10.mp3",
+      "duration": 20,
+      "options": [
+        "Гуф",
+        "Ярмак",
+        "L'One",
+        "Хаски"
+      ],
+      "correct": 2,
+      "comment": "«Сон» — L'One."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/11.mp3",
+      "duration": 20,
+      "options": [
+        "MiyaGi & Эндшпиль",
+        "Моргенштерн",
+        "Скриптонит",
+        "Элджей"
+      ],
+      "correct": 0,
+      "comment": "«I Got Love» — MiyaGi & Эндшпиль."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/12.mp3",
+      "duration": 20,
+      "options": [
+        "Face",
+        "Кравц",
+        "Моргенштерн",
+        "Feduk"
+      ],
+      "correct": 3,
+      "comment": "«Околофутбола» — Feduk."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/13.mp3",
+      "duration": 20,
+      "options": [
+        "Мот",
+        "Кравц",
+        "Макс Корж",
+        "Ярмак"
+      ],
+      "correct": 2,
+      "comment": "«Жить в кайф» — Макс Корж."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/14.mp3",
+      "duration": 20,
+      "options": [
+        "Noise MC",
+        "Тони Раут",
+        "Ляпис Трубецкой",
+        "Дельфин"
+      ],
+      "correct": 0,
+      "comment": "«Из окна» — Noise MC."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/15.mp3",
+      "duration": 20,
+      "options": [
+        "Ноггано",
+        "Смоки Мо",
+        "Гуф",
+        "Баста"
+      ],
+      "correct": 3,
+      "comment": "«Осень» — Баста."
+    },
+    {
+      "text": "Кто исполняет этот трек?",
+      "audio": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/rurap/16.mp3",
+      "duration": 20,
+      "options": [
+        "Скриптонит",
+        "Гнойный",
+        "Хаски",
+        "Oxxxymiron"
+      ],
+      "correct": 3,
+      "comment": "«НЛО» — Oxxxymiron."
+    }
+  ]
+}
