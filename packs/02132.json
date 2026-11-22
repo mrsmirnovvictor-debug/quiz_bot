@@ -1,0 +1,197 @@
+{
+  "title": "🚗 Угадай автомобильную марку по логотипу — 16 вопросов по 20 секунд",
+  "questions": [
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/1.webp",
+      "options": [
+        "Skoda",
+        "Seat",
+        "Abarth",
+        "Cupra"
+      ],
+      "correct": 3,
+      "comment": "Испания. Начиналась как спортивная линейка «Сеат», с 2018 года — отдельная марка."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/2.webp",
+      "options": [
+        "Renault",
+        "Dacia",
+        "Zastava",
+        "Lada"
+      ],
+      "correct": 1,
+      "comment": "Румыния. Марка основана в 1966 году, с 1999 года принадлежит французскому концерну «Рено»."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/3.webp",
+      "options": [
+        "DS Automobiles",
+        "Citroen",
+        "Peugeot",
+        "Alpine"
+      ],
+      "correct": 0,
+      "comment": "Франция. Марка выделилась из «Ситроен» в 2010-х годах как отдельный премиальный бренд."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/4.webp",
+      "options": [
+        "BYD",
+        "Haval",
+        "Hongqi",
+        "Chery"
+      ],
+      "correct": 3,
+      "comment": "Китай. Компания основана в 1997 году в городе Уху."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/5.webp",
+      "options": [
+        "Changan",
+        "Geely",
+        "Wuling",
+        "Dongfeng"
+      ],
+      "correct": 1,
+      "comment": "Китай. Концерн с 2010 года владеет шведской «Вольво»."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/6.webp",
+      "options": [
+        "Fisker",
+        "Polestar",
+        "Rivian",
+        "Lucid"
+      ],
+      "correct": 2,
+      "comment": "США. Электрический пикап R1T и внедорожник R1S; крупный заказчик электрофургонов — «Амазон»."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/7.webp",
+      "options": [
+        "NIO",
+        "Xpeng",
+        "Aiways",
+        "Li Auto"
+      ],
+      "correct": 0,
+      "comment": "Китай. Основана в 2014 году, известна станциями быстрой замены аккумуляторов."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/8.webp",
+      "options": [
+        "Force Motors",
+        "Mahindra",
+        "Ashok Leyland",
+        "Maruti"
+      ],
+      "correct": 1,
+      "comment": "Индия. Компания начинала в 1940-х годах со сборки лицензионных джипов «Виллис»."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/9.webp",
+      "options": [
+        "Hindustan Motors",
+        "Premier",
+        "Tata Motors",
+        "Bajaj"
+      ],
+      "correct": 2,
+      "comment": "Индия. С 2008 года владеет британскими «Ягуар» и «Лэнд Ровер»."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/10.webp",
+      "options": [
+        "Daewoo",
+        "Kia",
+        "SsangYong",
+        "Genesis"
+      ],
+      "correct": 3,
+      "comment": "Южная Корея. Премиальный бренд «Хёндэ», выделенный в отдельную марку в 2015 году."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/11.webp",
+      "options": [
+        "Baojun",
+        "Maxus",
+        "Roewe",
+        "MG"
+      ],
+      "correct": 2,
+      "comment": "Китай. Марка концерна SAIC, созданная на основе наработок британского «Ровер»."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/12.webp",
+      "options": [
+        "Tan Chong",
+        "Naza",
+        "Proton",
+        "Bufori"
+      ],
+      "correct": 2,
+      "comment": "Малайзия. Основана в 1983 году как первая национальная автомарка страны."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/13.webp",
+      "options": [
+        "Perodua",
+        "Inokom",
+        "Modenas",
+        "Daihatsu"
+      ],
+      "correct": 0,
+      "comment": "Малайзия. Основана в 1993 году при участии японской «Дайхацу»."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/14.webp",
+      "options": [
+        "Pagani",
+        "Koenigsegg",
+        "Volvo",
+        "Saab"
+      ],
+      "correct": 1,
+      "comment": "Швеция. Основана в 1994 году Кристианом фон Кёнигсеггом."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/15.webp",
+      "options": [
+        "Zagato",
+        "Italdesign",
+        "Bertone",
+        "Pininfarina"
+      ],
+      "correct": 3,
+      "comment": "Италия. Ателье основано в 1930 году в Турине дизайнером Баттистой Фариной по прозвищу Пинин."
+    },
+    {
+      "text": "Какой автомобильной марке принадлежит этот логотип?",
+      "image": "https://pub-ea6a4494c019470aa38328eec255511d.r2.dev/autobrands/16.webp",
+      "options": [
+        "Lancia",
+        "Maserati",
+        "Alfa Romeo",
+        "Fiat"
+      ],
+      "correct": 0,
+      "comment": "Италия. Основана в 1906 году Винченцо Ланчей, сегодня входит в «Стеллантис»."
+    }
+  ]
+}
